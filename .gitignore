@@ -3,3 +3,8 @@
 *.json
 *.swp
 *.log
+
+core
+
+./ctfo_events.log
+./db.json
