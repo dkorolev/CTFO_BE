@@ -53,10 +53,11 @@ using namespace yoda;
 using namespace bricks::random;
 using namespace bricks::strings;
 
-class CTFOServer {
+class CTFOServer final {
  public:
   explicit CTFOServer(const std::string& cards_file,
                       int port,
+                      const std::string& storage_file,
                       int event_log_port,
                       const std::string& event_log_file,
                       const bricks::time::MILLISECONDS_INTERVAL tick_interval_ms,
@@ -70,7 +71,7 @@ class CTFOServer {
                          "OK\n",
                          std::bind(&CTFOServer::OnMidichloriansEvent, this, std::placeholders::_1)),
         debug_print_(debug_print_to_stderr),
-        storage_("CTFO storage") {
+        storage_("CTFO storage", storage_file) {
     event_log_stream_.open(event_log_file_, std::ofstream::out | std::ofstream::app);
 
     bricks::cerealize::CerealFileParser<Card, bricks::cerealize::CerealFormat::JSON> cf(cards_file);
@@ -207,6 +208,11 @@ class CTFOServer {
     });
   }
 
+  ~CTFOServer() {
+    HTTP(port_).UnRegister("/ctfo/auth/ios");
+    HTTP(port_).UnRegister("/ctfo/feed");
+  }
+
   void Join() { HTTP(port_).Join(); }
 
  private:
@@ -216,7 +222,7 @@ class CTFOServer {
   EventCollectorHTTPServer event_collector_;
   const bool debug_print_;
 
-  typedef MemoryOnlyAPI<Dictionary<User>,
+  typedef SingleFileAPI<Dictionary<User>,
                         Matrix<AuthKeyTokenPair>,
                         Matrix<AuthKeyUIDPair>,
                         Dictionary<Card>,
