@@ -7,23 +7,31 @@ CEREAL_REGISTER_TYPE(DeviceInfoEvent);
 CEREAL_REGISTER_TYPE(CardActionEvent);
 
 struct SimpleDumpJSONToStandardError {
-  template<typename T>
+  template <typename T>
   void operator()(const T& entry) {
     std::cerr << JSON(entry) << std::endl;
   }
 };
 
-int main() {
-  EventPreprocessor<CTFOBaseEvent> preprocessor;
-  std::string raw_entry;
-  LogEntry log_entry;
-  SimpleDumpJSONToStandardError processor;
-  while(std::getline(std::cin, raw_entry)) {
-    try {
-      ParseJSON(raw_entry, log_entry);
-      preprocessor.DispatchLogEntry(log_entry, processor);
-    } catch (const bricks::ParseJSONException&) {
-      std::cerr << "Unable to parse raw log entry." << std::endl;
-    }      
+template <typename BASE_EVENT, typename CONSUMER>
+struct DispatchToPreprocessor {
+  EventPreprocessor<BASE_EVENT> preprocessor;
+  CONSUMER consumer;
+
+  template <typename T>
+  void operator()(const T& entry) {
+    preprocessor.DispatchLogEntry(entry, consumer);
   }
+};
+
+int main() {
+  /*
+    JSONByLineParser<LogEntry>::Process("test.txt",
+                                        DispatchToPreprocessor<CTFOBaseEvent, SimpleDumpJSONToStandardError>());
+    std::vector<std::string> v{"1", "2"};
+    JSONByLineParser<LogEntry>::Process(v,
+                                        DispatchToPreprocessor<CTFOBaseEvent, SimpleDumpJSONToStandardError>());
+  */
+  JSONByLineParser<LogEntry>::Process(std::cin,
+                                      DispatchToPreprocessor<CTFOBaseEvent, SimpleDumpJSONToStandardError>());
 }

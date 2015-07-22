@@ -58,3 +58,15 @@ struct CardActionEvent : CTFOBaseEvent {
     ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(action));
   }
 };
+
+struct FeedSwitchEvent : CTFOBaseEvent {
+  enum class FEED : int { Hot = 1, Recent = 2 };
+  UID uid;
+  FEED feed;
+
+  template <typename A>
+  void serialize(A& ar) {
+    CTFOBaseEvent::serialize(ar);
+    ar(CEREAL_NVP(uid), CEREAL_NVP(feed));
+  }
+};
