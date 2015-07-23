@@ -6,10 +6,10 @@ CEREAL_REGISTER_TYPE(FocusEvent);
 CEREAL_REGISTER_TYPE(DeviceInfoEvent);
 CEREAL_REGISTER_TYPE(CardActionEvent);
 
-struct SimpleDumpJSONToStandardError {
+struct SimpleDumpJSONToStandardOutput {
   template <typename T>
   void operator()(const T& entry) {
-    std::cerr << JSON(entry) << std::endl;
+    std::cout << JSON(entry) << std::endl;
   }
 };
 
@@ -27,11 +27,13 @@ struct DispatchToPreprocessor {
 int main() {
   /*
     JSONByLineParser<LogEntry>::Process("test.txt",
-                                        DispatchToPreprocessor<CTFOBaseEvent, SimpleDumpJSONToStandardError>());
+                                        DispatchToPreprocessor<CTFOBaseEvent,
+    SimpleDumpJSONToStandardOutput>());
     std::vector<std::string> v{"1", "2"};
     JSONByLineParser<LogEntry>::Process(v,
-                                        DispatchToPreprocessor<CTFOBaseEvent, SimpleDumpJSONToStandardError>());
+                                        DispatchToPreprocessor<CTFOBaseEvent,
+    SimpleDumpJSONToStandardOutput>());
   */
   JSONByLineParser<LogEntry>::Process(std::cin,
-                                      DispatchToPreprocessor<CTFOBaseEvent, SimpleDumpJSONToStandardError>());
+                                      DispatchToPreprocessor<CTFOBaseEvent, SimpleDumpJSONToStandardOutput>());
 }

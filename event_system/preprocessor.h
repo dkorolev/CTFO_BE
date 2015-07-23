@@ -1,6 +1,7 @@
 #include "event_schema.h"
 #include "../util.h"
 
+#include "../../Current/Bricks/strings/is_string_type.h"
 #include "../../Current/Bricks/template/metaprogramming.h"
 #include "../../Current/EventCollector/event_collector.h"
 #include "../../Current/Midichlorians/Dev/Beta/MidichloriansDataDictionary.h"
@@ -10,7 +11,7 @@ struct JSONByLineParser {
   template <typename F>
   static void Process(const std::string& filename, F&& f) {
     std::ifstream is(filename);
-    // Test for filbit & throw?
+    // Test for failbit & throw?
     JSONByLineParser<T>::Process(is, std::forward<F>(f));
   }
 
@@ -23,8 +24,9 @@ struct JSONByLineParser {
   }
 
   template <typename C, typename F>
-  static typename std::enable_if<std::is_convertible<typename C::value_type, std::string>::value>::type Process(
-      const C& container, F&& f) {
+  static typename std::enable_if<!bricks::strings::is_string_type<C>::value &&
+                                 std::is_convertible<typename C::value_type, std::string>::value>::type
+  Process(const C& container, F&& f) {
     for (const auto& cit : container) {
       ParseJSONAndCallF(cit, std::forward<F>(f));
     }
