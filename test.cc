@@ -185,7 +185,7 @@ TEST(CTFO, SmokeTest) {
                                                          actual_token.c_str())));
   EXPECT_EQ(200, static_cast<int>(feed_with_2_favs_response.code));
   const auto two_favs_response = ParseJSON<ResponseFavs>(feed_with_2_favs_response.body);
-  EXPECT_EQ(11000, two_favs_response.ms);
+  EXPECT_EQ(11000u, two_favs_response.ms);
   EXPECT_EQ(actual_uid, two_favs_response.user.uid);
   ASSERT_EQ(2u, two_favs_response.cards.size());
   EXPECT_EQ(cid2, two_favs_response.cards[0].cid);
@@ -208,7 +208,7 @@ TEST(CTFO, SmokeTest) {
                                                         actual_token.c_str())));
   EXPECT_EQ(200, static_cast<int>(feed_with_1_fav_response.code));
   const auto one_fav_response = ParseJSON<ResponseFavs>(feed_with_1_fav_response.body);
-  EXPECT_EQ(13000, one_fav_response.ms);
+  EXPECT_EQ(13000u, one_fav_response.ms);
   EXPECT_EQ(actual_uid, one_fav_response.user.uid);
   ASSERT_EQ(1u, one_fav_response.cards.size());
   EXPECT_EQ(cid2, one_fav_response.cards[0].cid);

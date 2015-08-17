@@ -247,10 +247,14 @@ class CTFOServer final {
                   // Get favs.
                   std::vector<std::pair<uint64_t, CID>> favs;
                   const auto favorites = Matrix<Favorite>::Accessor(data);
-                  for (const auto& fav : favorites[uid]) {
-                    if (fav.favorited) {
-                      favs.emplace_back(fav.ms, fav.cid);
+                  try {
+                    for (const auto& fav : favorites[uid]) {
+                      if (fav.favorited) {
+                        favs.emplace_back(fav.ms, fav.cid);
+                      }
                     }
+                  } catch (yoda::SubscriptException<Favorite>) {
+                    // No favorites for this user.
                   }
 
                   // In reverse chronological order.
