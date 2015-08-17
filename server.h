@@ -364,8 +364,15 @@ class CTFOServer final {
       card_entry.ctfo_count = card.ctfo_count;
       card_entry.tfu_count = card.tfu_count;
       card_entry.skip_count = card.skip_count;
-      const EntryWrapper<Favorite> fav = favorites.Get(uid, card.cid);
-      card_entry.favorited = static_cast<bool>(fav) && static_cast<Favorite>(fav).favorited;
+      card_entry.favorited = false;
+      try {
+        const EntryWrapper<Favorite> fav = favorites.Get(uid, card.cid);
+        if (fav) {
+          card_entry.favorited = static_cast<Favorite>(fav).favorited;
+        }
+      } catch (yoda::NonexistentEntryAccessed) {
+        // No favorites for this user or card.
+      }
       return card_entry;
     };
 
