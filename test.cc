@@ -170,6 +170,7 @@ TEST(CTFO, SmokeTest) {
   EXPECT_EQ(200, static_cast<int>(post_favorite_response_1.code));
   EXPECT_EQ("OK\n", post_favorite_response_1.body);
 
+  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(10001));
   favorite_event.fields["cid"] = cid2;
   const auto post_favorite_response_2 = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
                                                   WithBaseType<MidichloriansEvent>(favorite_event)));
