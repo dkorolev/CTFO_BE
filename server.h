@@ -206,6 +206,84 @@ class CTFOServer final {
         }
       }
     });
+
+    // TODO(dkorolev): Avoid this shameless copy-pasting ... after we have tests ... Thanks.
+    HTTP(port_).Register("/ctfo/favs", [this](Request r) {
+      const UID uid = StringToUID(r.url.query["uid"]);
+      const std::string token = r.url.query["token"];
+      if (r.method != "GET") {
+        DebugPrint(Printf("[/ctfo/favs] Wrong method '%s'. Requested URL = '%s'",
+                          r.method.c_str(),
+                          r.url.ComposeURL().c_str()));
+        r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
+      } else {
+        if (uid == UID::INVALID) {
+          DebugPrint(Printf("[/ctfo/favs] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+          r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
+        } else {
+          storage_.Transaction(
+              [this, uid, token](StorageAPI::T_DATA data) {
+                bool token_is_valid = false;
+                const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+                if (auth_token_accessor.Cols().Has(token)) {
+                  // Something went terribly wrong
+                  // if we have more than one authentication key for token.
+                  assert(auth_token_accessor[token].size() == 1);
+                  if (auth_token_accessor[token].begin()->valid) {
+                    // Double check, if the provided `uid` is correct as well.
+                    const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+                    token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                  }
+                }
+                if (!token_is_valid) {
+                  DebugPrint("[/ctfo/favs] Invalid token.");
+                  return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                } else {
+                  DebugPrint("[/ctfo/favs] Token validated.");
+                  const auto user = data.Get(uid);
+                  ResponseFavs rfavs;
+                  CopyUserInfoToResponseEntry(user, rfavs.user);
+
+                  // Get favs.
+                  std::vector<std::pair<uint64_t, CID>> favs;
+                  const auto favorites = Matrix<Favorite>::Accessor(data);
+                  for (const auto& fav : favorites[uid]) {
+                    if (fav.favorited) {
+                      favs.emplace_back(fav.ms, fav.cid);
+                    }
+                  }
+
+                  // In reverse chronological order.
+                  std::sort(favs.rbegin(), favs.rend());
+
+                  // And publish them.
+                  const auto GenerateCardForFavs = [this, uid, &favorites](const Card& card) {
+                    ResponseCardEntry card_entry;
+                    card_entry.cid = CIDToString(card.cid);
+                    card_entry.text = card.text;
+                    card_entry.color = card.color;
+                    card_entry.relevance = RandomDouble(0, 1);
+                    card_entry.ctfo_score = 50u;
+                    card_entry.tfu_score = 50u;
+                    card_entry.ctfo_count = card.ctfo_count;
+                    card_entry.tfu_count = card.tfu_count;
+                    card_entry.skip_count = card.skip_count;
+                    card_entry.favorited = true;
+                    return card_entry;
+                  };
+
+                  for (const auto& c : favs) {
+                    rfavs.cards.push_back(GenerateCardForFavs(data.Get(c.second)));
+                  }
+
+                  rfavs.ms = static_cast<uint64_t>(bricks::time::Now());
+                  return Response(rfavs, "favs");
+                }
+              },
+              std::move(r));
+        }
+      }
+    });
   }
 
   ~CTFOServer() {
@@ -263,6 +341,7 @@ class CTFOServer final {
     const UID uid = StringToUID(response.user.uid);
     const auto answers = Matrix<Answer>::Accessor(data);
     const auto cards = Dictionary<Card>::Accessor(data);
+    const auto favorites = Matrix<Favorite>::Accessor(data);
     for (const auto& card : cards) {
       if (!answers.Has(uid, card.cid)) {
         candidates.push_back(card.cid);
@@ -270,7 +349,7 @@ class CTFOServer final {
     }
     std::shuffle(candidates.begin(), candidates.end(), mt19937_64_tls());
 
-    auto GenerateCardForFeed = [this](const Card& card) {
+    const auto GenerateCardForFeed = [this, uid, &favorites](const Card& card) {
       ResponseCardEntry card_entry;
       card_entry.cid = CIDToString(card.cid);
       card_entry.text = card.text;
@@ -281,6 +360,8 @@ class CTFOServer final {
       card_entry.ctfo_count = card.ctfo_count;
       card_entry.tfu_count = card.tfu_count;
       card_entry.skip_count = card.skip_count;
+      const EntryWrapper<Favorite> fav = favorites.Get(uid, card.cid);
+      card_entry.favorited = static_cast<bool>(fav) && static_cast<Favorite>(fav).favorited;
       return card_entry;
     };
 

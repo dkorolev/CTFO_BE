@@ -156,10 +156,10 @@ TEST(CTFO, SmokeTest) {
                         std::back_inserter(texts_intersection));
   EXPECT_EQ(0u, texts_intersection.size());
 
-  // Test adding cards to favorites.
+  // Add two cards to favorites.
+  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(10000));
   const std::string cid1 = *hot_cids.begin();
   const std::string cid2 = *(++hot_cids.begin());
-  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(10000));
   iOSGenericEvent favorite_event;
   favorite_event.event = "FAV";
   favorite_event.fields["uid"] = actual_uid;
@@ -176,10 +176,39 @@ TEST(CTFO, SmokeTest) {
   EXPECT_EQ(200, static_cast<int>(post_favorite_response_2.code));
   EXPECT_EQ("OK\n", post_favorite_response_2.body);
 
+  // Confirm both are returned as favorites for this user.
+  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(11000));
+  const auto feed_with_2_favs_response = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str())));
+  EXPECT_EQ(200, static_cast<int>(feed_with_2_favs_response.code));
+  const auto two_favs_response = ParseJSON<ResponseFavs>(feed_with_2_favs_response.body);
+  EXPECT_EQ(11000, two_favs_response.ms);
+  EXPECT_EQ(actual_uid, two_favs_response.user.uid);
+  ASSERT_EQ(2u, two_favs_response.cards.size());
+  EXPECT_EQ(cid2, two_favs_response.cards[0].cid);
+  EXPECT_EQ(cid1, two_favs_response.cards[1].cid);
+
+  // Unfavorite one card.
+  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(12000));
   favorite_event.event = "UNFAV";
   favorite_event.fields["cid"] = cid1;
   const auto post_unfavorite_response = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
                                                   WithBaseType<MidichloriansEvent>(favorite_event)));
   EXPECT_EQ(200, static_cast<int>(post_unfavorite_response.code));
   EXPECT_EQ("OK\n", post_unfavorite_response.body);
+
+  // Confirm the remaining one is returned as a favorite for this user.
+  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(13000));
+  const auto feed_with_1_fav_response = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
+                                                        FLAGS_api_port,
+                                                        actual_uid.c_str(),
+                                                        actual_token.c_str())));
+  EXPECT_EQ(200, static_cast<int>(feed_with_1_fav_response.code));
+  const auto one_fav_response = ParseJSON<ResponseFavs>(feed_with_1_fav_response.body);
+  EXPECT_EQ(13000, one_fav_response.ms);
+  EXPECT_EQ(actual_uid, one_fav_response.user.uid);
+  ASSERT_EQ(1u, one_fav_response.cards.size());
+  EXPECT_EQ(cid2, one_fav_response.cards[0].cid);
 }

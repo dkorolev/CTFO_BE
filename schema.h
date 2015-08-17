@@ -194,7 +194,8 @@ struct User : yoda::Padawan {
   template <typename A>
   void serialize(A& ar) {
     Padawan::serialize(ar);
-    ar(CEREAL_NVP(uid), CEREAL_NVP(level), CEREAL_NVP(score));
+    // TODO(dkorolev): We don't have UID here. If it's OK, remove CID from another place too.
+    ar(CEREAL_NVP(level), CEREAL_NVP(score));
   }
 };
 
@@ -379,6 +380,18 @@ struct ResponseFeed {
   template <typename A>
   void serialize(A& ar) {
     ar(CEREAL_NVP(ms), CEREAL_NVP(user), CEREAL_NVP(feed_hot), CEREAL_NVP(feed_recent));
+  }
+};
+
+// Favorites response schema.
+struct ResponseFavs {
+  uint64_t ms;                           // Server timestamp, milliseconds from epoch.
+  ResponseUserEntry user;                // User information.
+  std::vector<ResponseCardEntry> cards;  // Favorited cards.
+
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms), CEREAL_NVP(user), CEREAL_NVP(cards));
   }
 };
 
