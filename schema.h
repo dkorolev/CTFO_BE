@@ -194,7 +194,7 @@ struct User : yoda::Padawan {
   template <typename A>
   void serialize(A& ar) {
     Padawan::serialize(ar);
-    ar(CEREAL_NVP(level), CEREAL_NVP(score));
+    ar(CEREAL_NVP(uid), CEREAL_NVP(level), CEREAL_NVP(score));
   }
 };
 
