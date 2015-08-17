@@ -38,17 +38,27 @@ CEREAL_REGISTER_TYPE(AuthKeyTokenPair);
 CEREAL_REGISTER_TYPE(AuthKeyUIDPair);
 CEREAL_REGISTER_TYPE(Card);
 CEREAL_REGISTER_TYPE(Answer);
+CEREAL_REGISTER_TYPE(Favorite);
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(api_port, 8383, "Port to spawn CTFO RESTful server on.");
 DEFINE_int32(event_log_port, 8384, "Port to spawn event collector on.");
 
 TEST(CTFO, SmokeTest) {
+#if 0
+  // A proper unit test.
   const std::string db_file = bricks::FileSystem::GenTmpFileName();
   bricks::FileSystem::ScopedRmFile scoped_rm_db_file(db_file);
 
   const std::string log_file = bricks::FileSystem::GenTmpFileName();
   bricks::FileSystem::ScopedRmFile scoped_rm_log_file(log_file);
+#else
+  // Used for development purposes.
+  const std::string db_file = "unittest-db.log";
+  const std::string log_file = "unittest-log.log";
+  bricks::FileSystem::RmFile(db_file, bricks::FileSystem::RmFileParameters::Silent);
+  bricks::FileSystem::RmFile(log_file, bricks::FileSystem::RmFileParameters::Silent);
+#endif
 
   bricks::random::SetSeed(42);
   CTFOServer server(FLAGS_cards_file,
@@ -56,7 +66,12 @@ TEST(CTFO, SmokeTest) {
                     db_file,
                     FLAGS_event_log_port,
                     log_file,
-                    static_cast<bricks::time::MILLISECONDS_INTERVAL>(100));
+                    static_cast<bricks::time::MILLISECONDS_INTERVAL>(100)
+#if 1
+                    ,
+                    true  // Debug print.
+#endif
+                    );
   bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(123));
 
   const std::string auth_id_str = "A_BUNCH_OF_DIGITS";
@@ -140,4 +155,31 @@ TEST(CTFO, SmokeTest) {
                         recent_texts.end(),
                         std::back_inserter(texts_intersection));
   EXPECT_EQ(0u, texts_intersection.size());
+
+  // Test adding cards to favorites.
+  const std::string cid1 = *hot_cids.begin();
+  const std::string cid2 = *(++hot_cids.begin());
+  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(10000));
+  iOSGenericEvent favorite_event;
+  favorite_event.event = "FAV";
+  favorite_event.fields["uid"] = actual_uid;
+  favorite_event.fields["cid"] = cid1;
+  favorite_event.fields["token"] = actual_token;
+  const auto post_favorite_response_1 = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                                  WithBaseType<MidichloriansEvent>(favorite_event)));
+  EXPECT_EQ(200, static_cast<int>(post_favorite_response_1.code));
+  EXPECT_EQ("OK\n", post_favorite_response_1.body);
+
+  favorite_event.fields["cid"] = cid2;
+  const auto post_favorite_response_2 = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                                  WithBaseType<MidichloriansEvent>(favorite_event)));
+  EXPECT_EQ(200, static_cast<int>(post_favorite_response_2.code));
+  EXPECT_EQ("OK\n", post_favorite_response_2.body);
+
+  favorite_event.event = "UNFAV";
+  favorite_event.fields["cid"] = cid1;
+  const auto post_unfavorite_response = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                                  WithBaseType<MidichloriansEvent>(favorite_event)));
+  EXPECT_EQ(200, static_cast<int>(post_unfavorite_response.code));
+  EXPECT_EQ("OK\n", post_unfavorite_response.body);
 }

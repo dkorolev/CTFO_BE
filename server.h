@@ -226,11 +226,15 @@ class CTFOServer final {
                         Matrix<AuthKeyTokenPair>,
                         Matrix<AuthKeyUIDPair>,
                         Dictionary<Card>,
-                        Matrix<Answer>> StorageAPI;
+                        Matrix<Answer>,
+                        Matrix<Favorite>> StorageAPI;
   StorageAPI storage_;
 
-  const std::map<std::string, ANSWER> valid_answers_ = {
-      {"CTFO", ANSWER::CTFO}, {"TFU", ANSWER::TFU}, {"SKIP", ANSWER::SKIP}};
+  const std::map<std::string, RESPONSE> valid_responses_ = {{"CTFO", RESPONSE::CTFO},
+                                                            {"TFU", RESPONSE::TFU},
+                                                            {"SKIP", RESPONSE::SKIP},
+                                                            {"FAV", RESPONSE::FAV},
+                                                            {"UNFAV", RESPONSE::UNFAV}};
 
   void DebugPrint(const std::string& message) {
     if (debug_print_) {
@@ -319,7 +323,7 @@ class CTFOServer final {
     try {
       const iOSGenericEvent& ge = dynamic_cast<const iOSGenericEvent&>(*event.get());
       try {
-        const ANSWER answer = valid_answers_.at(ge.event);
+        const RESPONSE response = valid_responses_.at(ge.event);
         const UID uid = StringToUID(ge.fields.at("uid"));
         const CID cid = StringToCID(ge.fields.at("cid"));
         const std::string& uid_str = ge.fields.at("uid");
@@ -331,7 +335,7 @@ class CTFOServer final {
                           cid_str.c_str(),
                           token.c_str()));
         if (uid != UID::INVALID && cid != CID::INVALID) {
-          storage_.Transaction([this, uid, cid, uid_str, cid_str, token, answer](StorageAPI::T_DATA data) {
+          storage_.Transaction([this, uid, cid, uid_str, cid_str, token, response](StorageAPI::T_DATA data) {
             const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
             bool token_is_valid = false;
             if (auth_token_accessor.Cols().Has(token)) {
@@ -344,59 +348,75 @@ class CTFOServer final {
             }
             if (token_is_valid) {
               if (!data.Has(uid)) {
-                DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s' in answer.", uid_str.c_str()));
+                DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s' in response.", uid_str.c_str()));
                 return;
               }
               if (!data.Has(cid)) {
-                DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in answer.", cid_str.c_str()));
+                DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in response.", cid_str.c_str()));
                 return;
               }
-              auto answers_mutator = Matrix<Answer>::Mutator(data);
-              if (!answers_mutator.Has(uid, cid)) {  // Do not overwrite existing answers.
-                data.Add(Answer(uid, cid, answer));
-                DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
-                                  UIDToString(uid).c_str(),
-                                  CIDToString(cid).c_str(),
-                                  static_cast<int>(answer)));
-                Card card = data.Get(cid);
-                auto user_mutator = Dictionary<User>::Mutator(data);
-                User user = user_mutator.Get(uid);
-                if (answer != ANSWER::SKIP) {
-                  if (answer == ANSWER::CTFO) {
-                    ++card.ctfo_count;
-                    DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
-                                      CIDToString(cid).c_str(),
-                                      card.ctfo_count));
-                    user.score += 50u;
-                    DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
-                                      UIDToString(uid).c_str(),
-                                      50u));
+              if (response == RESPONSE::SKIP || response == RESPONSE::CTFO || response == RESPONSE::TFU) {
+                auto answers_mutator = Matrix<Answer>::Mutator(data);
+                if (!answers_mutator.Has(uid, cid)) {  // Do not overwrite existing answers.
+                  data.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
+                  DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
+                                    UIDToString(uid).c_str(),
+                                    CIDToString(cid).c_str(),
+                                    static_cast<int>(response)));
+                  Card card = data.Get(cid);
+                  auto user_mutator = Dictionary<User>::Mutator(data);
+                  User user = user_mutator.Get(uid);
+                  if (response != RESPONSE::SKIP) {
+                    if (response == RESPONSE::CTFO) {
+                      ++card.ctfo_count;
+                      DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
+                                        CIDToString(cid).c_str(),
+                                        card.ctfo_count));
+                      user.score += 50u;
+                      DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
+                                        UIDToString(uid).c_str(),
+                                        50u));
+                    }
+                    if (response == RESPONSE::TFU) {
+                      ++card.tfu_count;
+                      DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
+                                        CIDToString(cid).c_str(),
+                                        card.tfu_count));
+                      user.score += 50u;
+                      DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
+                                        UIDToString(uid).c_str(),
+                                        50u));
+                    }
+                    if (user.level < LEVEL_SCORES.size() - 1 && user.score > LEVEL_SCORES[user.level + 1]) {
+                      user.score -= LEVEL_SCORES[user.level + 1];
+                      ++user.level;
+                      DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got promoted to a new level = %u",
+                                        UIDToString(uid).c_str(),
+                                        user.level));
+                    }
+                    data.Add(card);
+                    data.Add(user);
                   }
-                  if (answer == ANSWER::TFU) {
-                    ++card.tfu_count;
-                    DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
-                                      CIDToString(cid).c_str(),
-                                      card.tfu_count));
-                    user.score += 50u;
-                    DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
-                                      UIDToString(uid).c_str(),
-                                      50u));
-                  }
-                  if (user.level < LEVEL_SCORES.size() - 1 && user.score > LEVEL_SCORES[user.level + 1]) {
-                    user.score -= LEVEL_SCORES[user.level + 1];
-                    ++user.level;
-                    DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got promoted to a new level = %u",
-                                      UIDToString(uid).c_str(),
-                                      user.level));
-                  }
-                  data.Add(card);
-                  data.Add(user);
+                } else {
+                  DebugPrint(
+                      Printf("[UpdateStateOnEvent] Answer already exists: [%s, %s, %d]",
+                             UIDToString(uid).c_str(),
+                             CIDToString(cid).c_str(),
+                             static_cast<int>(static_cast<Answer>(answers_mutator.Get(uid, cid)).answer)));
                 }
-              } else {
-                DebugPrint(Printf("[UpdateStateOnEvent] Answer already exists: [%s, %s, %d]",
+              } else if (response == RESPONSE::FAV || response == RESPONSE::UNFAV) {
+                auto favorites_mutator = Matrix<Favorite>::Mutator(data);
+                favorites_mutator.Add(Favorite(uid, cid, (response == RESPONSE::FAV)));
+                DebugPrint(Printf("[UpdateStateOnEvent] Added favorite: [%s, %s, %s]",
                                   UIDToString(uid).c_str(),
                                   CIDToString(cid).c_str(),
-                                  static_cast<int>(static_cast<Answer>(answers_mutator.Get(uid, cid)).answer)));
+                                  (response == RESPONSE::FAV) ? "Favorite" : "Unfavorite"));
+              } else {
+                DebugPrint(Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
+                                  static_cast<int>(response),
+                                  uid_str.c_str(),
+                                  cid_str.c_str(),
+                                  token.c_str()));
               }
             }
             if (!token_is_valid) {
