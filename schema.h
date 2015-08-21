@@ -194,6 +194,10 @@ struct User : yoda::Padawan {
   template <typename A>
   void serialize(A& ar) {
     Padawan::serialize(ar);
+    // TODO(dkorolev): We don't have UID here.
+    // If it's OK, remove CID from another place too.
+    // If it's not OK, fix it.
+    // Not urgent since we can -- and will soon! -- replay the log to update the DB!
     ar(CEREAL_NVP(level), CEREAL_NVP(score));
   }
 };
@@ -308,6 +312,26 @@ struct Answer : yoda::Padawan {
   }
 };
 
+struct Favorite : yoda::Padawan {
+  UID uid = UID::INVALID;
+  CID cid = CID::INVALID;
+  bool favorited = false;
+
+  Favorite() = default;
+  Favorite(const UID uid, const CID cid, bool favorited = false) : uid(uid), cid(cid), favorited(favorited) {}
+
+  const UID& row() const { return uid; }
+  void set_row(const UID& value) { uid = value; }
+  CID col() const { return cid; }
+  void set_col(CID value) { cid = value; }
+
+  template <typename A>
+  void serialize(A& ar) {
+    Padawan::serialize(ar);
+    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(favorited));
+  }
+};
+
 // Data structures for generating RESTful response.
 struct ResponseUserEntry {
   std::string uid = "uINVALID";    // User id, format 'u01XXX...'.
@@ -332,6 +356,7 @@ struct ResponseCardEntry {
   uint64_t ctfo_count = 0u;      // Number of users, who said "CTFO" on this card.
   uint64_t tfu_count = 0u;       // Number of users, who said "TFU" on this card.
   uint64_t skip_count = 0u;      // Number of users, who said "SKIP" on this card.
+  bool favorited = false;        // True if the current user has favorited this card.
 
   template <typename A>
   void serialize(A& ar) {
@@ -343,7 +368,8 @@ struct ResponseCardEntry {
        CEREAL_NVP(tfu_score),
        CEREAL_NVP(ctfo_count),
        CEREAL_NVP(tfu_count),
-       CEREAL_NVP(skip_count));
+       CEREAL_NVP(skip_count),
+       CEREAL_NVP(favorited));
   }
 };
 
@@ -358,6 +384,27 @@ struct ResponseFeed {
   void serialize(A& ar) {
     ar(CEREAL_NVP(ms), CEREAL_NVP(user), CEREAL_NVP(feed_hot), CEREAL_NVP(feed_recent));
   }
+};
+
+// Favorites response schema.
+struct ResponseFavs {
+  uint64_t ms;                           // Server timestamp, milliseconds from epoch.
+  ResponseUserEntry user;                // User information.
+  std::vector<ResponseCardEntry> cards;  // Favorited cards.
+
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms), CEREAL_NVP(user), CEREAL_NVP(cards));
+  }
+};
+
+// To parse incoming Midichlorians logs.
+enum class RESPONSE : int {
+  SKIP = static_cast<int>(ANSWER::SKIP),
+  CTFO = static_cast<int>(ANSWER::CTFO),
+  TFU = static_cast<int>(ANSWER::TFU),
+  FAV = 101,
+  UNFAV = 102
 };
 
 #endif  // CTFO_SCHEMA_H

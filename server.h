@@ -206,6 +206,88 @@ class CTFOServer final {
         }
       }
     });
+
+    // TODO(dkorolev): Avoid this shameless copy-pasting.
+    HTTP(port_).Register("/ctfo/favs", [this](Request r) {
+      const UID uid = StringToUID(r.url.query["uid"]);
+      const std::string token = r.url.query["token"];
+      if (r.method != "GET") {
+        DebugPrint(Printf("[/ctfo/favs] Wrong method '%s'. Requested URL = '%s'",
+                          r.method.c_str(),
+                          r.url.ComposeURL().c_str()));
+        r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
+      } else {
+        if (uid == UID::INVALID) {
+          DebugPrint(Printf("[/ctfo/favs] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+          r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
+        } else {
+          storage_.Transaction(
+              [this, uid, token](StorageAPI::T_DATA data) {
+                bool token_is_valid = false;
+                const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+                if (auth_token_accessor.Cols().Has(token)) {
+                  // Something went terribly wrong
+                  // if we have more than one authentication key for token.
+                  assert(auth_token_accessor[token].size() == 1);
+                  if (auth_token_accessor[token].begin()->valid) {
+                    // Double check, if the provided `uid` is correct as well.
+                    const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+                    token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                  }
+                }
+                if (!token_is_valid) {
+                  DebugPrint("[/ctfo/favs] Invalid token.");
+                  return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                } else {
+                  DebugPrint("[/ctfo/favs] Token validated.");
+                  const auto user = data.Get(uid);
+                  ResponseFavs rfavs;
+                  CopyUserInfoToResponseEntry(user, rfavs.user);
+
+                  // Get favs.
+                  std::vector<std::pair<uint64_t, CID>> favs;
+                  const auto favorites = Matrix<Favorite>::Accessor(data);
+                  try {
+                    for (const auto& fav : favorites[uid]) {
+                      if (fav.favorited) {
+                        favs.emplace_back(fav.ms, fav.cid);
+                      }
+                    }
+                  } catch (yoda::SubscriptException<Favorite>) {
+                    // No favorites for this user.
+                  }
+
+                  // In reverse chronological order.
+                  std::sort(favs.rbegin(), favs.rend());
+
+                  // And publish them.
+                  const auto GenerateCardForFavs = [this, uid, &favorites](const Card& card) {
+                    ResponseCardEntry card_entry;
+                    card_entry.cid = CIDToString(card.cid);
+                    card_entry.text = card.text;
+                    card_entry.color = card.color;
+                    card_entry.relevance = RandomDouble(0, 1);
+                    card_entry.ctfo_score = 50u;
+                    card_entry.tfu_score = 50u;
+                    card_entry.ctfo_count = card.ctfo_count;
+                    card_entry.tfu_count = card.tfu_count;
+                    card_entry.skip_count = card.skip_count;
+                    card_entry.favorited = true;
+                    return card_entry;
+                  };
+
+                  for (const auto& c : favs) {
+                    rfavs.cards.push_back(GenerateCardForFavs(data.Get(c.second)));
+                  }
+
+                  rfavs.ms = static_cast<uint64_t>(bricks::time::Now());
+                  return Response(rfavs, "favs");
+                }
+              },
+              std::move(r));
+        }
+      }
+    });
   }
 
   ~CTFOServer() {
@@ -226,11 +308,15 @@ class CTFOServer final {
                         Matrix<AuthKeyTokenPair>,
                         Matrix<AuthKeyUIDPair>,
                         Dictionary<Card>,
-                        Matrix<Answer>> StorageAPI;
+                        Matrix<Answer>,
+                        Matrix<Favorite>> StorageAPI;
   StorageAPI storage_;
 
-  const std::map<std::string, ANSWER> valid_answers_ = {
-      {"CTFO", ANSWER::CTFO}, {"TFU", ANSWER::TFU}, {"SKIP", ANSWER::SKIP}};
+  const std::map<std::string, RESPONSE> valid_responses_ = {{"CTFO", RESPONSE::CTFO},
+                                                            {"TFU", RESPONSE::TFU},
+                                                            {"SKIP", RESPONSE::SKIP},
+                                                            {"FAV", RESPONSE::FAV},
+                                                            {"UNFAV", RESPONSE::UNFAV}};
 
   void DebugPrint(const std::string& message) {
     if (debug_print_) {
@@ -259,6 +345,7 @@ class CTFOServer final {
     const UID uid = StringToUID(response.user.uid);
     const auto answers = Matrix<Answer>::Accessor(data);
     const auto cards = Dictionary<Card>::Accessor(data);
+    const auto favorites = Matrix<Favorite>::Accessor(data);
     for (const auto& card : cards) {
       if (!answers.Has(uid, card.cid)) {
         candidates.push_back(card.cid);
@@ -266,7 +353,7 @@ class CTFOServer final {
     }
     std::shuffle(candidates.begin(), candidates.end(), mt19937_64_tls());
 
-    auto GenerateCardForFeed = [this](const Card& card) {
+    const auto GenerateCardForFeed = [this, uid, &favorites](const Card& card) {
       ResponseCardEntry card_entry;
       card_entry.cid = CIDToString(card.cid);
       card_entry.text = card.text;
@@ -277,6 +364,15 @@ class CTFOServer final {
       card_entry.ctfo_count = card.ctfo_count;
       card_entry.tfu_count = card.tfu_count;
       card_entry.skip_count = card.skip_count;
+      card_entry.favorited = false;
+      try {
+        const EntryWrapper<Favorite> fav = favorites.Get(uid, card.cid);
+        if (fav) {
+          card_entry.favorited = static_cast<Favorite>(fav).favorited;
+        }
+      } catch (yoda::NonexistentEntryAccessed) {
+        // No favorites for this user or card.
+      }
       return card_entry;
     };
 
@@ -319,7 +415,7 @@ class CTFOServer final {
     try {
       const iOSGenericEvent& ge = dynamic_cast<const iOSGenericEvent&>(*event.get());
       try {
-        const ANSWER answer = valid_answers_.at(ge.event);
+        const RESPONSE response = valid_responses_.at(ge.event);
         const UID uid = StringToUID(ge.fields.at("uid"));
         const CID cid = StringToCID(ge.fields.at("cid"));
         const std::string& uid_str = ge.fields.at("uid");
@@ -331,7 +427,7 @@ class CTFOServer final {
                           cid_str.c_str(),
                           token.c_str()));
         if (uid != UID::INVALID && cid != CID::INVALID) {
-          storage_.Transaction([this, uid, cid, uid_str, cid_str, token, answer](StorageAPI::T_DATA data) {
+          storage_.Transaction([this, uid, cid, uid_str, cid_str, token, response](StorageAPI::T_DATA data) {
             const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
             bool token_is_valid = false;
             if (auth_token_accessor.Cols().Has(token)) {
@@ -344,59 +440,75 @@ class CTFOServer final {
             }
             if (token_is_valid) {
               if (!data.Has(uid)) {
-                DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s' in answer.", uid_str.c_str()));
+                DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s' in response.", uid_str.c_str()));
                 return;
               }
               if (!data.Has(cid)) {
-                DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in answer.", cid_str.c_str()));
+                DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in response.", cid_str.c_str()));
                 return;
               }
-              auto answers_mutator = Matrix<Answer>::Mutator(data);
-              if (!answers_mutator.Has(uid, cid)) {  // Do not overwrite existing answers.
-                data.Add(Answer(uid, cid, answer));
-                DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
-                                  UIDToString(uid).c_str(),
-                                  CIDToString(cid).c_str(),
-                                  static_cast<int>(answer)));
-                Card card = data.Get(cid);
-                auto user_mutator = Dictionary<User>::Mutator(data);
-                User user = user_mutator.Get(uid);
-                if (answer != ANSWER::SKIP) {
-                  if (answer == ANSWER::CTFO) {
-                    ++card.ctfo_count;
-                    DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
-                                      CIDToString(cid).c_str(),
-                                      card.ctfo_count));
-                    user.score += 50u;
-                    DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
-                                      UIDToString(uid).c_str(),
-                                      50u));
+              if (response == RESPONSE::SKIP || response == RESPONSE::CTFO || response == RESPONSE::TFU) {
+                auto answers_mutator = Matrix<Answer>::Mutator(data);
+                if (!answers_mutator.Has(uid, cid)) {  // Do not overwrite existing answers.
+                  data.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
+                  DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
+                                    UIDToString(uid).c_str(),
+                                    CIDToString(cid).c_str(),
+                                    static_cast<int>(response)));
+                  Card card = data.Get(cid);
+                  auto user_mutator = Dictionary<User>::Mutator(data);
+                  User user = user_mutator.Get(uid);
+                  if (response != RESPONSE::SKIP) {
+                    if (response == RESPONSE::CTFO) {
+                      ++card.ctfo_count;
+                      DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
+                                        CIDToString(cid).c_str(),
+                                        card.ctfo_count));
+                      user.score += 50u;
+                      DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
+                                        UIDToString(uid).c_str(),
+                                        50u));
+                    }
+                    if (response == RESPONSE::TFU) {
+                      ++card.tfu_count;
+                      DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
+                                        CIDToString(cid).c_str(),
+                                        card.tfu_count));
+                      user.score += 50u;
+                      DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
+                                        UIDToString(uid).c_str(),
+                                        50u));
+                    }
+                    if (user.level < LEVEL_SCORES.size() - 1 && user.score > LEVEL_SCORES[user.level + 1]) {
+                      user.score -= LEVEL_SCORES[user.level + 1];
+                      ++user.level;
+                      DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got promoted to a new level = %u",
+                                        UIDToString(uid).c_str(),
+                                        user.level));
+                    }
+                    data.Add(card);
+                    data.Add(user);
                   }
-                  if (answer == ANSWER::TFU) {
-                    ++card.tfu_count;
-                    DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
-                                      CIDToString(cid).c_str(),
-                                      card.tfu_count));
-                    user.score += 50u;
-                    DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
-                                      UIDToString(uid).c_str(),
-                                      50u));
-                  }
-                  if (user.level < LEVEL_SCORES.size() - 1 && user.score > LEVEL_SCORES[user.level + 1]) {
-                    user.score -= LEVEL_SCORES[user.level + 1];
-                    ++user.level;
-                    DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got promoted to a new level = %u",
-                                      UIDToString(uid).c_str(),
-                                      user.level));
-                  }
-                  data.Add(card);
-                  data.Add(user);
+                } else {
+                  DebugPrint(
+                      Printf("[UpdateStateOnEvent] Answer already exists: [%s, %s, %d]",
+                             UIDToString(uid).c_str(),
+                             CIDToString(cid).c_str(),
+                             static_cast<int>(static_cast<Answer>(answers_mutator.Get(uid, cid)).answer)));
                 }
-              } else {
-                DebugPrint(Printf("[UpdateStateOnEvent] Answer already exists: [%s, %s, %d]",
+              } else if (response == RESPONSE::FAV || response == RESPONSE::UNFAV) {
+                auto favorites_mutator = Matrix<Favorite>::Mutator(data);
+                favorites_mutator.Add(Favorite(uid, cid, (response == RESPONSE::FAV)));
+                DebugPrint(Printf("[UpdateStateOnEvent] Added favorite: [%s, %s, %s]",
                                   UIDToString(uid).c_str(),
                                   CIDToString(cid).c_str(),
-                                  static_cast<int>(static_cast<Answer>(answers_mutator.Get(uid, cid)).answer)));
+                                  (response == RESPONSE::FAV) ? "Favorite" : "Unfavorite"));
+              } else {
+                DebugPrint(Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
+                                  static_cast<int>(response),
+                                  uid_str.c_str(),
+                                  cid_str.c_str(),
+                                  token.c_str()));
               }
             }
             if (!token_is_valid) {
