@@ -320,8 +320,8 @@ struct Favorite : yoda::Padawan {
   Favorite() = default;
   Favorite(const UID uid, const CID cid, bool favorited = false) : uid(uid), cid(cid), favorited(favorited) {}
 
-  const UID& row() const { return uid; }
-  void set_row(const UID& value) { uid = value; }
+  UID row() const { return uid; }
+  void set_row(const UID value) { uid = value; }
   CID col() const { return cid; }
   void set_col(CID value) { cid = value; }
 
