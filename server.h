@@ -241,47 +241,51 @@ class CTFOServer final {
                 } else {
                   DebugPrint("[/ctfo/favs] Token validated.");
                   const auto user = data.Get(uid);
-                  ResponseFavs rfavs;
-                  CopyUserInfoToResponseEntry(user, rfavs.user);
+                  if (!user) {
+                    return Response("NEED VALID USER\n", HTTPResponseCode.Unauthorized);
+                  } else {
+                    ResponseFavs rfavs;
+                    CopyUserInfoToResponseEntry(user, rfavs.user);
 
-                  // Get favs.
-                  std::vector<std::pair<uint64_t, CID>> favs;
-                  const auto favorites = Matrix<Favorite>::Accessor(data);
-                  try {
-                    for (const auto& fav : favorites[uid]) {
-                      if (fav.favorited) {
-                        favs.emplace_back(fav.ms, fav.cid);
+                    // Get favs.
+                    std::vector<std::pair<uint64_t, CID>> favs;
+                    const auto favorites = Matrix<Favorite>::Accessor(data);
+                    try {
+                      for (const auto& fav : favorites[uid]) {
+                        if (fav.favorited) {
+                          favs.emplace_back(fav.ms, fav.cid);
+                        }
                       }
+                    } catch (yoda::SubscriptException<Favorite>) {
+                      // No favorites for this user.
                     }
-                  } catch (yoda::SubscriptException<Favorite>) {
-                    // No favorites for this user.
+
+                    // In reverse chronological order.
+                    std::sort(favs.rbegin(), favs.rend());
+
+                    // And publish them.
+                    const auto GenerateCardForFavs = [this, uid](const Card& card) {
+                      ResponseCardEntry card_entry;
+                      card_entry.cid = CIDToString(card.cid);
+                      card_entry.text = card.text;
+                      card_entry.color = card.color;
+                      card_entry.relevance = RandomDouble(0, 1);
+                      card_entry.ctfo_score = 50u;
+                      card_entry.tfu_score = 50u;
+                      card_entry.ctfo_count = card.ctfo_count;
+                      card_entry.tfu_count = card.tfu_count;
+                      card_entry.skip_count = card.skip_count;
+                      card_entry.favorited = true;
+                      return card_entry;
+                    };
+
+                    for (const auto& c : favs) {
+                      rfavs.cards.push_back(GenerateCardForFavs(data.Get(c.second)));
+                    }
+
+                    rfavs.ms = static_cast<uint64_t>(bricks::time::Now());
+                    return Response(rfavs, "favs");
                   }
-
-                  // In reverse chronological order.
-                  std::sort(favs.rbegin(), favs.rend());
-
-                  // And publish them.
-                  const auto GenerateCardForFavs = [this, uid, &favorites](const Card& card) {
-                    ResponseCardEntry card_entry;
-                    card_entry.cid = CIDToString(card.cid);
-                    card_entry.text = card.text;
-                    card_entry.color = card.color;
-                    card_entry.relevance = RandomDouble(0, 1);
-                    card_entry.ctfo_score = 50u;
-                    card_entry.tfu_score = 50u;
-                    card_entry.ctfo_count = card.ctfo_count;
-                    card_entry.tfu_count = card.tfu_count;
-                    card_entry.skip_count = card.skip_count;
-                    card_entry.favorited = true;
-                    return card_entry;
-                  };
-
-                  for (const auto& c : favs) {
-                    rfavs.cards.push_back(GenerateCardForFavs(data.Get(c.second)));
-                  }
-
-                  rfavs.ms = static_cast<uint64_t>(bricks::time::Now());
-                  return Response(rfavs, "favs");
                 }
               },
               std::move(r));
@@ -365,13 +369,9 @@ class CTFOServer final {
       card_entry.tfu_count = card.tfu_count;
       card_entry.skip_count = card.skip_count;
       card_entry.favorited = false;
-      try {
-        const EntryWrapper<Favorite> fav = favorites.Get(uid, card.cid);
-        if (fav) {
-          card_entry.favorited = static_cast<Favorite>(fav).favorited;
-        }
-      } catch (yoda::NonexistentEntryAccessed) {
-        // No favorites for this user or card.
+      const EntryWrapper<Favorite> fav = favorites.Get(uid, card.cid);
+      if (fav) {
+        card_entry.favorited = static_cast<Favorite>(fav).favorited;
       }
       return card_entry;
     };
@@ -421,7 +421,7 @@ class CTFOServer final {
         const std::string& uid_str = ge.fields.at("uid");
         const std::string& cid_str = ge.fields.at("cid");
         const std::string token = ge.fields.at("token");
-        DebugPrint(Printf("[UpdateStateOnEvent] Event='%s', uid='%s', cid='%s',token='%s'",
+        DebugPrint(Printf("[UpdateStateOnEvent] Event='%s', uid='%s', cid='%s', token='%s'",
                           ge.event.c_str(),
                           uid_str.c_str(),
                           cid_str.c_str(),
@@ -510,8 +510,7 @@ class CTFOServer final {
                                   cid_str.c_str(),
                                   token.c_str()));
               }
-            }
-            if (!token_is_valid) {
+            } else {
               DebugPrint(Printf("[UpdateStateOnEvent] Not valid token '%s' found in event.", token.c_str()));
             }
           });

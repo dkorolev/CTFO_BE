@@ -175,6 +175,17 @@ TEST(CTFO, SmokeTest) {
   EXPECT_EQ(200, static_cast<int>(post_favorite_response_2.code));
   EXPECT_EQ("OK\n", post_favorite_response_2.body);
 
+  // Attempt to add a non-existing card to favorites.
+  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(10002));
+  favorite_event.fields["cid"] = CIDToString(static_cast<CID>(987654321));  // A non-existent ID.
+  const auto post_favorite_response_3 = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                                  WithBaseType<MidichloriansEvent>(favorite_event)));
+  EXPECT_EQ(200, static_cast<int>(post_favorite_response_3.code));
+  EXPECT_EQ("OK\n", post_favorite_response_3.body);
+
+  // HACK(dkorolev): Wait for the event to be asynchronously processed.
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
   // Confirm both are returned as favorites for this user.
   bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(11000));
   const auto feed_with_2_favs_response = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",

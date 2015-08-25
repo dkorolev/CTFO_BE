@@ -32,12 +32,11 @@ CEREAL_REGISTER_TYPE(AuthKeyTokenPair);
 CEREAL_REGISTER_TYPE(AuthKeyUIDPair);
 CEREAL_REGISTER_TYPE(Card);
 CEREAL_REGISTER_TYPE(Answer);
+CEREAL_REGISTER_TYPE(Favorite);
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(port, 8383, "Port to spawn CTFO RESTful server on.");
-DEFINE_string(storage_file,
-              "./db.json",
-              "The file to store the snapshot of the database in.");
+DEFINE_string(storage_file, "./db.json", "The file to store the snapshot of the database in.");
 DEFINE_int32(event_log_port, 0, "Port to spawn event collector on.");  // 0 = the same as `port`.
 DEFINE_string(event_log_file,
               "./ctfo_events.log",
