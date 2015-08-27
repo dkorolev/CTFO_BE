@@ -247,6 +247,8 @@ class CTFOServer final {
                     ResponseFavs rfavs;
                     CopyUserInfoToResponseEntry(user, rfavs.user);
 
+                    const auto answers = Matrix<Answer>::Accessor(data);
+
                     // Get favs.
                     std::vector<std::pair<uint64_t, CID>> favs;
                     const auto favorites = Matrix<Favorite>::Accessor(data);
@@ -264,7 +266,7 @@ class CTFOServer final {
                     std::sort(favs.rbegin(), favs.rend());
 
                     // And publish them.
-                    const auto GenerateCardForFavs = [this, uid](const Card& card) {
+                    const auto GenerateCardForFavs = [this, uid, &answers](const Card& card) {
                       ResponseCardEntry card_entry;
                       card_entry.cid = CIDToString(card.cid);
                       card_entry.text = card.text;
@@ -275,7 +277,19 @@ class CTFOServer final {
                       card_entry.ctfo_count = card.ctfo_count;
                       card_entry.tfu_count = card.tfu_count;
                       card_entry.skip_count = card.skip_count;
+
+                      const EntryWrapper<Answer> answer = answers.Get(uid, card.cid);
+                      if (answer) {
+                        const ANSWER vote = static_cast<Answer>(answer).answer;
+                        if (vote == ANSWER::CTFO) {
+                          card_entry.vote = "CTFO";
+                        } else if (vote == ANSWER::TFU) {
+                          card_entry.vote = "TFU";
+                        }
+                      }
+
                       card_entry.favorited = true;
+
                       return card_entry;
                     };
 
@@ -292,11 +306,195 @@ class CTFOServer final {
         }
       }
     });
+
+    // TODO(dkorolev): Avoid this shameless copy-pasting.
+    HTTP(port_).Register("/ctfo/my_cards", [this](Request r) {
+      const UID uid = StringToUID(r.url.query["uid"]);
+      const std::string token = r.url.query["token"];
+      if (r.method != "GET") {
+        DebugPrint(Printf("[/ctfo/my_cards] Wrong method '%s'. Requested URL = '%s'",
+                          r.method.c_str(),
+                          r.url.ComposeURL().c_str()));
+        r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
+      } else {
+        if (uid == UID::INVALID) {
+          DebugPrint(Printf("[/ctfo/my_cards] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+          r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
+        } else {
+          storage_.Transaction(
+              [this, uid, token](StorageAPI::T_DATA data) {
+                bool token_is_valid = false;
+                const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+                if (auth_token_accessor.Cols().Has(token)) {
+                  // Something went terribly wrong
+                  // if we have more than one authentication key for token.
+                  assert(auth_token_accessor[token].size() == 1);
+                  if (auth_token_accessor[token].begin()->valid) {
+                    // Double check, if the provided `uid` is correct as well.
+                    const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+                    token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                  }
+                }
+                if (!token_is_valid) {
+                  DebugPrint("[/ctfo/my_cards] Invalid token.");
+                  return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                } else {
+                  DebugPrint("[/ctfo/my_cards] Token validated.");
+                  const auto user = data.Get(uid);
+                  if (!user) {
+                    return Response("NEED VALID USER\n", HTTPResponseCode.Unauthorized);
+                  } else {
+                    ResponseMyCards r_my_cards;
+                    CopyUserInfoToResponseEntry(user, r_my_cards.user);
+
+                    const auto answers = Matrix<Answer>::Accessor(data);
+                    const auto favorites = Matrix<Favorite>::Accessor(data);
+
+                    // Get my cards.
+                    std::vector<std::pair<uint64_t, CID>> my_cards;
+                    const auto cards_by_author = Matrix<CardAuthor>::Accessor(data);
+                    try {
+                      for (const auto& my_card : cards_by_author[uid]) {
+                        my_cards.emplace_back(my_card.ms, my_card.cid);
+                      }
+                    } catch (yoda::SubscriptException<CardAuthor>) {
+                      // No cards for this user.
+                    }
+
+                    // In reverse chronological order.
+                    std::sort(my_cards.rbegin(), my_cards.rend());
+
+                    // And publish them.
+                    const auto GenerateCardForMyCards = [this, uid, &answers, &favorites](const Card& card) {
+                      ResponseCardEntry card_entry;
+                      card_entry.cid = CIDToString(card.cid);
+                      card_entry.text = card.text;
+                      card_entry.color = card.color;
+                      card_entry.relevance = RandomDouble(0, 1);
+                      card_entry.ctfo_score = 50u;
+                      card_entry.tfu_score = 50u;
+                      card_entry.ctfo_count = card.ctfo_count;
+                      card_entry.tfu_count = card.tfu_count;
+                      card_entry.skip_count = card.skip_count;
+
+                      const EntryWrapper<Answer> answer = answers.Get(uid, card.cid);
+                      if (answer) {
+                        const ANSWER vote = static_cast<Answer>(answer).answer;
+                        if (vote == ANSWER::CTFO) {
+                          card_entry.vote = "CTFO";
+                        } else if (vote == ANSWER::TFU) {
+                          card_entry.vote = "TFU";
+                        }
+                      }
+
+                      card_entry.favorited = false;
+                      const EntryWrapper<Favorite> fav = favorites.Get(uid, card.cid);
+                      if (fav) {
+                        card_entry.favorited = static_cast<Favorite>(fav).favorited;
+                      }
+
+                      return card_entry;
+                    };
+
+                    for (const auto& c : my_cards) {
+                      r_my_cards.cards.push_back(GenerateCardForMyCards(data.Get(c.second)));
+                    }
+
+                    r_my_cards.ms = static_cast<uint64_t>(bricks::time::Now());
+                    return Response(r_my_cards, "my_cards");
+                  }
+                }
+              },
+              std::move(r));
+        }
+      }
+    });
+
+    // TODO(dkorolev): Avoid this shameless copy-pasting.
+    HTTP(port_).Register("/ctfo/card", [this](Request r) {
+      const UID uid = StringToUID(r.url.query["uid"]);
+      const std::string token = r.url.query["token"];
+      if (r.method != "POST") {
+        DebugPrint(Printf("[/ctfo/card] Wrong method '%s'. Requested URL = '%s'",
+                          r.method.c_str(),
+                          r.url.ComposeURL().c_str()));
+        r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
+      } else {
+        if (uid == UID::INVALID) {
+          DebugPrint(Printf("[/ctfo/card] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+          r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
+        } else {
+          const std::string requested_url = r.url.ComposeURL();
+          try {
+            const auto request = ParseJSON<AddCardRequest>(r.body);
+            storage_.Transaction(
+                [this, uid, token, request, requested_url](StorageAPI::T_DATA data) {
+                  bool token_is_valid = false;
+                  const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+                  if (auth_token_accessor.Cols().Has(token)) {
+                    // Something went terribly wrong
+                    // if we have more than one authentication key for token.
+                    assert(auth_token_accessor[token].size() == 1);
+                    if (auth_token_accessor[token].begin()->valid) {
+                      // Double check, if the provided `uid` is correct as well.
+                      const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+                      token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                    }
+                  }
+                  if (!token_is_valid) {
+                    DebugPrint(
+                        Printf("[/ctfo/card] Invalid token. Requested URL = '%s'", requested_url.c_str()));
+                    return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                  } else {
+                    DebugPrint(
+                        Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
+                    const CID cid = RandomCID();
+                    const auto now = static_cast<uint64_t>(bricks::time::Now());
+
+                    auto cards_mutator = Dictionary<Card>::Mutator(data);
+                    auto authors_mutator = Matrix<CardAuthor>::Mutator(data);
+                    auto favorites_mutator = Matrix<Favorite>::Mutator(data);
+
+                    Card card;
+                    card.cid = cid;
+                    card.text = request.text;
+                    card.color = request.color;
+                    cards_mutator.Add(card);
+
+                    CardAuthor author;
+                    author.uid = uid;
+                    author.cid = cid;
+                    authors_mutator.Add(author);
+
+                    Favorite favorite;
+                    favorite.uid = uid;
+                    favorite.cid = cid;
+                    favorite.favorited = true;
+                    favorites_mutator.Add(favorite);
+
+                    AddCardResponse response;
+                    response.ms = now;
+                    response.cid = CIDToString(cid);
+                    return Response(response, "created");
+                  }
+                },
+                std::move(r));
+          } catch (const bricks::ParseJSONException&) {
+            DebugPrint(Printf("[/ctfo/card] Could not parse POST body. Requested URL = '%s'",
+                              r.url.ComposeURL().c_str()));
+            r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
+          }
+        }
+      }
+    });
   }
 
   ~CTFOServer() {
     HTTP(port_).UnRegister("/ctfo/auth/ios");
     HTTP(port_).UnRegister("/ctfo/feed");
+    HTTP(port_).UnRegister("/ctfo/favs");
+    HTTP(port_).UnRegister("/ctfo/my_cards");
+    HTTP(port_).UnRegister("/ctfo/card");
   }
 
   void Join() { HTTP(port_).Join(); }
@@ -312,6 +510,7 @@ class CTFOServer final {
                         Matrix<AuthKeyTokenPair>,
                         Matrix<AuthKeyUIDPair>,
                         Dictionary<Card>,
+                        Matrix<CardAuthor>,
                         Matrix<Answer>,
                         Matrix<Favorite>> StorageAPI;
   StorageAPI storage_;
@@ -347,8 +546,8 @@ class CTFOServer final {
 
     std::vector<CID> candidates;
     const UID uid = StringToUID(response.user.uid);
-    const auto answers = Matrix<Answer>::Accessor(data);
     const auto cards = Dictionary<Card>::Accessor(data);
+    const auto answers = Matrix<Answer>::Accessor(data);
     const auto favorites = Matrix<Favorite>::Accessor(data);
     for (const auto& card : cards) {
       if (!answers.Has(uid, card.cid)) {
@@ -357,7 +556,7 @@ class CTFOServer final {
     }
     std::shuffle(candidates.begin(), candidates.end(), mt19937_64_tls());
 
-    const auto GenerateCardForFeed = [this, uid, &favorites](const Card& card) {
+    const auto GenerateCardForFeed = [this, uid, &answers, &favorites](const Card& card) {
       ResponseCardEntry card_entry;
       card_entry.cid = CIDToString(card.cid);
       card_entry.text = card.text;
@@ -368,6 +567,18 @@ class CTFOServer final {
       card_entry.ctfo_count = card.ctfo_count;
       card_entry.tfu_count = card.tfu_count;
       card_entry.skip_count = card.skip_count;
+
+      card_entry.vote = "";
+      const EntryWrapper<Answer> answer = answers.Get(uid, card.cid);
+      if (answer) {
+        const ANSWER vote = static_cast<Answer>(answer).answer;
+        if (vote == ANSWER::CTFO) {
+          card_entry.vote = "CTFO";
+        } else if (vote == ANSWER::TFU) {
+          card_entry.vote = "TFU";
+        }
+      }
+
       card_entry.favorited = false;
       const EntryWrapper<Favorite> fav = favorites.Get(uid, card.cid);
       if (fav) {
