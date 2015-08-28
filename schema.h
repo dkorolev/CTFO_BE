@@ -424,7 +424,7 @@ struct ResponseFavs {
 struct ResponseMyCards {
   uint64_t ms;                           // Server timestamp, milliseconds from epoch.
   ResponseUserEntry user;                // User information.
-  std::vector<ResponseCardEntry> cards;  // Cards created by this used.
+  std::vector<ResponseCardEntry> cards;  // Cards created by this user.
 
   template <typename A>
   void serialize(A& ar) {
