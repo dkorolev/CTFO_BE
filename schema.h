@@ -291,6 +291,26 @@ struct Card : yoda::Padawan {
   }
 };
 
+struct CardAuthor : yoda::Padawan {
+  CID cid = CID::INVALID;
+  UID uid = UID::INVALID;
+
+  CardAuthor() = default;
+  CardAuthor(const CardAuthor&) = default;
+  CardAuthor(CID cid, UID uid) : cid(cid), uid(uid) {}
+
+  CID row() const { return cid; }
+  void set_row(CID value) { cid = value; }
+  UID col() const { return uid; }
+  void set_col(UID value) { uid = value; }
+
+  template <typename A>
+  void serialize(A& ar) {
+    Padawan::serialize(ar);
+    ar(CEREAL_NVP(cid), CEREAL_NVP(uid));
+  }
+};
+
 struct Answer : yoda::Padawan {
   UID uid = UID::INVALID;
   CID cid = CID::INVALID;
@@ -356,6 +376,7 @@ struct ResponseCardEntry {
   uint64_t ctfo_count = 0u;      // Number of users, who said "CTFO" on this card.
   uint64_t tfu_count = 0u;       // Number of users, who said "TFU" on this card.
   uint64_t skip_count = 0u;      // Number of users, who said "SKIP" on this card.
+  std::string vote = "";         // "CTFO" or "TFU" if this user has cast this vote, empty string otherwise.
   bool favorited = false;        // True if the current user has favorited this card.
 
   template <typename A>
@@ -369,6 +390,7 @@ struct ResponseCardEntry {
        CEREAL_NVP(ctfo_count),
        CEREAL_NVP(tfu_count),
        CEREAL_NVP(skip_count),
+       CEREAL_NVP(vote),
        CEREAL_NVP(favorited));
   }
 };
@@ -395,6 +417,38 @@ struct ResponseFavs {
   template <typename A>
   void serialize(A& ar) {
     ar(CEREAL_NVP(ms), CEREAL_NVP(user), CEREAL_NVP(cards));
+  }
+};
+
+// "My cards" response schema. Yes, it's the same as favorites. -- D.K.
+struct ResponseMyCards {
+  uint64_t ms;                           // Server timestamp, milliseconds from epoch.
+  ResponseUserEntry user;                // User information.
+  std::vector<ResponseCardEntry> cards;  // Cards created by this user.
+
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms), CEREAL_NVP(user), CEREAL_NVP(cards));
+  }
+};
+
+// Schema for the POST request to add a new card.
+struct AddCardRequest {
+  std::string text = "";  // Plain text.
+  Color color;            // Color.
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(text), CEREAL_NVP(color));
+  }
+};
+
+// Schema for the response of the POST request to add a new card.
+struct AddCardResponse {
+  uint64_t ms;
+  std::string cid;
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms), CEREAL_NVP(cid));
   }
 };
 
