@@ -100,7 +100,7 @@ class CTFOServer final {
           storage_.Transaction(
               [this, device_id, app_key, feed_count](StorageAPI::T_DATA data) {
                 AuthKey auth_key("iOS::" + device_id + "::" + app_key, AUTH_TYPE::IOS);
-                UID uid = UID::INVALID;
+                UID uid = UID::INVALID_USER;
                 User user;
                 ResponseUserEntry user_entry;
                 std::string token;
@@ -114,7 +114,7 @@ class CTFOServer final {
                 }
 
                 auto auth_token_mutator = Matrix<AuthKeyTokenPair>::Mutator(data);
-                if (uid != UID::INVALID) {
+                if (uid != UID::INVALID_USER) {
                   // User exists => invalidate all tokens.
                   for (const auto& auth_token : auth_token_mutator[auth_key]) {
                     auth_token_mutator.Add(AuthKeyTokenPair(auth_key, auth_token.token, false));
@@ -128,7 +128,7 @@ class CTFOServer final {
                 } while (auth_token_mutator.Cols().Has(token));
                 auth_token_mutator.Add(AuthKeyTokenPair(auth_key, token, true));
 
-                if (uid != UID::INVALID) {  // Existing user.
+                if (uid != UID::INVALID_USER) {  // Existing user.
                   user_entry.score = user.score;
                   DebugPrint(
                       Printf("[/ctfo/auth/ios] Existing user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
@@ -168,7 +168,7 @@ class CTFOServer final {
                           r.url.ComposeURL().c_str()));
         r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
       } else {
-        if (uid == UID::INVALID) {
+        if (uid == UID::INVALID_USER) {
           DebugPrint(Printf("[/ctfo/feed] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
           r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
         } else {
@@ -217,7 +217,7 @@ class CTFOServer final {
                           r.url.ComposeURL().c_str()));
         r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
       } else {
-        if (uid == UID::INVALID) {
+        if (uid == UID::INVALID_USER) {
           DebugPrint(Printf("[/ctfo/favs] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
           r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
         } else {
@@ -317,7 +317,7 @@ class CTFOServer final {
                           r.url.ComposeURL().c_str()));
         r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
       } else {
-        if (uid == UID::INVALID) {
+        if (uid == UID::INVALID_USER) {
           DebugPrint(Printf("[/ctfo/my_cards] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
           r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
         } else {
@@ -420,7 +420,7 @@ class CTFOServer final {
                           r.url.ComposeURL().c_str()));
         r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
       } else {
-        if (uid == UID::INVALID) {
+        if (uid == UID::INVALID_USER) {
           DebugPrint(Printf("[/ctfo/card] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
           r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
         } else {
@@ -519,7 +519,8 @@ class CTFOServer final {
                         Dictionary<Card>,
                         Matrix<CardAuthor>,
                         Matrix<Answer>,
-                        Matrix<Favorite>> StorageAPI;
+                        Matrix<Favorite>,
+                        Matrix<Comment>> StorageAPI;
   StorageAPI storage_;
 
   const std::map<std::string, RESPONSE> valid_responses_ = {{"CTFO", RESPONSE::CTFO},
@@ -644,7 +645,7 @@ class CTFOServer final {
                           uid_str.c_str(),
                           cid_str.c_str(),
                           token.c_str()));
-        if (uid != UID::INVALID && cid != CID::INVALID) {
+        if (uid != UID::INVALID_USER && cid != CID::INVALID_CARD) {
           storage_.Transaction([this, uid, cid, uid_str, cid_str, token, response](StorageAPI::T_DATA data) {
             const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
             bool token_is_valid = false;

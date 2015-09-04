@@ -178,13 +178,14 @@ const std::vector<Color> CARD_COLORS{{0x0A, 0xB2, 0xCB},
                                      {0xF5, 0xC6, 0x7A}};
 
 // Data structures for internal storage.
-enum class UID : uint64_t { INVALID = 0u };
-enum class CID : uint64_t { INVALID = 0u };
+enum class UID : uint64_t { INVALID_USER = 0u };
+enum class CID : uint64_t { INVALID_CARD = 0u };
+enum class OID : uint64_t { INVALID_COMMENT = 0u };
 enum class ANSWER : int { UNSEEN = 0, CTFO = 1, TFU = 2, SKIP = -1 };
 enum class AUTH_TYPE : int { UNDEFINED = 0, IOS };
 
 struct User : yoda::Padawan {
-  UID uid = UID::INVALID;
+  UID uid = UID::INVALID_USER;
   uint8_t level = 0u;   // User level [0, 9].
   uint64_t score = 0u;  // User score.
 
@@ -247,7 +248,7 @@ struct AuthKeyTokenPair : yoda::Padawan {
 
 struct AuthKeyUIDPair : yoda::Padawan {
   AuthKey auth_key;
-  UID uid = UID::INVALID;
+  UID uid = UID::INVALID_USER;
 
   AuthKeyUIDPair() = default;
   AuthKeyUIDPair(const AuthKey& auth_key, const UID uid) : auth_key(auth_key), uid(uid) {}
@@ -265,7 +266,7 @@ struct AuthKeyUIDPair : yoda::Padawan {
 };
 
 struct Card : yoda::Padawan {
-  CID cid = CID::INVALID;
+  CID cid = CID::INVALID_CARD;
   std::string text = "";     // Plain text.
   Color color;               // Color.
   uint64_t ctfo_count = 0u;  // Number of users, who said "CTFO" on this card.
@@ -292,8 +293,8 @@ struct Card : yoda::Padawan {
 };
 
 struct CardAuthor : yoda::Padawan {
-  CID cid = CID::INVALID;
-  UID uid = UID::INVALID;
+  CID cid = CID::INVALID_CARD;
+  UID uid = UID::INVALID_USER;
 
   CardAuthor() = default;
   CardAuthor(const CardAuthor&) = default;
@@ -312,8 +313,8 @@ struct CardAuthor : yoda::Padawan {
 };
 
 struct Answer : yoda::Padawan {
-  UID uid = UID::INVALID;
-  CID cid = CID::INVALID;
+  UID uid = UID::INVALID_USER;
+  CID cid = CID::INVALID_CARD;
   ANSWER answer = ANSWER::UNSEEN;
 
   Answer() = default;
@@ -333,8 +334,8 @@ struct Answer : yoda::Padawan {
 };
 
 struct Favorite : yoda::Padawan {
-  UID uid = UID::INVALID;
-  CID cid = CID::INVALID;
+  UID uid = UID::INVALID_USER;
+  CID cid = CID::INVALID_CARD;
   bool favorited = false;
 
   Favorite() = default;
@@ -349,6 +350,31 @@ struct Favorite : yoda::Padawan {
   void serialize(A& ar) {
     Padawan::serialize(ar);
     ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(favorited));
+  }
+};
+
+struct Comment : yoda::Padawan {
+  CID cid = CID::INVALID_CARD;     // Row key: Card ID.
+  OID oid = OID::INVALID_COMMENT;  // Col key: Comment ID.
+
+  OID parent_oid = OID::INVALID_COMMENT;  // `INVALID_COMMENT` for a top-level comment, parent PID otherwise.
+
+  UID author_uid = UID::INVALID_USER;
+  std::string text;
+
+  Comment() = default;
+  Comment(const CID cid, const OID oid, const OID parent_oid, const UID author_uid, const std::string& text)
+      : cid(cid), oid(oid), parent_oid(parent_oid), author_uid(author_uid), text(text) {}
+
+  CID row() const { return cid; }
+  void set_row(const CID value) { cid = value; }
+  OID col() const { return oid; }
+  void set_col(OID value) { oid = value; }
+
+  template <typename A>
+  void serialize(A& ar) {
+    Padawan::serialize(ar);
+    ar(CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(parent_oid), CEREAL_NVP(author_uid), CEREAL_NVP(text));
   }
 };
 

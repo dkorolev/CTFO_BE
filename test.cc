@@ -40,6 +40,7 @@ CEREAL_REGISTER_TYPE(Card);
 CEREAL_REGISTER_TYPE(CardAuthor);
 CEREAL_REGISTER_TYPE(Answer);
 CEREAL_REGISTER_TYPE(Favorite);
+CEREAL_REGISTER_TYPE(Comment);
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(api_port, 8383, "Port to spawn CTFO RESTful server on.");
@@ -415,6 +416,24 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("Bar.", my_cards_response.cards[1].text);
     EXPECT_EQ("Foo.", my_cards_response.cards[2].text);
   }
+
+  // Get comments for a non-exising card, expecting an error.
+
+  // Get comments for the card, expecting valid response with no comments.
+
+  // Add a top-level comment.
+
+  // Get comments, expecting one.
+
+  // Add another top-level comment.
+
+  // Get comments, expecting two top-level comments.
+
+  // Add a 2nd level comment.
+
+  // Get comments, expecting two top-level ones, and one 2nd level one.
+
+  // Attempt to add a 3rd level comment, expecting an error.
 }
 
 TEST(CTFO, StrictAuth) {
