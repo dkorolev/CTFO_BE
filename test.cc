@@ -320,21 +320,54 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(0u, my_card_fav_response.cards[1].skip_count);
   }
 
-  // Get a list of my cards.
+  // Get a list of my cards, should be only one.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(18001));
-    const auto my_cards_1 = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
-                                            FLAGS_api_port,
-                                            actual_uid.c_str(),
-                                            actual_token.c_str())));
-    EXPECT_EQ(200, static_cast<int>(my_cards_1.code));
-    const auto my_cards_1_response = ParseJSON<ResponseMyCards>(my_cards_1.body);
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(16001));
+    const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                          FLAGS_api_port,
+                                          actual_uid.c_str(),
+                                          actual_token.c_str())));
+    EXPECT_EQ(200, static_cast<int>(my_cards.code));
+    const auto my_cards_response = ParseJSON<ResponseMyCards>(my_cards.body);
 
-    EXPECT_EQ(18001u, my_cards_1_response.ms);
-    EXPECT_EQ(actual_uid, my_cards_1_response.user.uid);
-    ASSERT_EQ(1u, my_cards_1_response.cards.size());
-    EXPECT_EQ("Foo.", my_cards_1_response.cards[0].text);
+    EXPECT_EQ(18001u, my_cards_response.ms);
+    EXPECT_EQ(actual_uid, my_cards_response.user.uid);
+    ASSERT_EQ(1u, my_cards_response.cards.size());
+    EXPECT_EQ("Foo.", my_cards_response.cards[0].text);
+  }
+
+  // Add a second card, with full JSON body.
+  std::string added_card2_cid;
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(19001));
+    const auto post_card_request =
+        HTTP(POST(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s",
+                         FLAGS_api_port,
+                         actual_uid.c_str(),
+                         actual_token.c_str()),
+                  "{\"card\":{\"text\":\"Bar.\",\"color\":{\"red\":100,\"green\":101,\"blue\":102}}}"));
+    EXPECT_EQ(200, static_cast<int>(post_card_request.code));
+    const auto add_card_response = ParseJSON<AddCardResponse>(post_card_request.body);
+    EXPECT_EQ(19001u, add_card_response.ms);
+
+    added_card2_cid = add_card_response.cid;
+  }
+
+  // Get a list of my cards, should be two.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(20001));
+    const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                          FLAGS_api_port,
+                                          actual_uid.c_str(),
+                                          actual_token.c_str())));
+    EXPECT_EQ(200, static_cast<int>(my_cards.code));
+    const auto my_cards_response = ParseJSON<ResponseMyCards>(my_cards.body);
+
+    EXPECT_EQ(20001u, my_cards_response.ms);
+    EXPECT_EQ(actual_uid, my_cards_response.user.uid);
+    ASSERT_EQ(2u, my_cards_response.cards.size());
+    EXPECT_EQ("Bar.", my_cards_response.cards[0].text);
+    EXPECT_EQ("Foo.", my_cards_response.cards[1].text);
   }
 }
 
