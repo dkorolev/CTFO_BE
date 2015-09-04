@@ -442,6 +442,15 @@ struct AddCardRequest {
   }
 };
 
+// A shortened version of `AddCardRequest`.
+struct AddCardShortRequest {
+  std::string text = "";  // Plain text.
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(text));
+  }
+};
+
 // Schema for the response of the POST request to add a new card.
 struct AddCardResponse {
   uint64_t ms;

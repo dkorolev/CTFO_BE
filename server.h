@@ -425,10 +425,18 @@ class CTFOServer final {
           r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
         } else {
           const std::string requested_url = r.url.ComposeURL();
+          const CID cid = RandomCID();
           try {
-            const auto request = ParseJSON<AddCardRequest>(r.body);
+            AddCardRequest request;
+            try {
+              ParseJSON(r.body, request);
+            } catch (const bricks::ParseJSONException&) {
+              const auto short_request = ParseJSON<AddCardShortRequest>(r.body);
+              request.text = short_request.text;
+              request.color = CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()];
+            }
             storage_.Transaction(
-                [this, uid, token, request, requested_url](StorageAPI::T_DATA data) {
+                [this, cid, uid, token, request, requested_url](StorageAPI::T_DATA data) {
                   bool token_is_valid = false;
                   const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
                   if (auth_token_accessor.Cols().Has(token)) {
@@ -448,7 +456,6 @@ class CTFOServer final {
                   } else {
                     DebugPrint(
                         Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
-                    const CID cid = RandomCID();
                     const auto now = static_cast<uint64_t>(bricks::time::Now());
 
                     auto cards_mutator = Dictionary<Card>::Mutator(data);
