@@ -335,6 +335,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
     ASSERT_EQ(1u, my_cards_response.cards.size());
     EXPECT_EQ("Foo.", my_cards_response.cards[0].text);
+    EXPECT_EQ(16001, my_cards_response.cards[0].ms);
   }
 
   // Add a second card, with full JSON body, specifying the color explicitly.
@@ -368,7 +369,9 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
     ASSERT_EQ(2u, my_cards_response.cards.size());
     EXPECT_EQ("Bar.", my_cards_response.cards[0].text);
+    EXPECT_EQ(19001, my_cards_response.cards[0].ms);
     EXPECT_EQ("Foo.", my_cards_response.cards[1].text);
+    EXPECT_EQ(16001, my_cards_response.cards[1].ms);
   }
 
   // Add a third card, not specifying color.
@@ -387,7 +390,7 @@ TEST(CTFO, SmokeTest) {
     added_card3_cid = add_card_response.cid;
   }
 
-  // Attepmt to add a card but send it a malformed BODY.
+  // Attempt to add a card but send it a malformed BODY.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(22001));
     const auto post_card_response = HTTP(POST(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s",
@@ -413,13 +416,38 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
     ASSERT_EQ(3u, my_cards_response.cards.size());
     EXPECT_EQ("Meh.", my_cards_response.cards[0].text);
+    EXPECT_EQ(21001, my_cards_response.cards[0].ms);
     EXPECT_EQ("Bar.", my_cards_response.cards[1].text);
+    EXPECT_EQ(19001, my_cards_response.cards[1].ms);
     EXPECT_EQ("Foo.", my_cards_response.cards[2].text);
+    EXPECT_EQ(16001, my_cards_response.cards[2].ms);
   }
 
   // Get comments for a non-exising card, expecting an error.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(100001));
+    const auto get_comments_response = HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=",
+                                                       FLAGS_api_port,
+                                                       actual_uid.c_str(),
+                                                       actual_token.c_str(),
+                                                       CIDToString(RandomCID()).c_str())));
+    EXPECT_EQ(400, static_cast<int>(get_comments_response.code));
+    EXPECT_EQ("NEED VALID CID\n", get_comments_response.body);
+  }
 
-  // Get comments for the card, expecting valid response with no comments.
+  // Get comments for the actual card, expecting valid response with no comments.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(101001));
+    const auto get_comments_response =
+        HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                        FLAGS_api_port,
+                        actual_uid.c_str(),
+                        actual_token.c_str(),
+                        added_card2_cid.c_str())));
+    EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
+    const auto response = ParseJSON<ResponseComments>(get_comments_response.body);
+    EXPECT_EQ(101001, response.ms);
+  }
 
   // Add a top-level comment.
 
