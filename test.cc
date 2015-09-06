@@ -296,7 +296,7 @@ TEST(CTFO, SmokeTest) {
     added_card_cid = add_card_response.cid;
   }
 
-  // Confirm this new card is favorited by default.
+  // Confirm this new card is not favorited by default.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(17001));
     const auto favs_including_my_card_response =
@@ -308,17 +308,12 @@ TEST(CTFO, SmokeTest) {
     const auto my_card_fav_response = ParseJSON<ResponseFavs>(favs_including_my_card_response.body);
     EXPECT_EQ(17001u, my_card_fav_response.ms);
     EXPECT_EQ(actual_uid, my_card_fav_response.user.uid);
-    ASSERT_EQ(2u, my_card_fav_response.cards.size());
-    EXPECT_EQ(added_card_cid, my_card_fav_response.cards[0].cid);
-    EXPECT_EQ("", my_card_fav_response.cards[0].vote);
-    EXPECT_EQ(0u, my_card_fav_response.cards[0].ctfo_count);
+    ASSERT_EQ(1u, my_card_fav_response.cards.size());
+    EXPECT_EQ(cid2, my_card_fav_response.cards[0].cid);
+    EXPECT_EQ("CTFO", my_card_fav_response.cards[0].vote);
+    EXPECT_EQ(1u, my_card_fav_response.cards[0].ctfo_count);
     EXPECT_EQ(0u, my_card_fav_response.cards[0].tfu_count);
     EXPECT_EQ(0u, my_card_fav_response.cards[0].skip_count);
-    EXPECT_EQ(cid2, my_card_fav_response.cards[1].cid);
-    EXPECT_EQ("CTFO", my_card_fav_response.cards[1].vote);
-    EXPECT_EQ(1u, my_card_fav_response.cards[1].ctfo_count);
-    EXPECT_EQ(0u, my_card_fav_response.cards[1].tfu_count);
-    EXPECT_EQ(0u, my_card_fav_response.cards[1].skip_count);
   }
 
   // Get a list of my cards, should be only one.

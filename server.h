@@ -475,11 +475,14 @@ class CTFOServer final {
                     author.cid = cid;
                     authors_mutator.Add(author);
 
-                    Favorite favorite;
-                    favorite.uid = uid;
-                    favorite.cid = cid;
-                    favorite.favorited = true;
-                    favorites_mutator.Add(favorite);
+                    if (false) {
+                      // Master Gene taught us own cards should not be favorited by default.
+                      Favorite favorite;
+                      favorite.uid = uid;
+                      favorite.cid = cid;
+                      favorite.favorited = true;
+                      favorites_mutator.Add(favorite);
+                    }
 
                     AddCardResponse response;
                     response.ms = now;
