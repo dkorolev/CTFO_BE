@@ -67,4 +67,8 @@ inline CID StringToCID(const std::string& s) {
   return CID::INVALID_CARD;
 }
 
+inline std::string OIDToString(const OID oid) {
+  return bricks::strings::Printf("o%020llu", static_cast<uint64_t>(oid));
+}
+
 #endif  // CTFO_UTIL_H

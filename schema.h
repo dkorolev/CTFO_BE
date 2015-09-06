@@ -491,17 +491,17 @@ struct AddCardResponse {
 
 // Comments response schema.
 struct ResponseComment {
-  std::string oid = "oINVALID";  // Comment id, format 'o05XXX...'.
-  std::string parent_oid = "";   // Empty string or parent comment id. NOTE: Two levels of comments only.
-  std::string uid = "uINVALID";  // User id, format 'u01XXX...'.
-  std::string text;              // Comment text.
-  uint64_t ms;                   // Comment timestamp, milliseconds from epoch.
+  std::string oid = "oINVALID";         // Comment id, format 'o05XXX...'.
+  std::string parent_oid = "";          // Empty string or parent comment id. NOTE: Two levels of comments only.
+  std::string author_uid = "uINVALID";  // User id, format 'u01XXX...'.
+  std::string text;                     // Comment text.
+  uint64_t ms;                          // Comment timestamp, milliseconds from epoch.
   // TODO(dkorolev): User name? Tier status?
   // TODO(dkorolev): Color?
 
   template <typename A>
   void serialize(A& ar) {
-    ar(CEREAL_NVP(oid), CEREAL_NVP(parent_oid), CEREAL_NVP(uid), CEREAL_NVP(text));
+    ar(CEREAL_NVP(oid), CEREAL_NVP(parent_oid), CEREAL_NVP(author_uid), CEREAL_NVP(text));
   }
 };
 

@@ -330,7 +330,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
     ASSERT_EQ(1u, my_cards_response.cards.size());
     EXPECT_EQ("Foo.", my_cards_response.cards[0].text);
-    EXPECT_EQ(16001, my_cards_response.cards[0].ms);
+    EXPECT_EQ(16001u, my_cards_response.cards[0].ms);
   }
 
   // Add a second card, with full JSON body, specifying the color explicitly.
@@ -364,9 +364,9 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
     ASSERT_EQ(2u, my_cards_response.cards.size());
     EXPECT_EQ("Bar.", my_cards_response.cards[0].text);
-    EXPECT_EQ(19001, my_cards_response.cards[0].ms);
+    EXPECT_EQ(19001u, my_cards_response.cards[0].ms);
     EXPECT_EQ("Foo.", my_cards_response.cards[1].text);
-    EXPECT_EQ(16001, my_cards_response.cards[1].ms);
+    EXPECT_EQ(16001u, my_cards_response.cards[1].ms);
   }
 
   // Add a third card, not specifying color.
@@ -411,11 +411,11 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
     ASSERT_EQ(3u, my_cards_response.cards.size());
     EXPECT_EQ("Meh.", my_cards_response.cards[0].text);
-    EXPECT_EQ(21001, my_cards_response.cards[0].ms);
+    EXPECT_EQ(21001u, my_cards_response.cards[0].ms);
     EXPECT_EQ("Bar.", my_cards_response.cards[1].text);
-    EXPECT_EQ(19001, my_cards_response.cards[1].ms);
+    EXPECT_EQ(19001u, my_cards_response.cards[1].ms);
     EXPECT_EQ("Foo.", my_cards_response.cards[2].text);
-    EXPECT_EQ(16001, my_cards_response.cards[2].ms);
+    EXPECT_EQ(16001u, my_cards_response.cards[2].ms);
   }
 
   // Get comments for a non-exising card, expecting an error.
@@ -441,7 +441,8 @@ TEST(CTFO, SmokeTest) {
                         added_card2_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
     const auto response = ParseJSON<ResponseComments>(get_comments_response.body);
-    EXPECT_EQ(101001, response.ms);
+    EXPECT_EQ(101001u, response.ms);
+    EXPECT_EQ(0u, response.comments.size());
   }
 
   // Add a top-level comment.
