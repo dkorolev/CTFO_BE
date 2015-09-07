@@ -545,9 +545,87 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(102001u, response.comments[1].ms);
   }
 
-  // Add a 2nd level comment.
+  // Add 2nd level comment 1/2.
+  std::string added_nested_comment_1_oid;
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(107001));
+    AddCommentRequest add_comment_request;
+    add_comment_request.text = "for";
+    add_comment_request.parent_oid = added_second_comment_oid;
+    const auto post_comment_response =
+        HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
+                         FLAGS_api_port,
+                         actual_uid.c_str(),
+                         actual_token.c_str(),
+                         added_card_cid.c_str()),
+                  add_comment_request));
+    EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
+    const auto add_comment_response = ParseJSON<AddCommentResponse>(post_comment_response.body);
+    EXPECT_EQ(107001u, add_comment_response.ms);
 
-  // Get comments, expecting two top-level ones, and one 2nd level one.
+    added_nested_comment_1_oid = add_comment_response.oid;
+  }
+
+  // Add 2nd level comment 2/2, to confirm the final sort order of the GET is right.
+  std::string added_nested_comment_2_oid;
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(108001));
+    AddCommentRequest add_comment_request;
+    add_comment_request.text = "real?";
+    add_comment_request.parent_oid = added_second_comment_oid;
+    const auto post_comment_response =
+        HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
+                         FLAGS_api_port,
+                         actual_uid.c_str(),
+                         actual_token.c_str(),
+                         added_card_cid.c_str()),
+                  add_comment_request));
+    EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
+    const auto add_comment_response = ParseJSON<AddCommentResponse>(post_comment_response.body);
+    EXPECT_EQ(108001u, add_comment_response.ms);
+
+    added_nested_comment_2_oid = add_comment_response.oid;
+  }
+
+  // Get comments, expecting two top-level ones, and two 2nd level ones, in the right order.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(109001));
+    const auto get_comments_response =
+        HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                        FLAGS_api_port,
+                        actual_uid.c_str(),
+                        actual_token.c_str(),
+                        added_card_cid.c_str())));
+    EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
+    const auto response = ParseJSON<ResponseComments>(get_comments_response.body);
+    EXPECT_EQ(109001u, response.ms);
+
+    ASSERT_EQ(4u, response.comments.size());
+
+    EXPECT_EQ(added_second_comment_oid, response.comments[0].oid);
+    EXPECT_EQ("", response.comments[0].parent_oid);
+    EXPECT_EQ(actual_uid, response.comments[0].author_uid);
+    EXPECT_EQ("Bla.", response.comments[0].text);
+    EXPECT_EQ(105001u, response.comments[0].ms);
+
+    EXPECT_EQ(added_nested_comment_1_oid, response.comments[1].oid);
+    EXPECT_EQ(added_second_comment_oid, response.comments[1].parent_oid);
+    EXPECT_EQ(actual_uid, response.comments[1].author_uid);
+    EXPECT_EQ("for", response.comments[1].text);
+    EXPECT_EQ(107001u, response.comments[1].ms);
+
+    EXPECT_EQ(added_nested_comment_2_oid, response.comments[2].oid);
+    EXPECT_EQ(added_second_comment_oid, response.comments[2].parent_oid);
+    EXPECT_EQ(actual_uid, response.comments[2].author_uid);
+    EXPECT_EQ("real?", response.comments[2].text);
+    EXPECT_EQ(108001u, response.comments[2].ms);
+
+    EXPECT_EQ(added_comment_oid, response.comments[3].oid);
+    EXPECT_EQ("", response.comments[3].parent_oid);
+    EXPECT_EQ(actual_uid, response.comments[3].author_uid);
+    EXPECT_EQ("Meh.", response.comments[3].text);
+    EXPECT_EQ(102001u, response.comments[3].ms);
+  }
 
   // Attempt to add a 3rd level comment, expecting an error.
 }

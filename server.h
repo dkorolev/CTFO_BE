@@ -648,6 +648,8 @@ class CTFOServer final {
                     comment.oid = oid;
                     comment.author_uid = uid;
                     comment.text = request.text;
+                    // DIMA: Add existence and/or 3rd-level check here.
+                    comment.parent_oid = StringToOID(request.parent_oid);
                     comments_mutator.Add(comment);
 
                     AddCommentResponse response;
