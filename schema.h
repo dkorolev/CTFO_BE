@@ -393,22 +393,25 @@ struct ResponseUserEntry {
 };
 
 struct ResponseCardEntry {
-  std::string cid = "cINVALID";  // Card id, format 'c02XXX...'.
-  std::string text = "";         // Card text.
-  uint64_t ms;                   // Card timestamp, milliseconds from epoch.
-  Color color;                   // Card color.
-  double relevance = 0.0;        // Card relevance for particular user, [0.0, 1.0].
-  uint64_t ctfo_score = 0u;      // Number of points, which user gets for "CTFO" answer.
-  uint64_t tfu_score = 0u;       // Number of points, which user gets for "TFU" answer.
-  uint64_t ctfo_count = 0u;      // Number of users, who said "CTFO" on this card.
-  uint64_t tfu_count = 0u;       // Number of users, who said "TFU" on this card.
-  uint64_t skip_count = 0u;      // Number of users, who said "SKIP" on this card.
-  std::string vote = "";         // "CTFO" or "TFU" if this user has cast this vote, empty string otherwise.
-  bool favorited = false;        // True if the current user has favorited this card.
+  std::string cid = "cINVALID";         // Card id, format 'c02XXX...'.
+  std::string author_uid = "uINVALID";  // The author of this comment.
+  std::string text = "";                // Card text.
+  uint64_t ms;                          // Card timestamp, milliseconds from epoch.
+  Color color;                          // Card color.
+  double relevance = 0.0;               // Card relevance for particular user, [0.0, 1.0].
+  uint64_t ctfo_score = 0u;             // Number of points, which user gets for "CTFO" answer.
+  uint64_t tfu_score = 0u;              // Number of points, which user gets for "TFU" answer.
+  uint64_t ctfo_count = 0u;             // Number of users, who said "CTFO" on this card.
+  uint64_t tfu_count = 0u;              // Number of users, who said "TFU" on this card.
+  uint64_t skip_count = 0u;             // Number of users, who said "SKIP" on this card.
+  std::string vote = "";    // "CTFO" or "TFU" if this user has cast this vote, empty string otherwise.
+  bool favorited = false;   // True if the current user has favorited this card.
+  bool is_my_card = false;  // True if this card has been created by this user.
 
   template <typename A>
   void serialize(A& ar) {
     ar(CEREAL_NVP(cid),
+       CEREAL_NVP(author_uid),
        CEREAL_NVP(text),
        CEREAL_NVP(ms),
        CEREAL_NVP(color),
@@ -419,7 +422,8 @@ struct ResponseCardEntry {
        CEREAL_NVP(tfu_count),
        CEREAL_NVP(skip_count),
        CEREAL_NVP(vote),
-       CEREAL_NVP(favorited));
+       CEREAL_NVP(favorited),
+       CEREAL_NVP(is_my_card));
   }
 };
 
@@ -492,9 +496,10 @@ struct AddCardResponse {
 // Schema for the POST request to add a new comment.
 struct AddCommentRequest {
   std::string text = "";  // Plain text.
+  std::string parent_oid = "";
   template <typename A>
   void serialize(A& ar) {
-    ar(CEREAL_NVP(text));
+    ar(CEREAL_NVP(text), CEREAL_NVP(parent_oid));
   }
 };
 

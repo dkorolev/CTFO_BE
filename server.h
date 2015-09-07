@@ -266,9 +266,19 @@ class CTFOServer final {
                     std::sort(favs.rbegin(), favs.rend());
 
                     // And publish them.
-                    const auto GenerateCardForFavs = [this, uid, &answers](const Card& card) {
+                    const auto card_authors = Matrix<CardAuthor>::Accessor(data);
+                    const auto GenerateCardForFavs = [this, uid, &answers, &card_authors](const Card& card) {
                       ResponseCardEntry card_entry;
                       card_entry.cid = CIDToString(card.cid);
+                      try {
+                        const auto& iterable = card_authors.Rows()[card.cid];
+                        if (iterable.size() == 1u) {
+                          const UID author_uid = (*iterable.begin()).uid;
+                          card_entry.author_uid = UIDToString(author_uid);
+                          card_entry.is_my_card = (uid == author_uid);
+                        }
+                      } catch (yoda::SubscriptException<CardAuthor>) {
+                      }
                       card_entry.text = card.text;
                       card_entry.ms = card.ms;
                       card_entry.color = card.color;
@@ -366,9 +376,20 @@ class CTFOServer final {
                     std::sort(my_cards.rbegin(), my_cards.rend());
 
                     // And publish them.
-                    const auto GenerateCardForMyCards = [this, uid, &answers, &favorites](const Card& card) {
+                    const auto card_authors = Matrix<CardAuthor>::Accessor(data);
+                    const auto GenerateCardForMyCards =
+                        [this, uid, &answers, &favorites, &card_authors](const Card& card) {
                       ResponseCardEntry card_entry;
                       card_entry.cid = CIDToString(card.cid);
+                      try {
+                        const auto& iterable = card_authors.Rows()[card.cid];
+                        if (iterable.size() == 1u) {
+                          const UID author_uid = (*iterable.begin()).uid;
+                          card_entry.author_uid = UIDToString(author_uid);
+                          card_entry.is_my_card = (uid == author_uid);
+                        }
+                      } catch (yoda::SubscriptException<CardAuthor>) {
+                      }
                       card_entry.text = card.text;
                       card_entry.ms = card.ms;
                       card_entry.color = card.color;
@@ -538,23 +559,53 @@ class CTFOServer final {
                   } else {
                     ResponseComments response;
                     response.ms = static_cast<uint64_t>(bricks::time::Now());
-                    std::vector<ResponseComment>& output_comments = response.comments;
+                    std::vector<Comment> proto_comments;
                     try {
                       const auto comments = Matrix<Comment>::Accessor(data);
                       for (const auto& comment : comments[cid]) {
-                        // TODO(dkorolev): Need a function to convert `Comment` into `ResponseComment`.
-                        ResponseComment c;
-                        c.oid = OIDToString(comment.oid);
-                        if (comment.parent_oid != OID::INVALID_COMMENT) {
-                          // `c.parent_oid` should be either parent comment ID, or blank string.
-                          c.parent_oid = OIDToString(comment.parent_oid);
-                        }
-                        c.author_uid = UIDToString(comment.author_uid);
-                        c.text = comment.text;
-                        c.ms = comment.ms;
-                        output_comments.push_back(std::move(c));
+                        proto_comments.push_back(comment);
                       }
                     } catch (yoda::SubscriptException<Comment>) {
+                    }
+                    const auto comments_accessor = Matrix<Comment>::Accessor(data);
+                    const auto sortkey = [&comments_accessor](const Comment& c)
+                        -> std::pair<uint64_t, uint64_t> {
+                      uint64_t comment_timestamp = 0u;
+                      uint64_t top_level_comment_timestamp = 0u;
+                      if (c.parent_oid == OID::INVALID_COMMENT) {
+                        // This comment is top-level.
+                        top_level_comment_timestamp = c.ms;
+                      } else {
+                        // This is a 2nd-level comment.
+                        comment_timestamp = c.ms;
+                        try {
+                          const auto& iterable = comments_accessor.Cols()[c.parent_oid];
+                          if (iterable.size() == 1u) {
+                            top_level_comment_timestamp = (*iterable.begin()).ms;
+                          }
+                        } catch (yoda::SubscriptException<Comment>) {
+                        }
+                      }
+                      // Top-level comments reverse chronologically, 2nd level comments chronologically.
+                      return std::make_pair(~top_level_comment_timestamp, comment_timestamp);
+                    };
+                    std::sort(proto_comments.begin(),
+                              proto_comments.end(),
+                              [&sortkey](const Comment& lhs,
+                                         const Comment& rhs) { return sortkey(lhs) < sortkey(rhs); });
+                    std::vector<ResponseComment>& output_comments = response.comments;
+                    for (const auto& comment : proto_comments) {
+                      // TODO(dkorolev): Need a function to convert `Comment` into `ResponseComment`.
+                      ResponseComment c;
+                      c.oid = OIDToString(comment.oid);
+                      if (comment.parent_oid != OID::INVALID_COMMENT) {
+                        // `c.parent_oid` should be either parent comment ID, or blank string.
+                        c.parent_oid = OIDToString(comment.parent_oid);
+                      }
+                      c.author_uid = UIDToString(comment.author_uid);
+                      c.text = comment.text;
+                      c.ms = comment.ms;
+                      output_comments.push_back(std::move(c));
                     }
                     return Response(response, "comments");
                   }
@@ -562,7 +613,6 @@ class CTFOServer final {
               },
               std::move(r));
         } else if (r.method == "POST") {
-          // DIMA
           const std::string requested_url = r.url.ComposeURL();
           const OID oid = RandomOID();
           try {
@@ -695,9 +745,19 @@ class CTFOServer final {
     }
     std::shuffle(candidates.begin(), candidates.end(), mt19937_64_tls());
 
-    const auto GenerateCardForFeed = [this, uid, &answers, &favorites](const Card& card) {
+    const auto card_authors = Matrix<CardAuthor>::Accessor(data);
+    const auto GenerateCardForFeed = [this, uid, &answers, &favorites, &card_authors](const Card& card) {
       ResponseCardEntry card_entry;
       card_entry.cid = CIDToString(card.cid);
+      try {
+        const auto& iterable = card_authors.Rows()[card.cid];
+        if (iterable.size() == 1u) {
+          const UID author_uid = (*iterable.begin()).uid;
+          card_entry.author_uid = UIDToString(author_uid);
+          card_entry.is_my_card = (uid == author_uid);
+        }
+      } catch (yoda::SubscriptException<CardAuthor>) {
+      }
       card_entry.text = card.text;
       card_entry.ms = card.ms;
       card_entry.color = card.color;

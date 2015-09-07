@@ -451,12 +451,13 @@ TEST(CTFO, SmokeTest) {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(102001));
     AddCommentRequest add_comment_request;
     add_comment_request.text = "Meh.";
-    const auto post_comment_response = HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
-                                                     FLAGS_api_port,
-                                                     actual_uid.c_str(),
-                                                     actual_token.c_str(),
-                                                     added_card_cid.c_str()),
-                                              add_comment_request));
+    const auto post_comment_response =
+        HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
+                         FLAGS_api_port,
+                         actual_uid.c_str(),
+                         actual_token.c_str(),
+                         added_card_cid.c_str()),
+                  add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
     const auto add_comment_response = ParseJSON<AddCommentResponse>(post_comment_response.body);
     EXPECT_EQ(102001u, add_comment_response.ms);
@@ -500,8 +501,49 @@ TEST(CTFO, SmokeTest) {
   }
 
   // Add another top-level comment.
+  std::string added_second_comment_oid;
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(105001));
+    AddCommentRequest add_comment_request;
+    add_comment_request.text = "Bla.";
+    const auto post_comment_response =
+        HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
+                         FLAGS_api_port,
+                         actual_uid.c_str(),
+                         actual_token.c_str(),
+                         added_card_cid.c_str()),
+                  add_comment_request));
+    EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
+    const auto add_comment_response = ParseJSON<AddCommentResponse>(post_comment_response.body);
+    EXPECT_EQ(105001u, add_comment_response.ms);
+
+    added_second_comment_oid = add_comment_response.oid;
+  }
 
   // Get comments, expecting two top-level comments.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(106001));
+    const auto get_comments_response =
+        HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                        FLAGS_api_port,
+                        actual_uid.c_str(),
+                        actual_token.c_str(),
+                        added_card_cid.c_str())));
+    EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
+    const auto response = ParseJSON<ResponseComments>(get_comments_response.body);
+    EXPECT_EQ(106001u, response.ms);
+    ASSERT_EQ(2u, response.comments.size());
+    EXPECT_EQ(added_second_comment_oid, response.comments[0].oid);
+    EXPECT_EQ("", response.comments[0].parent_oid);
+    EXPECT_EQ(actual_uid, response.comments[0].author_uid);
+    EXPECT_EQ("Bla.", response.comments[0].text);
+    EXPECT_EQ(105001u, response.comments[0].ms);
+    EXPECT_EQ(added_comment_oid, response.comments[1].oid);
+    EXPECT_EQ("", response.comments[1].parent_oid);
+    EXPECT_EQ(actual_uid, response.comments[1].author_uid);
+    EXPECT_EQ("Meh.", response.comments[1].text);
+    EXPECT_EQ(102001u, response.comments[1].ms);
+  }
 
   // Add a 2nd level comment.
 

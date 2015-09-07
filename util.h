@@ -71,4 +71,11 @@ inline std::string OIDToString(const OID oid) {
   return bricks::strings::Printf("o%020llu", static_cast<uint64_t>(oid));
 }
 
+inline OID StringToOID(const std::string& s) {
+  if (s.length() == 21 && s[0] == 'o') {  // 'c' + 20 digits of `uint64_t` decimal representation.
+    return static_cast<OID>(FromString<uint64_t>(s.substr(1)));
+  }
+  return OID::INVALID_COMMENT;
+}
+
 #endif  // CTFO_UTIL_H
