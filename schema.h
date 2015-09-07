@@ -357,7 +357,7 @@ struct Comment : yoda::Padawan {
   CID cid = CID::INVALID_CARD;     // Row key: Card ID.
   OID oid = OID::INVALID_COMMENT;  // Col key: Comment ID.
 
-  OID parent_oid = OID::INVALID_COMMENT;  // `INVALID_COMMENT` for a top-level comment, parent PID otherwise.
+  OID parent_oid = OID::INVALID_COMMENT;  // `INVALID_COMMENT` for a top-level comment, parent OID otherwise.
 
   UID author_uid = UID::INVALID_USER;
   std::string text;
@@ -500,6 +500,15 @@ struct AddCommentRequest {
   template <typename A>
   void serialize(A& ar) {
     ar(CEREAL_NVP(text), CEREAL_NVP(parent_oid));
+  }
+};
+
+// A shortened version of `AddCommentRequest`.
+struct AddCommentShortRequest {
+  std::string text = "";  // Plain text.
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(text));
   }
 };
 

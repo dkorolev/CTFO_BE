@@ -504,7 +504,7 @@ TEST(CTFO, SmokeTest) {
   std::string added_second_comment_oid;
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(105001));
-    AddCommentRequest add_comment_request;
+    AddCommentShortRequest add_comment_request;
     add_comment_request.text = "Bla.";
     const auto post_comment_response =
         HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
@@ -628,6 +628,38 @@ TEST(CTFO, SmokeTest) {
   }
 
   // Attempt to add a 3rd level comment, expecting an error.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(110001));
+    AddCommentRequest add_comment_request;
+    add_comment_request.text = "Nah.";
+    add_comment_request.parent_oid = added_nested_comment_2_oid;
+    const auto post_comment_response =
+        HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
+                         FLAGS_api_port,
+                         actual_uid.c_str(),
+                         actual_token.c_str(),
+                         added_card_cid.c_str()),
+                  add_comment_request));
+    EXPECT_EQ(400, static_cast<int>(post_comment_response.code));
+    EXPECT_EQ("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n", post_comment_response.body);
+  }
+
+  // Attempt to add a 2nd level comment to a non-existing 1st level comment.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(110001));
+    AddCommentRequest add_comment_request;
+    add_comment_request.text = "Still nah.";
+    add_comment_request.parent_oid = OIDToString(RandomOID());
+    const auto post_comment_response =
+        HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
+                         FLAGS_api_port,
+                         actual_uid.c_str(),
+                         actual_token.c_str(),
+                         added_card_cid.c_str()),
+                  add_comment_request));
+    EXPECT_EQ(400, static_cast<int>(post_comment_response.code));
+    EXPECT_EQ("NEED EMPTY OR VALID PARENT_OID\n", post_comment_response.body);
+  }
 }
 
 TEST(CTFO, StrictAuth) {

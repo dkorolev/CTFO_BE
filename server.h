@@ -617,7 +617,12 @@ class CTFOServer final {
           const OID oid = RandomOID();
           try {
             AddCommentRequest request;
-            ParseJSON(r.body, request);
+            try {
+              ParseJSON(r.body, request);
+            } catch (const bricks::ParseJSONException&) {
+              const auto short_request = ParseJSON<AddCommentShortRequest>(r.body);
+              request.text = short_request.text;
+            }
             storage_.Transaction(
                 [this, cid, uid, oid, token, request, requested_url](StorageAPI::T_DATA data) {
                   bool token_is_valid = false;
@@ -648,8 +653,23 @@ class CTFOServer final {
                     comment.oid = oid;
                     comment.author_uid = uid;
                     comment.text = request.text;
-                    // DIMA: Add existence and/or 3rd-level check here.
-                    comment.parent_oid = StringToOID(request.parent_oid);
+
+                    if (!request.parent_oid.empty()) {
+                      comment.parent_oid = StringToOID(request.parent_oid);
+                      try {
+                        const auto& iterable = comments_mutator.Cols()[comment.parent_oid];
+                        if (iterable.size() != 1u) {
+                          // TODO(dkorolev): This error is oh so wrong. Fix it.
+                          return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
+                        } else if ((*iterable.begin()).parent_oid != OID::INVALID_COMMENT) {
+                          return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n",
+                                          HTTPResponseCode.BadRequest);
+                        }
+                      } catch (yoda::SubscriptException<Comment>) {
+                        return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
+                      }
+                    }
+
                     comments_mutator.Add(comment);
 
                     AddCommentResponse response;
