@@ -506,7 +506,7 @@ class CTFOServer final {
       const std::string token = r.url.query["token"];
       const CID cid = StringToCID(r.url.query["cid"]);
       if (uid == UID::INVALID_USER) {
-        DebugPrint(Printf("[/ctfo/card] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+        DebugPrint(Printf("[/ctfo/comment] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
       } else if (cid == CID::INVALID_CARD) {
         DebugPrint(Printf("[/ctfo/comments] Wrong CID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
@@ -564,19 +564,12 @@ class CTFOServer final {
         } else if (r.method == "POST") {
           // DIMA
           const std::string requested_url = r.url.ComposeURL();
-          // const OID oid = RandomOID();
-          /*
+          const OID oid = RandomOID();
           try {
-            AddCardRequest request;
-            try {
-              ParseJSON(r.body, request);
-            } catch (const bricks::ParseJSONException&) {
-              const auto short_request = ParseJSON<AddCardShortRequest>(r.body);
-              request.text = short_request.text;
-              request.color = CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()];
-            }
+            AddCommentRequest request;
+            ParseJSON(r.body, request);
             storage_.Transaction(
-                [this, cid, uid, token, request, requested_url](StorageAPI::T_DATA data) {
+                [this, cid, uid, oid, token, request, requested_url](StorageAPI::T_DATA data) {
                   bool token_is_valid = false;
                   const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
                   if (auth_token_accessor.Cols().Has(token)) {
@@ -591,50 +584,34 @@ class CTFOServer final {
                   }
                   if (!token_is_valid) {
                     DebugPrint(
-                        Printf("[/ctfo/card] Invalid token. Requested URL = '%s'", requested_url.c_str()));
+                        Printf("[/ctfo/comment] Invalid token. Requested URL = '%s'", requested_url.c_str()));
                     return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
                   } else {
                     DebugPrint(
-                        Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
+                        Printf("[/ctfo/comment] Token validated. Requested URL = '%s'", requested_url.c_str()));
                     const auto now = static_cast<uint64_t>(bricks::time::Now());
 
-                    auto cards_mutator = Dictionary<Card>::Mutator(data);
-                    auto authors_mutator = Matrix<CardAuthor>::Mutator(data);
-                    auto favorites_mutator = Matrix<Favorite>::Mutator(data);
+                    auto comments_mutator = Matrix<Comment>::Mutator(data);
 
-                    Card card;
-                    card.cid = cid;
-                    card.text = request.text;
-                    card.color = request.color;
-                    cards_mutator.Add(card);
+                    Comment comment;
+                    comment.cid = cid;
+                    comment.oid = oid;
+                    comment.author_uid = uid;
+                    comment.text = request.text;
+                    comments_mutator.Add(comment);
 
-                    CardAuthor author;
-                    author.uid = uid;
-                    author.cid = cid;
-                    authors_mutator.Add(author);
-
-                    if (false) {
-                      // Master Gene taught us own cards should not be favorited by default.
-                      Favorite favorite;
-                      favorite.uid = uid;
-                      favorite.cid = cid;
-                      favorite.favorited = true;
-                      favorites_mutator.Add(favorite);
-                    }
-
-                    AddCardResponse response;
+                    AddCommentResponse response;
                     response.ms = now;
-                    response.cid = CIDToString(cid);
+                    response.oid = OIDToString(oid);
                     return Response(response, "created");
                   }
                 },
                 std::move(r));
           } catch (const bricks::ParseJSONException&) {
-            DebugPrint(Printf("[/ctfo/card] Could not parse POST body. Requested URL = '%s'",
+            DebugPrint(Printf("[/ctfo/comment] Could not parse POST body. Requested URL = '%s'",
                               r.url.ComposeURL().c_str()));
             r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
           }
-          */
         } else {
           DebugPrint(Printf("[/ctfo/comments] Wrong method '%s'. Requested URL = '%s'",
                             r.method.c_str(),

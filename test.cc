@@ -446,8 +446,58 @@ TEST(CTFO, SmokeTest) {
   }
 
   // Add a top-level comment.
+  std::string added_comment_oid;
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(102001));
+    AddCommentRequest add_comment_request;
+    add_comment_request.text = "Meh.";
+    const auto post_comment_response = HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
+                                                     FLAGS_api_port,
+                                                     actual_uid.c_str(),
+                                                     actual_token.c_str(),
+                                                     added_card_cid.c_str()),
+                                              add_comment_request));
+    EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
+    const auto add_comment_response = ParseJSON<AddCommentResponse>(post_comment_response.body);
+    EXPECT_EQ(102001u, add_comment_response.ms);
 
-  // Get comments, expecting one.
+    added_comment_oid = add_comment_response.oid;
+  }
+
+  // Get comments for the card where the comment was added, expecting one.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(103001));
+    const auto get_comments_response =
+        HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                        FLAGS_api_port,
+                        actual_uid.c_str(),
+                        actual_token.c_str(),
+                        added_card_cid.c_str())));
+    EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
+    const auto response = ParseJSON<ResponseComments>(get_comments_response.body);
+    EXPECT_EQ(103001u, response.ms);
+    ASSERT_EQ(1u, response.comments.size());
+    EXPECT_EQ(added_comment_oid, response.comments[0].oid);
+    EXPECT_EQ("", response.comments[0].parent_oid);
+    EXPECT_EQ(actual_uid, response.comments[0].author_uid);
+    EXPECT_EQ("Meh.", response.comments[0].text);
+    EXPECT_EQ(102001u, response.comments[0].ms);
+  }
+
+  // Get comments for the card where the comment was not added, expecting none.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(104001));
+    const auto get_comments_response =
+        HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                        FLAGS_api_port,
+                        actual_uid.c_str(),
+                        actual_token.c_str(),
+                        added_card2_cid.c_str())));
+    EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
+    const auto response = ParseJSON<ResponseComments>(get_comments_response.body);
+    EXPECT_EQ(104001u, response.ms);
+    EXPECT_EQ(0u, response.comments.size());
+  }
 
   // Add another top-level comment.
 

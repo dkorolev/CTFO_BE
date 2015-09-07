@@ -489,6 +489,25 @@ struct AddCardResponse {
   }
 };
 
+// Schema for the POST request to add a new comment.
+struct AddCommentRequest {
+  std::string text = "";  // Plain text.
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(text));
+  }
+};
+
+// Schema for the POST request to add a new comment.
+struct AddCommentResponse {
+  uint64_t ms;
+  std::string oid;
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms), CEREAL_NVP(oid));
+  }
+};
+
 // Comments response schema.
 struct ResponseComment {
   std::string oid = "oINVALID";         // Comment id, format 'o05XXX...'.
@@ -501,7 +520,7 @@ struct ResponseComment {
 
   template <typename A>
   void serialize(A& ar) {
-    ar(CEREAL_NVP(oid), CEREAL_NVP(parent_oid), CEREAL_NVP(author_uid), CEREAL_NVP(text));
+    ar(CEREAL_NVP(oid), CEREAL_NVP(parent_oid), CEREAL_NVP(author_uid), CEREAL_NVP(text), CEREAL_NVP(ms));
   }
 };
 
