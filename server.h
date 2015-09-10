@@ -527,7 +527,7 @@ class CTFOServer final {
       const std::string token = r.url.query["token"];
       const CID cid = StringToCID(r.url.query["cid"]);
       if (uid == UID::INVALID_USER) {
-        DebugPrint(Printf("[/ctfo/comment] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+        DebugPrint(Printf("[/ctfo/comments] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
       } else if (cid == CID::INVALID_CARD) {
         DebugPrint(Printf("[/ctfo/comments] Wrong CID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
@@ -639,11 +639,11 @@ class CTFOServer final {
                   }
                   if (!token_is_valid) {
                     DebugPrint(
-                        Printf("[/ctfo/comment] Invalid token. Requested URL = '%s'", requested_url.c_str()));
+                        Printf("[/ctfo/comments] Invalid token. Requested URL = '%s'", requested_url.c_str()));
                     return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
                   } else {
-                    DebugPrint(
-                        Printf("[/ctfo/comment] Token validated. Requested URL = '%s'", requested_url.c_str()));
+                    DebugPrint(Printf("[/ctfo/comments] Token validated. Requested URL = '%s'",
+                                      requested_url.c_str()));
                     const auto now = static_cast<uint64_t>(bricks::time::Now());
 
                     auto comments_mutator = Matrix<Comment>::Mutator(data);
@@ -680,7 +680,7 @@ class CTFOServer final {
                 },
                 std::move(r));
           } catch (const bricks::ParseJSONException&) {
-            DebugPrint(Printf("[/ctfo/comment] Could not parse POST body. Requested URL = '%s'",
+            DebugPrint(Printf("[/ctfo/comments] Could not parse POST body. Requested URL = '%s'",
                               r.url.ComposeURL().c_str()));
             r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
           }

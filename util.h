@@ -72,7 +72,7 @@ inline std::string OIDToString(const OID oid) {
 }
 
 inline OID StringToOID(const std::string& s) {
-  if (s.length() == 21 && s[0] == 'o') {  // 'c' + 20 digits of `uint64_t` decimal representation.
+  if (s.length() == 21 && s[0] == 'o') {  // 'o' + 20 digits of `uint64_t` decimal representation.
     return static_cast<OID>(FromString<uint64_t>(s.substr(1)));
   }
   return OID::INVALID_COMMENT;
