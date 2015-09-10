@@ -697,6 +697,56 @@ class CTFOServer final {
                               r.url.ComposeURL().c_str()));
             r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
           }
+        } else if (r.method == "DELETE") {
+          const OID oid = StringToOID(r.url.query["oid"]);
+          if (oid == OID::INVALID_COMMENT) {
+            DebugPrint(Printf("[/ctfo/comments] Wrong OID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+            r("NEED VALID OID\n", HTTPResponseCode.BadRequest);
+          } else {
+            const std::string requested_url = r.url.ComposeURL();
+            storage_.Transaction(
+                [this, requested_url, uid, cid, token, oid](StorageAPI::T_DATA data) {
+                  bool token_is_valid = false;
+                  const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+                  if (auth_token_accessor.Cols().Has(token)) {
+                    // Something went terribly wrong
+                    // if we have more than one authentication key for token.
+                    assert(auth_token_accessor[token].size() == 1);
+                    if (auth_token_accessor[token].begin()->valid) {
+                      // Double check, if the provided `uid` is correct as well.
+                      const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+                      token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                    }
+                  }
+                  if (!token_is_valid) {
+                    DebugPrint(
+                        Printf("[/ctfo/comments] Invalid token. Requested URL = '%s'", requested_url.c_str()));
+                    return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                  } else {
+                    DebugPrint(Printf("[/ctfo/comments] Token validated. Requested URL = '%s'",
+                                      requested_url.c_str()));
+                    DeleteCommentResponse response;
+                    // TODO(dkorolev): Do something smart about non-existing comments.
+                    try {
+                      auto comments_mutator = Matrix<Comment>::Mutator(data);
+                      std::vector<OID> oids_to_delete;
+                      oids_to_delete.push_back(oid);
+                      for (const Comment& c : comments_mutator[cid]) {
+                        if (c.parent_oid == oid) {
+                          oids_to_delete.push_back(c.oid);
+                        }
+                      }
+                      for (const OID& o : oids_to_delete) {
+                        comments_mutator.Delete(cid, o);
+                      }
+                    } catch (yoda::SubscriptException<Comment>) {
+                    }
+                    response.ms = static_cast<uint64_t>(bricks::time::Now());
+                    return Response(response, "deleted");
+                  }
+                },
+                std::move(r));
+          }
         } else {
           DebugPrint(Printf("[/ctfo/comments] Wrong method '%s'. Requested URL = '%s'",
                             r.method.c_str(),
@@ -846,7 +896,7 @@ class CTFOServer final {
     return response;
   }
 
-  void OnMidichloriansEvent(const LogEntry& entry) {
+  void OnMidichloriansEvent(const LogEntryWithHeaders& entry) {
     std::unique_ptr<MidichloriansEvent> event;
     if (entry.m == "POST") {
       try {

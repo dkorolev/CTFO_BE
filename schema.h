@@ -514,13 +514,22 @@ struct AddCommentShortRequest {
   }
 };
 
-// Schema for the POST request to add a new comment.
+// Schema for the response of the POST request to add a new comment.
 struct AddCommentResponse {
   uint64_t ms;
   std::string oid;
   template <typename A>
   void serialize(A& ar) {
     ar(CEREAL_NVP(ms), CEREAL_NVP(oid));
+  }
+};
+
+// Schema for the response of the DELETE request for a comment.
+struct DeleteCommentResponse {
+  uint64_t ms;
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms));
   }
 };
 
