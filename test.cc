@@ -810,6 +810,33 @@ TEST(CTFO, SmokeTest) {
   }
 
   // TODO(dkorolev): Test that I can only delete my own comments.
+
+  // Test that deleting one card of mine reduces the number of my cards from three to two.
+  {
+    EXPECT_EQ(3u,
+              ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str()))).body).cards.size());
+
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(201001));
+    const auto delete_card_response = HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str(),
+                                                         added_card_cid.c_str())));
+    EXPECT_EQ(200, static_cast<int>(delete_card_response.code));
+    const auto payload = ParseJSON<DeleteCardResponse>(delete_card_response.body);
+    EXPECT_EQ(201001u, payload.ms);
+
+    EXPECT_EQ(2u,
+              ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str()))).body).cards.size());
+  }
+
+  // TODO(dkorolev): Test that I can only delete my own cards.
 }
 
 TEST(CTFO, StrictAuth) {

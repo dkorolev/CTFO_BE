@@ -450,12 +450,7 @@ class CTFOServer final {
     HTTP(port_).Register("/ctfo/card", [this](Request r) {
       const UID uid = StringToUID(r.url.query["uid"]);
       const std::string token = r.url.query["token"];
-      if (r.method != "POST") {
-        DebugPrint(Printf("[/ctfo/card] Wrong method '%s'. Requested URL = '%s'",
-                          r.method.c_str(),
-                          r.url.ComposeURL().c_str()));
-        r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
-      } else {
+      if (r.method == "POST") {
         if (uid == UID::INVALID_USER) {
           DebugPrint(Printf("[/ctfo/card] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
           r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
@@ -531,6 +526,63 @@ class CTFOServer final {
             r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
           }
         }
+      } else if (r.method == "DELETE") {
+        const CID cid = StringToCID(r.url.query["cid"]);
+        if (cid == CID::INVALID_CARD) {
+          DebugPrint(Printf("[/ctfo/card] Wrong CID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+          r("NEED VALID OID\n", HTTPResponseCode.BadRequest);
+        } else {
+          const std::string requested_url = r.url.ComposeURL();
+          storage_.Transaction(
+              [this, requested_url, uid, cid, token](StorageAPI::T_DATA data) {
+                bool token_is_valid = false;
+                const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+                if (auth_token_accessor.Cols().Has(token)) {
+                  // Something went terribly wrong
+                  // if we have more than one authentication key for token.
+                  assert(auth_token_accessor[token].size() == 1);
+                  if (auth_token_accessor[token].begin()->valid) {
+                    // Double check, if the provided `uid` is correct as well.
+                    const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+                    token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                  }
+                }
+                if (!token_is_valid) {
+                  DebugPrint(Printf("[/ctfo/card] Invalid token. Requested URL = '%s'", requested_url.c_str()));
+                  return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                } else {
+                  DebugPrint(
+                      Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
+                  // TODO(dkorolev): Do something smart about non-existing cards.
+                  auto cards_mutator = Dictionary<Card>::Mutator(data);
+                  cards_mutator.Delete(cid);
+                  auto card_authors_mutator = Matrix<CardAuthor>::Mutator(data);
+                  card_authors_mutator.Delete(cid, uid);
+                  try {
+                    auto comments_mutator = Matrix<Comment>::Mutator(data);
+                    std::vector<OID> oids_to_delete;
+                    for (const Comment& c : comments_mutator[cid]) {
+                      oids_to_delete.push_back(c.oid);
+                    }
+                    for (const OID& o : oids_to_delete) {
+                      comments_mutator.Delete(cid, o);
+                    }
+                  } catch (yoda::SubscriptException<Comment>) {
+                    DebugPrint(Printf("[/ctfo/card] yoda::SubscriptException<Comment>, Requested URL = '%s'",
+                                      requested_url.c_str()));
+                  }
+                  DeleteCardResponse response;
+                  response.ms = static_cast<uint64_t>(bricks::time::Now());
+                  return Response(response, "deleted");
+                }
+              },
+              std::move(r));
+        }
+      } else {
+        DebugPrint(Printf("[/ctfo/card] Wrong method '%s'. Requested URL = '%s'",
+                          r.method.c_str(),
+                          r.url.ComposeURL().c_str()));
+        r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
       }
     });
 
@@ -547,8 +599,9 @@ class CTFOServer final {
         r("NEED VALID CID\n", HTTPResponseCode.BadRequest);
       } else {
         if (r.method == "GET") {
+          const std::string requested_url = r.url.ComposeURL();
           storage_.Transaction(
-              [this, uid, cid, token](StorageAPI::T_DATA data) {
+              [this, uid, cid, token, requested_url](StorageAPI::T_DATA data) {
                 bool token_is_valid = false;
                 const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
                 if (auth_token_accessor.Cols().Has(token)) {
@@ -579,6 +632,9 @@ class CTFOServer final {
                         proto_comments.push_back(comment);
                       }
                     } catch (yoda::SubscriptException<Comment>) {
+                      DebugPrint(
+                          Printf("[/ctfo/comments] yoda:SubscriptException<Comment>, Requested URL = '%s'",
+                                 requested_url.c_str()));
                     }
                     const auto comments_accessor = Matrix<Comment>::Accessor(data);
                     const auto sortkey = [&comments_accessor](const Comment& c)
@@ -725,7 +781,6 @@ class CTFOServer final {
                   } else {
                     DebugPrint(Printf("[/ctfo/comments] Token validated. Requested URL = '%s'",
                                       requested_url.c_str()));
-                    DeleteCommentResponse response;
                     // TODO(dkorolev): Do something smart about non-existing comments.
                     try {
                       auto comments_mutator = Matrix<Comment>::Mutator(data);
@@ -741,6 +796,7 @@ class CTFOServer final {
                       }
                     } catch (yoda::SubscriptException<Comment>) {
                     }
+                    DeleteCommentResponse response;
                     response.ms = static_cast<uint64_t>(bricks::time::Now());
                     return Response(response, "deleted");
                   }

@@ -495,6 +495,15 @@ struct AddCardResponse {
   }
 };
 
+// Schema for the response of the DELETE request for a card.
+struct DeleteCardResponse {
+  uint64_t ms;
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms));
+  }
+};
+
 // Schema for the POST request to add a new comment.
 struct AddCommentRequest {
   std::string text = "";  // Plain text.
