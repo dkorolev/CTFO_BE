@@ -178,13 +178,14 @@ const std::vector<Color> CARD_COLORS{{0x0A, 0xB2, 0xCB},
                                      {0xF5, 0xC6, 0x7A}};
 
 // Data structures for internal storage.
-enum class UID : uint64_t { INVALID = 0u };
-enum class CID : uint64_t { INVALID = 0u };
+enum class UID : uint64_t { INVALID_USER = 0u };
+enum class CID : uint64_t { INVALID_CARD = 0u };
+enum class OID : uint64_t { INVALID_COMMENT = 0u };
 enum class ANSWER : int { UNSEEN = 0, CTFO = 1, TFU = 2, SKIP = -1 };
 enum class AUTH_TYPE : int { UNDEFINED = 0, IOS };
 
 struct User : yoda::Padawan {
-  UID uid = UID::INVALID;
+  UID uid = UID::INVALID_USER;
   uint8_t level = 0u;   // User level [0, 9].
   uint64_t score = 0u;  // User score.
 
@@ -247,7 +248,7 @@ struct AuthKeyTokenPair : yoda::Padawan {
 
 struct AuthKeyUIDPair : yoda::Padawan {
   AuthKey auth_key;
-  UID uid = UID::INVALID;
+  UID uid = UID::INVALID_USER;
 
   AuthKeyUIDPair() = default;
   AuthKeyUIDPair(const AuthKey& auth_key, const UID uid) : auth_key(auth_key), uid(uid) {}
@@ -265,7 +266,7 @@ struct AuthKeyUIDPair : yoda::Padawan {
 };
 
 struct Card : yoda::Padawan {
-  CID cid = CID::INVALID;
+  CID cid = CID::INVALID_CARD;
   std::string text = "";     // Plain text.
   Color color;               // Color.
   uint64_t ctfo_count = 0u;  // Number of users, who said "CTFO" on this card.
@@ -292,8 +293,8 @@ struct Card : yoda::Padawan {
 };
 
 struct CardAuthor : yoda::Padawan {
-  CID cid = CID::INVALID;
-  UID uid = UID::INVALID;
+  CID cid = CID::INVALID_CARD;
+  UID uid = UID::INVALID_USER;
 
   CardAuthor() = default;
   CardAuthor(const CardAuthor&) = default;
@@ -312,8 +313,8 @@ struct CardAuthor : yoda::Padawan {
 };
 
 struct Answer : yoda::Padawan {
-  UID uid = UID::INVALID;
-  CID cid = CID::INVALID;
+  UID uid = UID::INVALID_USER;
+  CID cid = CID::INVALID_CARD;
   ANSWER answer = ANSWER::UNSEEN;
 
   Answer() = default;
@@ -333,8 +334,8 @@ struct Answer : yoda::Padawan {
 };
 
 struct Favorite : yoda::Padawan {
-  UID uid = UID::INVALID;
-  CID cid = CID::INVALID;
+  UID uid = UID::INVALID_USER;
+  CID cid = CID::INVALID_CARD;
   bool favorited = false;
 
   Favorite() = default;
@@ -349,6 +350,31 @@ struct Favorite : yoda::Padawan {
   void serialize(A& ar) {
     Padawan::serialize(ar);
     ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(favorited));
+  }
+};
+
+struct Comment : yoda::Padawan {
+  CID cid = CID::INVALID_CARD;     // Row key: Card ID.
+  OID oid = OID::INVALID_COMMENT;  // Col key: Comment ID.
+
+  OID parent_oid = OID::INVALID_COMMENT;  // `INVALID_COMMENT` for a top-level comment, parent OID otherwise.
+
+  UID author_uid = UID::INVALID_USER;
+  std::string text;
+
+  Comment() = default;
+  Comment(const CID cid, const OID oid, const OID parent_oid, const UID author_uid, const std::string& text)
+      : cid(cid), oid(oid), parent_oid(parent_oid), author_uid(author_uid), text(text) {}
+
+  CID row() const { return cid; }
+  void set_row(const CID value) { cid = value; }
+  OID col() const { return oid; }
+  void set_col(OID value) { oid = value; }
+
+  template <typename A>
+  void serialize(A& ar) {
+    Padawan::serialize(ar);
+    ar(CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(parent_oid), CEREAL_NVP(author_uid), CEREAL_NVP(text));
   }
 };
 
@@ -367,22 +393,27 @@ struct ResponseUserEntry {
 };
 
 struct ResponseCardEntry {
-  std::string cid = "cINVALID";  // Card id, format 'c02XXX...'.
-  std::string text = "";         // Card text.
-  Color color;                   // Card color.
-  double relevance = 0.0;        // Card relevance for particular user, [0.0, 1.0].
-  uint64_t ctfo_score = 0u;      // Number of points, which user gets for "CTFO" answer.
-  uint64_t tfu_score = 0u;       // Number of points, which user gets for "TFU" answer.
-  uint64_t ctfo_count = 0u;      // Number of users, who said "CTFO" on this card.
-  uint64_t tfu_count = 0u;       // Number of users, who said "TFU" on this card.
-  uint64_t skip_count = 0u;      // Number of users, who said "SKIP" on this card.
-  std::string vote = "";         // "CTFO" or "TFU" if this user has cast this vote, empty string otherwise.
-  bool favorited = false;        // True if the current user has favorited this card.
+  std::string cid = "cINVALID";         // Card id, format 'c02XXX...'.
+  std::string author_uid = "uINVALID";  // The author of this comment.
+  std::string text = "";                // Card text.
+  uint64_t ms;                          // Card timestamp, milliseconds from epoch.
+  Color color;                          // Card color.
+  double relevance = 0.0;               // Card relevance for particular user, [0.0, 1.0].
+  uint64_t ctfo_score = 0u;             // Number of points, which user gets for "CTFO" answer.
+  uint64_t tfu_score = 0u;              // Number of points, which user gets for "TFU" answer.
+  uint64_t ctfo_count = 0u;             // Number of users, who said "CTFO" on this card.
+  uint64_t tfu_count = 0u;              // Number of users, who said "TFU" on this card.
+  uint64_t skip_count = 0u;             // Number of users, who said "SKIP" on this card.
+  std::string vote = "";    // "CTFO" or "TFU" if this user has cast this vote, empty string otherwise.
+  bool favorited = false;   // True if the current user has favorited this card.
+  bool is_my_card = false;  // True if this card has been created by this user.
 
   template <typename A>
   void serialize(A& ar) {
     ar(CEREAL_NVP(cid),
+       CEREAL_NVP(author_uid),
        CEREAL_NVP(text),
+       CEREAL_NVP(ms),
        CEREAL_NVP(color),
        CEREAL_NVP(relevance),
        CEREAL_NVP(ctfo_score),
@@ -391,7 +422,8 @@ struct ResponseCardEntry {
        CEREAL_NVP(tfu_count),
        CEREAL_NVP(skip_count),
        CEREAL_NVP(vote),
-       CEREAL_NVP(favorited));
+       CEREAL_NVP(favorited),
+       CEREAL_NVP(is_my_card));
   }
 };
 
@@ -442,6 +474,15 @@ struct AddCardRequest {
   }
 };
 
+// A shortened version of `AddCardRequest`.
+struct AddCardShortRequest {
+  std::string text = "";  // Plain text.
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(text));
+  }
+};
+
 // Schema for the response of the POST request to add a new card.
 struct AddCardResponse {
   uint64_t ms;
@@ -451,6 +492,63 @@ struct AddCardResponse {
     ar(CEREAL_NVP(ms), CEREAL_NVP(cid));
   }
 };
+
+// Schema for the POST request to add a new comment.
+struct AddCommentRequest {
+  std::string text = "";  // Plain text.
+  std::string parent_oid = "";
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(text), CEREAL_NVP(parent_oid));
+  }
+};
+
+// A shortened version of `AddCommentRequest`.
+struct AddCommentShortRequest {
+  std::string text = "";  // Plain text.
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(text));
+  }
+};
+
+// Schema for the POST request to add a new comment.
+struct AddCommentResponse {
+  uint64_t ms;
+  std::string oid;
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms), CEREAL_NVP(oid));
+  }
+};
+
+// Comments response schema.
+struct ResponseComment {
+  std::string oid = "oINVALID";         // Comment id, format 'o05XXX...'.
+  std::string parent_oid = "";          // Empty string or parent comment id. NOTE: Two levels of comments only.
+  std::string author_uid = "uINVALID";  // User id, format 'u01XXX...'.
+  std::string text;                     // Comment text.
+  uint64_t ms;                          // Comment timestamp, milliseconds from epoch.
+  // TODO(dkorolev): User name? Tier status?
+  // TODO(dkorolev): Color?
+
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(oid), CEREAL_NVP(parent_oid), CEREAL_NVP(author_uid), CEREAL_NVP(text), CEREAL_NVP(ms));
+  }
+};
+
+struct ResponseComments {
+  uint64_t ms;                            // Server timestamp, milliseconds from epoch.
+  std::vector<ResponseComment> comments;  // Comments.
+
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms), CEREAL_NVP(comments));
+  }
+};
+
+// TODO(dkorolev): Constraints on comment length when adding them?
 
 // To parse incoming Midichlorians logs.
 enum class RESPONSE : int {

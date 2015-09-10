@@ -100,7 +100,7 @@ class CTFOServer final {
           storage_.Transaction(
               [this, device_id, app_key, feed_count](StorageAPI::T_DATA data) {
                 AuthKey auth_key("iOS::" + device_id + "::" + app_key, AUTH_TYPE::IOS);
-                UID uid = UID::INVALID;
+                UID uid = UID::INVALID_USER;
                 User user;
                 ResponseUserEntry user_entry;
                 std::string token;
@@ -114,7 +114,7 @@ class CTFOServer final {
                 }
 
                 auto auth_token_mutator = Matrix<AuthKeyTokenPair>::Mutator(data);
-                if (uid != UID::INVALID) {
+                if (uid != UID::INVALID_USER) {
                   // User exists => invalidate all tokens.
                   for (const auto& auth_token : auth_token_mutator[auth_key]) {
                     auth_token_mutator.Add(AuthKeyTokenPair(auth_key, auth_token.token, false));
@@ -128,7 +128,7 @@ class CTFOServer final {
                 } while (auth_token_mutator.Cols().Has(token));
                 auth_token_mutator.Add(AuthKeyTokenPair(auth_key, token, true));
 
-                if (uid != UID::INVALID) {  // Existing user.
+                if (uid != UID::INVALID_USER) {  // Existing user.
                   user_entry.score = user.score;
                   DebugPrint(
                       Printf("[/ctfo/auth/ios] Existing user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
@@ -168,7 +168,7 @@ class CTFOServer final {
                           r.url.ComposeURL().c_str()));
         r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
       } else {
-        if (uid == UID::INVALID) {
+        if (uid == UID::INVALID_USER) {
           DebugPrint(Printf("[/ctfo/feed] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
           r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
         } else {
@@ -217,7 +217,7 @@ class CTFOServer final {
                           r.url.ComposeURL().c_str()));
         r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
       } else {
-        if (uid == UID::INVALID) {
+        if (uid == UID::INVALID_USER) {
           DebugPrint(Printf("[/ctfo/favs] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
           r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
         } else {
@@ -266,10 +266,21 @@ class CTFOServer final {
                     std::sort(favs.rbegin(), favs.rend());
 
                     // And publish them.
-                    const auto GenerateCardForFavs = [this, uid, &answers](const Card& card) {
+                    const auto card_authors = Matrix<CardAuthor>::Accessor(data);
+                    const auto GenerateCardForFavs = [this, uid, &answers, &card_authors](const Card& card) {
                       ResponseCardEntry card_entry;
                       card_entry.cid = CIDToString(card.cid);
+                      try {
+                        const auto& iterable = card_authors.Rows()[card.cid];
+                        if (iterable.size() == 1u) {
+                          const UID author_uid = (*iterable.begin()).uid;
+                          card_entry.author_uid = UIDToString(author_uid);
+                          card_entry.is_my_card = (uid == author_uid);
+                        }
+                      } catch (yoda::SubscriptException<CardAuthor>) {
+                      }
                       card_entry.text = card.text;
+                      card_entry.ms = card.ms;
                       card_entry.color = card.color;
                       card_entry.relevance = RandomDouble(0, 1);
                       card_entry.ctfo_score = 50u;
@@ -317,7 +328,7 @@ class CTFOServer final {
                           r.url.ComposeURL().c_str()));
         r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
       } else {
-        if (uid == UID::INVALID) {
+        if (uid == UID::INVALID_USER) {
           DebugPrint(Printf("[/ctfo/my_cards] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
           r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
         } else {
@@ -365,10 +376,22 @@ class CTFOServer final {
                     std::sort(my_cards.rbegin(), my_cards.rend());
 
                     // And publish them.
-                    const auto GenerateCardForMyCards = [this, uid, &answers, &favorites](const Card& card) {
+                    const auto card_authors = Matrix<CardAuthor>::Accessor(data);
+                    const auto GenerateCardForMyCards =
+                        [this, uid, &answers, &favorites, &card_authors](const Card& card) {
                       ResponseCardEntry card_entry;
                       card_entry.cid = CIDToString(card.cid);
+                      try {
+                        const auto& iterable = card_authors.Rows()[card.cid];
+                        if (iterable.size() == 1u) {
+                          const UID author_uid = (*iterable.begin()).uid;
+                          card_entry.author_uid = UIDToString(author_uid);
+                          card_entry.is_my_card = (uid == author_uid);
+                        }
+                      } catch (yoda::SubscriptException<CardAuthor>) {
+                      }
                       card_entry.text = card.text;
+                      card_entry.ms = card.ms;
                       card_entry.color = card.color;
                       card_entry.relevance = RandomDouble(0, 1);
                       card_entry.ctfo_score = 50u;
@@ -420,15 +443,23 @@ class CTFOServer final {
                           r.url.ComposeURL().c_str()));
         r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
       } else {
-        if (uid == UID::INVALID) {
+        if (uid == UID::INVALID_USER) {
           DebugPrint(Printf("[/ctfo/card] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
           r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
         } else {
           const std::string requested_url = r.url.ComposeURL();
+          const CID cid = RandomCID();
           try {
-            const auto request = ParseJSON<AddCardRequest>(r.body);
+            AddCardRequest request;
+            try {
+              ParseJSON(r.body, request);
+            } catch (const bricks::ParseJSONException&) {
+              const auto short_request = ParseJSON<AddCardShortRequest>(r.body);
+              request.text = short_request.text;
+              request.color = CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()];
+            }
             storage_.Transaction(
-                [this, uid, token, request, requested_url](StorageAPI::T_DATA data) {
+                [this, cid, uid, token, request, requested_url](StorageAPI::T_DATA data) {
                   bool token_is_valid = false;
                   const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
                   if (auth_token_accessor.Cols().Has(token)) {
@@ -448,7 +479,6 @@ class CTFOServer final {
                   } else {
                     DebugPrint(
                         Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
-                    const CID cid = RandomCID();
                     const auto now = static_cast<uint64_t>(bricks::time::Now());
 
                     auto cards_mutator = Dictionary<Card>::Mutator(data);
@@ -466,11 +496,14 @@ class CTFOServer final {
                     author.cid = cid;
                     authors_mutator.Add(author);
 
-                    Favorite favorite;
-                    favorite.uid = uid;
-                    favorite.cid = cid;
-                    favorite.favorited = true;
-                    favorites_mutator.Add(favorite);
+                    if (false) {
+                      // Master Gene taught us own cards should not be favorited by default.
+                      Favorite favorite;
+                      favorite.uid = uid;
+                      favorite.cid = cid;
+                      favorite.favorited = true;
+                      favorites_mutator.Add(favorite);
+                    }
 
                     AddCardResponse response;
                     response.ms = now;
@@ -487,14 +520,191 @@ class CTFOServer final {
         }
       }
     });
+
+    // TODO(dkorolev): Avoid this shameless copy-pasting.
+    const auto comments_handler = [this](Request r) {
+      const UID uid = StringToUID(r.url.query["uid"]);
+      const std::string token = r.url.query["token"];
+      const CID cid = StringToCID(r.url.query["cid"]);
+      if (uid == UID::INVALID_USER) {
+        DebugPrint(Printf("[/ctfo/comments] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+        r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
+      } else if (cid == CID::INVALID_CARD) {
+        DebugPrint(Printf("[/ctfo/comments] Wrong CID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+        r("NEED VALID CID\n", HTTPResponseCode.BadRequest);
+      } else {
+        if (r.method == "GET") {
+          storage_.Transaction(
+              [this, uid, cid, token](StorageAPI::T_DATA data) {
+                bool token_is_valid = false;
+                const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+                if (auth_token_accessor.Cols().Has(token)) {
+                  // Something went terribly wrong
+                  // if we have more than one authentication key for token.
+                  assert(auth_token_accessor[token].size() == 1);
+                  if (auth_token_accessor[token].begin()->valid) {
+                    // Double check, if the provided `uid` is correct as well.
+                    const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+                    token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                  }
+                }
+                if (!token_is_valid) {
+                  DebugPrint("[/ctfo/comments] Invalid token.");
+                  return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                } else {
+                  DebugPrint("[/ctfo/comments] Token validated.");
+                  const auto user = data.Get(uid);
+                  if (!user) {
+                    return Response("NEED VALID USER\n", HTTPResponseCode.Unauthorized);
+                  } else {
+                    ResponseComments response;
+                    response.ms = static_cast<uint64_t>(bricks::time::Now());
+                    std::vector<Comment> proto_comments;
+                    try {
+                      const auto comments = Matrix<Comment>::Accessor(data);
+                      for (const auto& comment : comments[cid]) {
+                        proto_comments.push_back(comment);
+                      }
+                    } catch (yoda::SubscriptException<Comment>) {
+                    }
+                    const auto comments_accessor = Matrix<Comment>::Accessor(data);
+                    const auto sortkey = [&comments_accessor](const Comment& c)
+                        -> std::pair<uint64_t, uint64_t> {
+                      uint64_t comment_timestamp = 0u;
+                      uint64_t top_level_comment_timestamp = 0u;
+                      if (c.parent_oid == OID::INVALID_COMMENT) {
+                        // This comment is top-level.
+                        top_level_comment_timestamp = c.ms;
+                      } else {
+                        // This is a 2nd-level comment.
+                        comment_timestamp = c.ms;
+                        try {
+                          const auto& iterable = comments_accessor.Cols()[c.parent_oid];
+                          if (iterable.size() == 1u) {
+                            top_level_comment_timestamp = (*iterable.begin()).ms;
+                          }
+                        } catch (yoda::SubscriptException<Comment>) {
+                        }
+                      }
+                      // Top-level comments reverse chronologically, 2nd level comments chronologically.
+                      return std::make_pair(~top_level_comment_timestamp, comment_timestamp);
+                    };
+                    std::sort(proto_comments.begin(),
+                              proto_comments.end(),
+                              [&sortkey](const Comment& lhs,
+                                         const Comment& rhs) { return sortkey(lhs) < sortkey(rhs); });
+                    std::vector<ResponseComment>& output_comments = response.comments;
+                    for (const auto& comment : proto_comments) {
+                      // TODO(dkorolev): Need a function to convert `Comment` into `ResponseComment`.
+                      ResponseComment c;
+                      c.oid = OIDToString(comment.oid);
+                      if (comment.parent_oid != OID::INVALID_COMMENT) {
+                        // `c.parent_oid` should be either parent comment ID, or blank string.
+                        c.parent_oid = OIDToString(comment.parent_oid);
+                      }
+                      c.author_uid = UIDToString(comment.author_uid);
+                      c.text = comment.text;
+                      c.ms = comment.ms;
+                      output_comments.push_back(std::move(c));
+                    }
+                    return Response(response, "comments");
+                  }
+                }
+              },
+              std::move(r));
+        } else if (r.method == "POST") {
+          const std::string requested_url = r.url.ComposeURL();
+          const OID oid = RandomOID();
+          try {
+            AddCommentRequest request;
+            try {
+              ParseJSON(r.body, request);
+            } catch (const bricks::ParseJSONException&) {
+              const auto short_request = ParseJSON<AddCommentShortRequest>(r.body);
+              request.text = short_request.text;
+            }
+            storage_.Transaction(
+                [this, cid, uid, oid, token, request, requested_url](StorageAPI::T_DATA data) {
+                  bool token_is_valid = false;
+                  const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+                  if (auth_token_accessor.Cols().Has(token)) {
+                    // Something went terribly wrong
+                    // if we have more than one authentication key for token.
+                    assert(auth_token_accessor[token].size() == 1);
+                    if (auth_token_accessor[token].begin()->valid) {
+                      // Double check, if the provided `uid` is correct as well.
+                      const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+                      token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                    }
+                  }
+                  if (!token_is_valid) {
+                    DebugPrint(
+                        Printf("[/ctfo/comments] Invalid token. Requested URL = '%s'", requested_url.c_str()));
+                    return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                  } else {
+                    DebugPrint(Printf("[/ctfo/comments] Token validated. Requested URL = '%s'",
+                                      requested_url.c_str()));
+                    const auto now = static_cast<uint64_t>(bricks::time::Now());
+
+                    auto comments_mutator = Matrix<Comment>::Mutator(data);
+
+                    Comment comment;
+                    comment.cid = cid;
+                    comment.oid = oid;
+                    comment.author_uid = uid;
+                    comment.text = request.text;
+
+                    if (!request.parent_oid.empty()) {
+                      comment.parent_oid = StringToOID(request.parent_oid);
+                      try {
+                        const auto& iterable = comments_mutator.Cols()[comment.parent_oid];
+                        if (iterable.size() != 1u) {
+                          // TODO(dkorolev): This error is oh so wrong. Fix it.
+                          return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
+                        } else if ((*iterable.begin()).parent_oid != OID::INVALID_COMMENT) {
+                          return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n",
+                                          HTTPResponseCode.BadRequest);
+                        }
+                      } catch (yoda::SubscriptException<Comment>) {
+                        return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
+                      }
+                    }
+
+                    comments_mutator.Add(comment);
+
+                    AddCommentResponse response;
+                    response.ms = now;
+                    response.oid = OIDToString(oid);
+                    return Response(response, "created");
+                  }
+                },
+                std::move(r));
+          } catch (const bricks::ParseJSONException&) {
+            DebugPrint(Printf("[/ctfo/comments] Could not parse POST body. Requested URL = '%s'",
+                              r.url.ComposeURL().c_str()));
+            r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
+          }
+        } else {
+          DebugPrint(Printf("[/ctfo/comments] Wrong method '%s'. Requested URL = '%s'",
+                            r.method.c_str(),
+                            r.url.ComposeURL().c_str()));
+          r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
+        }
+      }
+    };
+    HTTP(port_).Register("/ctfo/comments", comments_handler);
+    HTTP(port_).Register("/ctfo/comment", comments_handler);
   }
 
   ~CTFOServer() {
+    // TODO(dkorolev): Scoped registerers FTW.
     HTTP(port_).UnRegister("/ctfo/auth/ios");
     HTTP(port_).UnRegister("/ctfo/feed");
     HTTP(port_).UnRegister("/ctfo/favs");
     HTTP(port_).UnRegister("/ctfo/my_cards");
     HTTP(port_).UnRegister("/ctfo/card");
+    HTTP(port_).UnRegister("/ctfo/comments");
+    HTTP(port_).UnRegister("/ctfo/comment");
   }
 
   void Join() { HTTP(port_).Join(); }
@@ -512,7 +722,8 @@ class CTFOServer final {
                         Dictionary<Card>,
                         Matrix<CardAuthor>,
                         Matrix<Answer>,
-                        Matrix<Favorite>> StorageAPI;
+                        Matrix<Favorite>,
+                        Matrix<Comment>> StorageAPI;
   StorageAPI storage_;
 
   const std::map<std::string, RESPONSE> valid_responses_ = {{"CTFO", RESPONSE::CTFO},
@@ -556,10 +767,21 @@ class CTFOServer final {
     }
     std::shuffle(candidates.begin(), candidates.end(), mt19937_64_tls());
 
-    const auto GenerateCardForFeed = [this, uid, &answers, &favorites](const Card& card) {
+    const auto card_authors = Matrix<CardAuthor>::Accessor(data);
+    const auto GenerateCardForFeed = [this, uid, &answers, &favorites, &card_authors](const Card& card) {
       ResponseCardEntry card_entry;
       card_entry.cid = CIDToString(card.cid);
+      try {
+        const auto& iterable = card_authors.Rows()[card.cid];
+        if (iterable.size() == 1u) {
+          const UID author_uid = (*iterable.begin()).uid;
+          card_entry.author_uid = UIDToString(author_uid);
+          card_entry.is_my_card = (uid == author_uid);
+        }
+      } catch (yoda::SubscriptException<CardAuthor>) {
+      }
       card_entry.text = card.text;
+      card_entry.ms = card.ms;
       card_entry.color = card.color;
       card_entry.relevance = RandomDouble(0, 1);
       card_entry.ctfo_score = 50u;
@@ -637,7 +859,7 @@ class CTFOServer final {
                           uid_str.c_str(),
                           cid_str.c_str(),
                           token.c_str()));
-        if (uid != UID::INVALID && cid != CID::INVALID) {
+        if (uid != UID::INVALID_USER && cid != CID::INVALID_CARD) {
           storage_.Transaction([this, uid, cid, uid_str, cid_str, token, response](StorageAPI::T_DATA data) {
             const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
             bool token_is_valid = false;

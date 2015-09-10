@@ -43,6 +43,8 @@ inline std::string RandomToken() {
   return bricks::strings::Printf("t%020llu", RandomUInt64(3 * ID_RANGE + 1, 4 * ID_RANGE - 1));
 }
 
+inline OID RandomOID() { return static_cast<OID>(RandomUInt64(4 * ID_RANGE + 1, 5 * ID_RANGE - 1)); }
+
 inline std::string UIDToString(const UID uid) {
   return bricks::strings::Printf("u%020llu", static_cast<uint64_t>(uid));
 }
@@ -51,7 +53,7 @@ inline UID StringToUID(const std::string& s) {
   if (s.length() == 21 && s[0] == 'u') {  // 'u' + 20 digits of `uint64_t` decimal representation.
     return static_cast<UID>(FromString<uint64_t>(s.substr(1)));
   }
-  return UID::INVALID;
+  return UID::INVALID_USER;
 }
 
 inline std::string CIDToString(const CID cid) {
@@ -62,7 +64,18 @@ inline CID StringToCID(const std::string& s) {
   if (s.length() == 21 && s[0] == 'c') {  // 'c' + 20 digits of `uint64_t` decimal representation.
     return static_cast<CID>(FromString<uint64_t>(s.substr(1)));
   }
-  return CID::INVALID;
+  return CID::INVALID_CARD;
+}
+
+inline std::string OIDToString(const OID oid) {
+  return bricks::strings::Printf("o%020llu", static_cast<uint64_t>(oid));
+}
+
+inline OID StringToOID(const std::string& s) {
+  if (s.length() == 21 && s[0] == 'o') {  // 'o' + 20 digits of `uint64_t` decimal representation.
+    return static_cast<OID>(FromString<uint64_t>(s.substr(1)));
+  }
+  return OID::INVALID_COMMENT;
 }
 
 #endif  // CTFO_UTIL_H
