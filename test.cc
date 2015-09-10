@@ -127,6 +127,8 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ(0u, card.ctfo_count);
       EXPECT_EQ(0u, card.tfu_count);
       EXPECT_EQ(0u, card.skip_count);
+      EXPECT_EQ(false, card.is_my_card);
+      EXPECT_EQ(0u, card.number_of_comments);
     }
     for (const ResponseCardEntry& card : feed_response.feed_recent) {
       recent_cids.insert(card.cid);
@@ -134,6 +136,8 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ(0u, card.ctfo_count);
       EXPECT_EQ(0u, card.tfu_count);
       EXPECT_EQ(0u, card.skip_count);
+      EXPECT_EQ(false, card.is_my_card);
+      EXPECT_EQ(0u, card.number_of_comments);
     }
     EXPECT_EQ(40u, hot_cids.size());
     EXPECT_EQ(40u, hot_texts.size());
@@ -465,6 +469,30 @@ TEST(CTFO, SmokeTest) {
     added_comment_oid = add_comment_response.oid;
   }
 
+  // Confirm the card payload lists the number of comments as "1" now.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(102501));
+    const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                          FLAGS_api_port,
+                                          actual_uid.c_str(),
+                                          actual_token.c_str())));
+    EXPECT_EQ(200, static_cast<int>(my_cards.code));
+    const auto my_cards_response = ParseJSON<ResponseMyCards>(my_cards.body);
+
+    EXPECT_EQ(102501u, my_cards_response.ms);
+    EXPECT_EQ(actual_uid, my_cards_response.user.uid);
+    ASSERT_EQ(3u, my_cards_response.cards.size());
+    EXPECT_EQ("Meh.", my_cards_response.cards[0].text);
+    EXPECT_EQ(21001u, my_cards_response.cards[0].ms);
+    EXPECT_EQ(0u, my_cards_response.cards[0].number_of_comments);
+    EXPECT_EQ("Bar.", my_cards_response.cards[1].text);
+    EXPECT_EQ(19001u, my_cards_response.cards[1].ms);
+    EXPECT_EQ(0u, my_cards_response.cards[1].number_of_comments);
+    EXPECT_EQ("Foo.", my_cards_response.cards[2].text);
+    EXPECT_EQ(16001u, my_cards_response.cards[2].ms);
+    EXPECT_EQ(1u, my_cards_response.cards[2].number_of_comments);
+  }
+
   // Get comments for the card where the comment was added, expecting one.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(103001));
@@ -625,6 +653,30 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(actual_uid, response.comments[3].author_uid);
     EXPECT_EQ("Meh.", response.comments[3].text);
     EXPECT_EQ(102001u, response.comments[3].ms);
+  }
+
+  // Confirm the card payload lists the number of comments as "4" now.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(109501));
+    const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                          FLAGS_api_port,
+                                          actual_uid.c_str(),
+                                          actual_token.c_str())));
+    EXPECT_EQ(200, static_cast<int>(my_cards.code));
+    const auto my_cards_response = ParseJSON<ResponseMyCards>(my_cards.body);
+
+    EXPECT_EQ(109501u, my_cards_response.ms);
+    EXPECT_EQ(actual_uid, my_cards_response.user.uid);
+    ASSERT_EQ(3u, my_cards_response.cards.size());
+    EXPECT_EQ("Meh.", my_cards_response.cards[0].text);
+    EXPECT_EQ(21001u, my_cards_response.cards[0].ms);
+    EXPECT_EQ(0u, my_cards_response.cards[0].number_of_comments);
+    EXPECT_EQ("Bar.", my_cards_response.cards[1].text);
+    EXPECT_EQ(19001u, my_cards_response.cards[1].ms);
+    EXPECT_EQ(0u, my_cards_response.cards[1].number_of_comments);
+    EXPECT_EQ("Foo.", my_cards_response.cards[2].text);
+    EXPECT_EQ(16001u, my_cards_response.cards[2].ms);
+    EXPECT_EQ(4u, my_cards_response.cards[2].number_of_comments);
   }
 
   // Attempt to add a 3rd level comment, expecting an error.

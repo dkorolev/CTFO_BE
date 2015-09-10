@@ -267,7 +267,9 @@ class CTFOServer final {
 
                     // And publish them.
                     const auto card_authors = Matrix<CardAuthor>::Accessor(data);
-                    const auto GenerateCardForFavs = [this, uid, &answers, &card_authors](const Card& card) {
+                    const auto comments = Matrix<Comment>::Accessor(data);
+                    const auto GenerateCardForFavs =
+                        [this, uid, &answers, &card_authors, &comments](const Card& card) {
                       ResponseCardEntry card_entry;
                       card_entry.cid = CIDToString(card.cid);
                       try {
@@ -278,6 +280,11 @@ class CTFOServer final {
                           card_entry.is_my_card = (uid == author_uid);
                         }
                       } catch (yoda::SubscriptException<CardAuthor>) {
+                      }
+                      try {
+                        card_entry.number_of_comments = comments.Rows()[card.cid].size();
+                      } catch (yoda::SubscriptException<Comment>) {
+                        // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
                       }
                       card_entry.text = card.text;
                       card_entry.ms = card.ms;
@@ -377,8 +384,9 @@ class CTFOServer final {
 
                     // And publish them.
                     const auto card_authors = Matrix<CardAuthor>::Accessor(data);
+                    const auto comments = Matrix<Comment>::Accessor(data);
                     const auto GenerateCardForMyCards =
-                        [this, uid, &answers, &favorites, &card_authors](const Card& card) {
+                        [this, uid, &answers, &favorites, &card_authors, comments](const Card& card) {
                       ResponseCardEntry card_entry;
                       card_entry.cid = CIDToString(card.cid);
                       try {
@@ -389,6 +397,11 @@ class CTFOServer final {
                           card_entry.is_my_card = (uid == author_uid);
                         }
                       } catch (yoda::SubscriptException<CardAuthor>) {
+                      }
+                      try {
+                        card_entry.number_of_comments = comments.Rows()[card.cid].size();
+                      } catch (yoda::SubscriptException<Comment>) {
+                        // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
                       }
                       card_entry.text = card.text;
                       card_entry.ms = card.ms;
@@ -768,7 +781,9 @@ class CTFOServer final {
     std::shuffle(candidates.begin(), candidates.end(), mt19937_64_tls());
 
     const auto card_authors = Matrix<CardAuthor>::Accessor(data);
-    const auto GenerateCardForFeed = [this, uid, &answers, &favorites, &card_authors](const Card& card) {
+    const auto comments = Matrix<Comment>::Accessor(data);
+    const auto GenerateCardForFeed =
+        [this, uid, &answers, &favorites, &comments, &card_authors](const Card& card) {
       ResponseCardEntry card_entry;
       card_entry.cid = CIDToString(card.cid);
       try {
@@ -779,6 +794,11 @@ class CTFOServer final {
           card_entry.is_my_card = (uid == author_uid);
         }
       } catch (yoda::SubscriptException<CardAuthor>) {
+      }
+      try {
+        card_entry.number_of_comments = comments.Rows()[card.cid].size();
+      } catch (yoda::SubscriptException<Comment>) {
+        // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
       }
       card_entry.text = card.text;
       card_entry.ms = card.ms;
