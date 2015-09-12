@@ -273,7 +273,7 @@ class CTFOServer final {
                       ResponseCardEntry card_entry;
                       card_entry.cid = CIDToString(card.cid);
                       try {
-                        const auto& iterable = card_authors.Rows()[card.cid];
+                        const auto& iterable = card_authors[card.cid];
                         if (iterable.size() == 1u) {
                           const UID author_uid = (*iterable.begin()).uid;
                           card_entry.author_uid = UIDToString(author_uid);
@@ -282,7 +282,7 @@ class CTFOServer final {
                       } catch (yoda::SubscriptException<CardAuthor>) {
                       }
                       try {
-                        card_entry.number_of_comments = comments.Rows()[card.cid].size();
+                        card_entry.number_of_comments = comments[card.cid].size();
                       } catch (yoda::SubscriptException<Comment>) {
                         // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
                       }
@@ -386,11 +386,11 @@ class CTFOServer final {
                     const auto card_authors = Matrix<CardAuthor>::Accessor(data);
                     const auto comments = Matrix<Comment>::Accessor(data);
                     const auto GenerateCardForMyCards =
-                        [this, uid, &answers, &favorites, &card_authors, comments](const Card& card) {
+                        [this, uid, &answers, &favorites, &card_authors, &comments](const Card& card) {
                       ResponseCardEntry card_entry;
                       card_entry.cid = CIDToString(card.cid);
                       try {
-                        const auto& iterable = card_authors.Rows()[card.cid];
+                        const auto& iterable = card_authors[card.cid];
                         if (iterable.size() == 1u) {
                           const UID author_uid = (*iterable.begin()).uid;
                           card_entry.author_uid = UIDToString(author_uid);
@@ -399,7 +399,7 @@ class CTFOServer final {
                       } catch (yoda::SubscriptException<CardAuthor>) {
                       }
                       try {
-                        card_entry.number_of_comments = comments.Rows()[card.cid].size();
+                        card_entry.number_of_comments = comments[card.cid].size();
                       } catch (yoda::SubscriptException<Comment>) {
                         // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
                       }
@@ -893,7 +893,7 @@ class CTFOServer final {
       ResponseCardEntry card_entry;
       card_entry.cid = CIDToString(card.cid);
       try {
-        const auto& iterable = card_authors.Rows()[card.cid];
+        const auto& iterable = card_authors[card.cid];
         if (iterable.size() == 1u) {
           const UID author_uid = (*iterable.begin()).uid;
           card_entry.author_uid = UIDToString(author_uid);
@@ -902,7 +902,7 @@ class CTFOServer final {
       } catch (yoda::SubscriptException<CardAuthor>) {
       }
       try {
-        card_entry.number_of_comments = comments.Rows()[card.cid].size();
+        card_entry.number_of_comments = comments[card.cid].size();
       } catch (yoda::SubscriptException<Comment>) {
         // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
       }
