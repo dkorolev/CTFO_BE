@@ -267,17 +267,24 @@ class CTFOServer final {
 
                     // And publish them.
                     const auto card_authors = Matrix<CardAuthor>::Accessor(data);
-                    const auto GenerateCardForFavs = [this, uid, &answers, &card_authors](const Card& card) {
+                    const auto comments = Matrix<Comment>::Accessor(data);
+                    const auto GenerateCardForFavs =
+                        [this, uid, &answers, &card_authors, &comments](const Card& card) {
                       ResponseCardEntry card_entry;
                       card_entry.cid = CIDToString(card.cid);
                       try {
-                        const auto& iterable = card_authors.Rows()[card.cid];
+                        const auto& iterable = card_authors[card.cid];
                         if (iterable.size() == 1u) {
                           const UID author_uid = (*iterable.begin()).uid;
                           card_entry.author_uid = UIDToString(author_uid);
                           card_entry.is_my_card = (uid == author_uid);
                         }
                       } catch (yoda::SubscriptException<CardAuthor>) {
+                      }
+                      try {
+                        card_entry.number_of_comments = comments[card.cid].size();
+                      } catch (yoda::SubscriptException<Comment>) {
+                        // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
                       }
                       card_entry.text = card.text;
                       card_entry.ms = card.ms;
@@ -377,18 +384,24 @@ class CTFOServer final {
 
                     // And publish them.
                     const auto card_authors = Matrix<CardAuthor>::Accessor(data);
+                    const auto comments = Matrix<Comment>::Accessor(data);
                     const auto GenerateCardForMyCards =
-                        [this, uid, &answers, &favorites, &card_authors](const Card& card) {
+                        [this, uid, &answers, &favorites, &card_authors, &comments](const Card& card) {
                       ResponseCardEntry card_entry;
                       card_entry.cid = CIDToString(card.cid);
                       try {
-                        const auto& iterable = card_authors.Rows()[card.cid];
+                        const auto& iterable = card_authors[card.cid];
                         if (iterable.size() == 1u) {
                           const UID author_uid = (*iterable.begin()).uid;
                           card_entry.author_uid = UIDToString(author_uid);
                           card_entry.is_my_card = (uid == author_uid);
                         }
                       } catch (yoda::SubscriptException<CardAuthor>) {
+                      }
+                      try {
+                        card_entry.number_of_comments = comments[card.cid].size();
+                      } catch (yoda::SubscriptException<Comment>) {
+                        // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
                       }
                       card_entry.text = card.text;
                       card_entry.ms = card.ms;
@@ -437,12 +450,7 @@ class CTFOServer final {
     HTTP(port_).Register("/ctfo/card", [this](Request r) {
       const UID uid = StringToUID(r.url.query["uid"]);
       const std::string token = r.url.query["token"];
-      if (r.method != "POST") {
-        DebugPrint(Printf("[/ctfo/card] Wrong method '%s'. Requested URL = '%s'",
-                          r.method.c_str(),
-                          r.url.ComposeURL().c_str()));
-        r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
-      } else {
+      if (r.method == "POST") {
         if (uid == UID::INVALID_USER) {
           DebugPrint(Printf("[/ctfo/card] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
           r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
@@ -518,6 +526,63 @@ class CTFOServer final {
             r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
           }
         }
+      } else if (r.method == "DELETE") {
+        const CID cid = StringToCID(r.url.query["cid"]);
+        if (cid == CID::INVALID_CARD) {
+          DebugPrint(Printf("[/ctfo/card] Wrong CID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+          r("NEED VALID OID\n", HTTPResponseCode.BadRequest);
+        } else {
+          const std::string requested_url = r.url.ComposeURL();
+          storage_.Transaction(
+              [this, requested_url, uid, cid, token](StorageAPI::T_DATA data) {
+                bool token_is_valid = false;
+                const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+                if (auth_token_accessor.Cols().Has(token)) {
+                  // Something went terribly wrong
+                  // if we have more than one authentication key for token.
+                  assert(auth_token_accessor[token].size() == 1);
+                  if (auth_token_accessor[token].begin()->valid) {
+                    // Double check, if the provided `uid` is correct as well.
+                    const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+                    token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                  }
+                }
+                if (!token_is_valid) {
+                  DebugPrint(Printf("[/ctfo/card] Invalid token. Requested URL = '%s'", requested_url.c_str()));
+                  return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                } else {
+                  DebugPrint(
+                      Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
+                  // TODO(dkorolev): Do something smart about non-existing cards.
+                  auto cards_mutator = Dictionary<Card>::Mutator(data);
+                  cards_mutator.Delete(cid);
+                  auto card_authors_mutator = Matrix<CardAuthor>::Mutator(data);
+                  card_authors_mutator.Delete(cid, uid);
+                  try {
+                    auto comments_mutator = Matrix<Comment>::Mutator(data);
+                    std::vector<OID> oids_to_delete;
+                    for (const Comment& c : comments_mutator[cid]) {
+                      oids_to_delete.push_back(c.oid);
+                    }
+                    for (const OID& o : oids_to_delete) {
+                      comments_mutator.Delete(cid, o);
+                    }
+                  } catch (yoda::SubscriptException<Comment>) {
+                    DebugPrint(Printf("[/ctfo/card] yoda::SubscriptException<Comment>, Requested URL = '%s'",
+                                      requested_url.c_str()));
+                  }
+                  DeleteCardResponse response;
+                  response.ms = static_cast<uint64_t>(bricks::time::Now());
+                  return Response(response, "deleted");
+                }
+              },
+              std::move(r));
+        }
+      } else {
+        DebugPrint(Printf("[/ctfo/card] Wrong method '%s'. Requested URL = '%s'",
+                          r.method.c_str(),
+                          r.url.ComposeURL().c_str()));
+        r("METHOD NOT ALLOWED\n", HTTPResponseCode.MethodNotAllowed);
       }
     });
 
@@ -534,8 +599,9 @@ class CTFOServer final {
         r("NEED VALID CID\n", HTTPResponseCode.BadRequest);
       } else {
         if (r.method == "GET") {
+          const std::string requested_url = r.url.ComposeURL();
           storage_.Transaction(
-              [this, uid, cid, token](StorageAPI::T_DATA data) {
+              [this, uid, cid, token, requested_url](StorageAPI::T_DATA data) {
                 bool token_is_valid = false;
                 const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
                 if (auth_token_accessor.Cols().Has(token)) {
@@ -566,6 +632,9 @@ class CTFOServer final {
                         proto_comments.push_back(comment);
                       }
                     } catch (yoda::SubscriptException<Comment>) {
+                      DebugPrint(
+                          Printf("[/ctfo/comments] yoda:SubscriptException<Comment>, Requested URL = '%s'",
+                                 requested_url.c_str()));
                     }
                     const auto comments_accessor = Matrix<Comment>::Accessor(data);
                     const auto sortkey = [&comments_accessor](const Comment& c)
@@ -684,6 +753,56 @@ class CTFOServer final {
                               r.url.ComposeURL().c_str()));
             r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
           }
+        } else if (r.method == "DELETE") {
+          const OID oid = StringToOID(r.url.query["oid"]);
+          if (oid == OID::INVALID_COMMENT) {
+            DebugPrint(Printf("[/ctfo/comments] Wrong OID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+            r("NEED VALID OID\n", HTTPResponseCode.BadRequest);
+          } else {
+            const std::string requested_url = r.url.ComposeURL();
+            storage_.Transaction(
+                [this, requested_url, uid, cid, token, oid](StorageAPI::T_DATA data) {
+                  bool token_is_valid = false;
+                  const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+                  if (auth_token_accessor.Cols().Has(token)) {
+                    // Something went terribly wrong
+                    // if we have more than one authentication key for token.
+                    assert(auth_token_accessor[token].size() == 1);
+                    if (auth_token_accessor[token].begin()->valid) {
+                      // Double check, if the provided `uid` is correct as well.
+                      const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+                      token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                    }
+                  }
+                  if (!token_is_valid) {
+                    DebugPrint(
+                        Printf("[/ctfo/comments] Invalid token. Requested URL = '%s'", requested_url.c_str()));
+                    return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                  } else {
+                    DebugPrint(Printf("[/ctfo/comments] Token validated. Requested URL = '%s'",
+                                      requested_url.c_str()));
+                    // TODO(dkorolev): Do something smart about non-existing comments.
+                    try {
+                      auto comments_mutator = Matrix<Comment>::Mutator(data);
+                      std::vector<OID> oids_to_delete;
+                      oids_to_delete.push_back(oid);
+                      for (const Comment& c : comments_mutator[cid]) {
+                        if (c.parent_oid == oid) {
+                          oids_to_delete.push_back(c.oid);
+                        }
+                      }
+                      for (const OID& o : oids_to_delete) {
+                        comments_mutator.Delete(cid, o);
+                      }
+                    } catch (yoda::SubscriptException<Comment>) {
+                    }
+                    DeleteCommentResponse response;
+                    response.ms = static_cast<uint64_t>(bricks::time::Now());
+                    return Response(response, "deleted");
+                  }
+                },
+                std::move(r));
+          }
         } else {
           DebugPrint(Printf("[/ctfo/comments] Wrong method '%s'. Requested URL = '%s'",
                             r.method.c_str(),
@@ -768,17 +887,24 @@ class CTFOServer final {
     std::shuffle(candidates.begin(), candidates.end(), mt19937_64_tls());
 
     const auto card_authors = Matrix<CardAuthor>::Accessor(data);
-    const auto GenerateCardForFeed = [this, uid, &answers, &favorites, &card_authors](const Card& card) {
+    const auto comments = Matrix<Comment>::Accessor(data);
+    const auto GenerateCardForFeed =
+        [this, uid, &answers, &favorites, &comments, &card_authors](const Card& card) {
       ResponseCardEntry card_entry;
       card_entry.cid = CIDToString(card.cid);
       try {
-        const auto& iterable = card_authors.Rows()[card.cid];
+        const auto& iterable = card_authors[card.cid];
         if (iterable.size() == 1u) {
           const UID author_uid = (*iterable.begin()).uid;
           card_entry.author_uid = UIDToString(author_uid);
           card_entry.is_my_card = (uid == author_uid);
         }
       } catch (yoda::SubscriptException<CardAuthor>) {
+      }
+      try {
+        card_entry.number_of_comments = comments[card.cid].size();
+      } catch (yoda::SubscriptException<Comment>) {
+        // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
       }
       card_entry.text = card.text;
       card_entry.ms = card.ms;
@@ -826,7 +952,7 @@ class CTFOServer final {
     return response;
   }
 
-  void OnMidichloriansEvent(const LogEntry& entry) {
+  void OnMidichloriansEvent(const LogEntryWithHeaders& entry) {
     std::unique_ptr<MidichloriansEvent> event;
     if (entry.m == "POST") {
       try {

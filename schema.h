@@ -404,9 +404,10 @@ struct ResponseCardEntry {
   uint64_t ctfo_count = 0u;             // Number of users, who said "CTFO" on this card.
   uint64_t tfu_count = 0u;              // Number of users, who said "TFU" on this card.
   uint64_t skip_count = 0u;             // Number of users, who said "SKIP" on this card.
-  std::string vote = "";    // "CTFO" or "TFU" if this user has cast this vote, empty string otherwise.
-  bool favorited = false;   // True if the current user has favorited this card.
-  bool is_my_card = false;  // True if this card has been created by this user.
+  std::string vote = "";                // "CTFO", "TFU", or empty string.
+  bool favorited = false;               // True if the current user has favorited this card.
+  bool is_my_card = false;              // True if this card has been created by this user.
+  size_t number_of_comments = 0u;       // The total number of comments left for this card.
 
   template <typename A>
   void serialize(A& ar) {
@@ -423,7 +424,8 @@ struct ResponseCardEntry {
        CEREAL_NVP(skip_count),
        CEREAL_NVP(vote),
        CEREAL_NVP(favorited),
-       CEREAL_NVP(is_my_card));
+       CEREAL_NVP(is_my_card),
+       CEREAL_NVP(number_of_comments));
   }
 };
 
@@ -493,6 +495,15 @@ struct AddCardResponse {
   }
 };
 
+// Schema for the response of the DELETE request for a card.
+struct DeleteCardResponse {
+  uint64_t ms;
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms));
+  }
+};
+
 // Schema for the POST request to add a new comment.
 struct AddCommentRequest {
   std::string text = "";  // Plain text.
@@ -512,13 +523,22 @@ struct AddCommentShortRequest {
   }
 };
 
-// Schema for the POST request to add a new comment.
+// Schema for the response of the POST request to add a new comment.
 struct AddCommentResponse {
   uint64_t ms;
   std::string oid;
   template <typename A>
   void serialize(A& ar) {
     ar(CEREAL_NVP(ms), CEREAL_NVP(oid));
+  }
+};
+
+// Schema for the response of the DELETE request for a comment.
+struct DeleteCommentResponse {
+  uint64_t ms;
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms));
   }
 };
 

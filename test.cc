@@ -127,6 +127,8 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ(0u, card.ctfo_count);
       EXPECT_EQ(0u, card.tfu_count);
       EXPECT_EQ(0u, card.skip_count);
+      EXPECT_FALSE(card.is_my_card);
+      EXPECT_EQ(0u, card.number_of_comments);
     }
     for (const ResponseCardEntry& card : feed_response.feed_recent) {
       recent_cids.insert(card.cid);
@@ -134,6 +136,8 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ(0u, card.ctfo_count);
       EXPECT_EQ(0u, card.tfu_count);
       EXPECT_EQ(0u, card.skip_count);
+      EXPECT_FALSE(card.is_my_card);
+      EXPECT_EQ(0u, card.number_of_comments);
     }
     EXPECT_EQ(40u, hot_cids.size());
     EXPECT_EQ(40u, hot_texts.size());
@@ -465,6 +469,30 @@ TEST(CTFO, SmokeTest) {
     added_comment_oid = add_comment_response.oid;
   }
 
+  // Confirm the card payload lists the number of comments as "1" now.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(102501));
+    const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                          FLAGS_api_port,
+                                          actual_uid.c_str(),
+                                          actual_token.c_str())));
+    EXPECT_EQ(200, static_cast<int>(my_cards.code));
+    const auto my_cards_response = ParseJSON<ResponseMyCards>(my_cards.body);
+
+    EXPECT_EQ(102501u, my_cards_response.ms);
+    EXPECT_EQ(actual_uid, my_cards_response.user.uid);
+    ASSERT_EQ(3u, my_cards_response.cards.size());
+    EXPECT_EQ("Meh.", my_cards_response.cards[0].text);
+    EXPECT_EQ(21001u, my_cards_response.cards[0].ms);
+    EXPECT_EQ(0u, my_cards_response.cards[0].number_of_comments);
+    EXPECT_EQ("Bar.", my_cards_response.cards[1].text);
+    EXPECT_EQ(19001u, my_cards_response.cards[1].ms);
+    EXPECT_EQ(0u, my_cards_response.cards[1].number_of_comments);
+    EXPECT_EQ("Foo.", my_cards_response.cards[2].text);
+    EXPECT_EQ(16001u, my_cards_response.cards[2].ms);
+    EXPECT_EQ(1u, my_cards_response.cards[2].number_of_comments);
+  }
+
   // Get comments for the card where the comment was added, expecting one.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(103001));
@@ -627,6 +655,30 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(102001u, response.comments[3].ms);
   }
 
+  // Confirm the card payload lists the number of comments as "4" now.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(109501));
+    const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                          FLAGS_api_port,
+                                          actual_uid.c_str(),
+                                          actual_token.c_str())));
+    EXPECT_EQ(200, static_cast<int>(my_cards.code));
+    const auto my_cards_response = ParseJSON<ResponseMyCards>(my_cards.body);
+
+    EXPECT_EQ(109501u, my_cards_response.ms);
+    EXPECT_EQ(actual_uid, my_cards_response.user.uid);
+    ASSERT_EQ(3u, my_cards_response.cards.size());
+    EXPECT_EQ("Meh.", my_cards_response.cards[0].text);
+    EXPECT_EQ(21001u, my_cards_response.cards[0].ms);
+    EXPECT_EQ(0u, my_cards_response.cards[0].number_of_comments);
+    EXPECT_EQ("Bar.", my_cards_response.cards[1].text);
+    EXPECT_EQ(19001u, my_cards_response.cards[1].ms);
+    EXPECT_EQ(0u, my_cards_response.cards[1].number_of_comments);
+    EXPECT_EQ("Foo.", my_cards_response.cards[2].text);
+    EXPECT_EQ(16001u, my_cards_response.cards[2].ms);
+    EXPECT_EQ(4u, my_cards_response.cards[2].number_of_comments);
+  }
+
   // Attempt to add a 3rd level comment, expecting an error.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(110001));
@@ -660,6 +712,131 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(400, static_cast<int>(post_comment_response.code));
     EXPECT_EQ("NEED EMPTY OR VALID PARENT_OID\n", post_comment_response.body);
   }
+
+  // Delete the top-level comment with no second level comments,
+  // and confirm that the number of comments goes down from 4 to 3.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(111001));
+    const auto delete_comment_response =
+        HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
+                           FLAGS_api_port,
+                           actual_uid.c_str(),
+                           actual_token.c_str(),
+                           added_card_cid.c_str(),
+                           added_comment_oid.c_str())));
+    EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
+    const auto payload = ParseJSON<DeleteCommentResponse>(delete_comment_response.body);
+    EXPECT_EQ(111001u, payload.ms);
+
+    EXPECT_EQ(3u,
+              ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str()))).body)
+                  .cards[2]
+                  .number_of_comments);
+  }
+
+  // Try to delete a comment w/o specifying card ID.
+  {
+    const auto delete_comment_response =
+        HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&oid=%s",
+                           FLAGS_api_port,
+                           actual_uid.c_str(),
+                           actual_token.c_str(),
+                           added_comment_oid.c_str())));
+    EXPECT_EQ(400, static_cast<int>(delete_comment_response.code));
+    EXPECT_EQ("NEED VALID CID\n", delete_comment_response.body);
+  }
+
+  // Try to delete a comment using a wrong token.
+  {
+    const auto delete_comment_response =
+        HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=WRONG_TOKEN&cid=%s&oid=%s",
+                           FLAGS_api_port,
+                           actual_uid.c_str(),
+                           added_card_cid.c_str(),
+                           added_comment_oid.c_str())));
+    EXPECT_EQ(401, static_cast<int>(delete_comment_response.code));
+    EXPECT_EQ("NEED VALID UID-TOKEN PAIR\n", delete_comment_response.body);
+  }
+
+  // Delete one of two second-level comments, and confirm that
+  // the number of comments goes down from 3 to 2.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(112001));
+    const auto delete_comment_response =
+        HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
+                           FLAGS_api_port,
+                           actual_uid.c_str(),
+                           actual_token.c_str(),
+                           added_card_cid.c_str(),
+                           added_nested_comment_2_oid.c_str())));
+    EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
+    const auto payload = ParseJSON<DeleteCommentResponse>(delete_comment_response.body);
+    EXPECT_EQ(112001u, payload.ms);
+
+    EXPECT_EQ(2u,
+              ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str()))).body)
+                  .cards[2]
+                  .number_of_comments);
+  }
+
+  // Delete the remaining top-level comment, and confirm that the number of comments
+  // goes down from 2 to 0, since deleting the top-level comments deletes its children.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(113001));
+    const auto delete_comment_response =
+        HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
+                           FLAGS_api_port,
+                           actual_uid.c_str(),
+                           actual_token.c_str(),
+                           added_card_cid.c_str(),
+                           added_second_comment_oid.c_str())));
+    EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
+    const auto payload = ParseJSON<DeleteCommentResponse>(delete_comment_response.body);
+    EXPECT_EQ(113001u, payload.ms);
+
+    EXPECT_EQ(0u,
+              ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str()))).body)
+                  .cards[2]
+                  .number_of_comments);
+  }
+
+  // TODO(dkorolev): Test that I can only delete my own comments.
+
+  // Test that deleting one card of mine reduces the number of my cards from three to two.
+  {
+    EXPECT_EQ(3u,
+              ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str()))).body).cards.size());
+
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(201001));
+    const auto delete_card_response = HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str(),
+                                                         added_card_cid.c_str())));
+    EXPECT_EQ(200, static_cast<int>(delete_card_response.code));
+    const auto payload = ParseJSON<DeleteCardResponse>(delete_card_response.body);
+    EXPECT_EQ(201001u, payload.ms);
+
+    EXPECT_EQ(2u,
+              ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str()))).body).cards.size());
+  }
+
+  // TODO(dkorolev): Test that I can only delete my own cards.
 }
 
 TEST(CTFO, StrictAuth) {
