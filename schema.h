@@ -543,6 +543,7 @@ struct ResponseComment {
   std::string oid = "oINVALID";         // Comment id, format 'o05XXX...'.
   std::string parent_oid = "";          // Empty string or parent comment id. NOTE: Two levels of comments only.
   std::string author_uid = "uINVALID";  // User id, format 'u01XXX...'.
+  uint8_t author_level = 0u;            // Author user level, [0, 9].
   std::string text;                     // Comment text.
   uint64_t ms;                          // Comment timestamp, milliseconds from epoch.
   // TODO(dkorolev): User name? Tier status?
@@ -550,7 +551,12 @@ struct ResponseComment {
 
   template <typename A>
   void serialize(A& ar) {
-    ar(CEREAL_NVP(oid), CEREAL_NVP(parent_oid), CEREAL_NVP(author_uid), CEREAL_NVP(text), CEREAL_NVP(ms));
+    ar(CEREAL_NVP(oid),
+       CEREAL_NVP(parent_oid),
+       CEREAL_NVP(author_uid),
+       CEREAL_NVP(author_level),
+       CEREAL_NVP(text),
+       CEREAL_NVP(ms));
   }
 };
 

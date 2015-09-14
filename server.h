@@ -660,6 +660,7 @@ class CTFOServer final {
                     DebugPrint(Printf("[/ctfo/comments] yoda:SubscriptException<Comment>, Requested URL = '%s'",
                                       requested_url.c_str()));
                   }
+                  const auto users_accessor = Dictionary<User>::Accessor(data);
                   const auto comments_accessor = Matrix<Comment>::Accessor(data);
                   const auto sortkey = [&comments_accessor](const Comment& c) -> std::pair<uint64_t, uint64_t> {
                     uint64_t comment_timestamp = 0u;
@@ -695,6 +696,7 @@ class CTFOServer final {
                       c.parent_oid = OIDToString(comment.parent_oid);
                     }
                     c.author_uid = UIDToString(comment.author_uid);
+                    c.author_level = users_accessor[uid].level;
                     c.text = comment.text;
                     c.ms = comment.ms;
                     output_comments.push_back(std::move(c));
