@@ -390,6 +390,22 @@ struct CommentLike : yoda::Padawan {
   }
 };
 
+struct CommentFlagAsInappropriate : yoda::Padawan {
+  OID oid;
+  UID uid;
+
+  OID row() const { return oid; }
+  void set_row(const OID value) { oid = value; }
+  UID col() const { return uid; }
+  void set_col(UID value) { uid = value; }
+
+  template <typename A>
+  void serialize(A& ar) {
+    Padawan::serialize(ar);
+    ar(CEREAL_NVP(oid), CEREAL_NVP(uid));
+  }
+};
+
 // Data structures for generating RESTful responses.
 struct ResponseUserEntry {
   std::string uid = "uINVALID";    // User id, format 'u01XXX...'.
@@ -601,6 +617,7 @@ enum class RESPONSE : int {
   UNFAV_CARD = 102,
   LIKE_COMMENT = 201,
   UNLIKE_COMMENT = 202,
+  FLAG_COMMENT = 203
 };
 
 #endif  // CTFO_SCHEMA_H

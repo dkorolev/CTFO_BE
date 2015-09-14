@@ -285,7 +285,7 @@ class CTFOServer final {
                                          favs.emplace_back(fav.ms, fav.cid);
                                        }
                                      }
-                                   } catch (yoda::SubscriptException<Favorite>) {
+                                   } catch (const yoda::SubscriptException<Favorite>&) {
                                      // No favorites for this user.
                                    }
 
@@ -306,11 +306,11 @@ class CTFOServer final {
                                          card_entry.author_uid = UIDToString(author_uid);
                                          card_entry.is_my_card = (uid == author_uid);
                                        }
-                                     } catch (yoda::SubscriptException<CardAuthor>) {
+                                     } catch (const yoda::SubscriptException<CardAuthor>&) {
                                      }
                                      try {
                                        card_entry.number_of_comments = comments[card.cid].size();
-                                     } catch (yoda::SubscriptException<Comment>) {
+                                     } catch (const yoda::SubscriptException<Comment>&) {
                                        // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
                                      }
                                      card_entry.text = card.text;
@@ -402,7 +402,7 @@ class CTFOServer final {
                     for (const auto& my_card : cards_by_author[uid]) {
                       my_cards.emplace_back(my_card.ms, my_card.cid);
                     }
-                  } catch (yoda::SubscriptException<CardAuthor>) {
+                  } catch (const yoda::SubscriptException<CardAuthor>&) {
                     // No cards for this user.
                   }
 
@@ -423,11 +423,11 @@ class CTFOServer final {
                         card_entry.author_uid = UIDToString(author_uid);
                         card_entry.is_my_card = (uid == author_uid);
                       }
-                    } catch (yoda::SubscriptException<CardAuthor>) {
+                    } catch (const yoda::SubscriptException<CardAuthor>&) {
                     }
                     try {
                       card_entry.number_of_comments = comments[card.cid].size();
-                    } catch (yoda::SubscriptException<Comment>) {
+                    } catch (const yoda::SubscriptException<Comment>&) {
                       // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
                     }
                     card_entry.text = card.text;
@@ -592,7 +592,7 @@ class CTFOServer final {
                   for (const OID& o : oids_to_delete) {
                     comments_mutator.Delete(cid, o);
                   }
-                } catch (yoda::SubscriptException<Comment>) {
+                } catch (const yoda::SubscriptException<Comment>&) {
                   DebugPrint(Printf("[/ctfo/card] yoda::SubscriptException<Comment>, Requested URL = '%s'",
                                     requested_url.c_str()));
                 }
@@ -648,21 +648,27 @@ class CTFOServer final {
                 if (!user) {
                   return Response("NEED VALID USER\n", HTTPResponseCode.Unauthorized);
                 } else {
-                  ResponseComments response;
-                  response.ms = static_cast<uint64_t>(bricks::time::Now());
+                  const auto users_accessor = Dictionary<User>::Accessor(data);
+                  const auto comments_accessor = Matrix<Comment>::Accessor(data);
+                  const auto comment_likes_accessor = Matrix<CommentLike>::Accessor(data);
+                  const auto comment_flagged_accessor = Matrix<CommentFlagAsInappropriate>::Accessor(data);
                   std::vector<Comment> proto_comments;
                   try {
                     const auto comments = Matrix<Comment>::Accessor(data);
                     for (const auto& comment : comments[cid]) {
-                      proto_comments.push_back(comment);
+                      try {
+                        if (!comment_flagged_accessor[uid].Has(comment.oid)) {
+                          proto_comments.push_back(comment);
+                        }
+                      } catch (const yoda::SubscriptException<CommentFlagAsInappropriate>&) {
+                        // TODO(dkorolev): An `Optional<>`-like accessor would eliminate the need in this.
+                        proto_comments.push_back(comment);
+                      }
                     }
-                  } catch (yoda::SubscriptException<Comment>) {
+                  } catch (const yoda::SubscriptException<Comment>&) {
                     DebugPrint(Printf("[/ctfo/comments] yoda:SubscriptException<Comment>, Requested URL = '%s'",
                                       requested_url.c_str()));
                   }
-                  const auto users_accessor = Dictionary<User>::Accessor(data);
-                  const auto comments_accessor = Matrix<Comment>::Accessor(data);
-                  const auto comment_likes_accessor = Matrix<CommentLike>::Accessor(data);
                   const auto sortkey = [&comments_accessor](const Comment& c) -> std::pair<uint64_t, uint64_t> {
                     uint64_t comment_timestamp = 0u;
                     uint64_t top_level_comment_timestamp = 0u;
@@ -677,7 +683,7 @@ class CTFOServer final {
                         if (iterable.size() == 1u) {
                           top_level_comment_timestamp = (*iterable.begin()).ms;
                         }
-                      } catch (yoda::SubscriptException<Comment>) {
+                      } catch (const yoda::SubscriptException<Comment>&) {
                       }
                     }
                     // Top-level comments reverse chronologically, 2nd level comments chronologically.
@@ -687,6 +693,8 @@ class CTFOServer final {
                             proto_comments.end(),
                             [&sortkey](const Comment& lhs,
                                        const Comment& rhs) { return sortkey(lhs) < sortkey(rhs); });
+                  ResponseComments response;
+                  response.ms = static_cast<uint64_t>(bricks::time::Now());
                   std::vector<ResponseComment>& output_comments = response.comments;
                   for (const auto& comment : proto_comments) {
                     // TODO(dkorolev): Need a function to convert `Comment` into `ResponseComment`.
@@ -703,7 +711,7 @@ class CTFOServer final {
                       const auto& likers = comment_likes_accessor[comment.oid];
                       c.number_of_likes = likers.size();
                       c.liked = likers.Has(uid);
-                    } catch (yoda::SubscriptException<CommentLike>) {
+                    } catch (const yoda::SubscriptException<CommentLike>&) {
                     }
                     c.ms = comment.ms;
                     output_comments.push_back(std::move(c));
@@ -765,7 +773,7 @@ class CTFOServer final {
                       } else if ((*iterable.begin()).parent_oid != OID::INVALID_COMMENT) {
                         return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n", HTTPResponseCode.BadRequest);
                       }
-                    } catch (yoda::SubscriptException<Comment>) {
+                    } catch (const yoda::SubscriptException<Comment>&) {
                       return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
                     }
                   }
@@ -825,7 +833,7 @@ class CTFOServer final {
                     for (const OID& o : oids_to_delete) {
                       comments_mutator.Delete(cid, o);
                     }
-                  } catch (yoda::SubscriptException<Comment>) {
+                  } catch (const yoda::SubscriptException<Comment>&) {
                   }
                   DeleteCommentResponse response;
                   response.ms = static_cast<uint64_t>(bricks::time::Now());
@@ -858,7 +866,8 @@ class CTFOServer final {
                         Matrix<Answer>,
                         Matrix<Favorite>,
                         Matrix<Comment>,
-                        Matrix<CommentLike>> StorageAPI;
+                        Matrix<CommentLike>,
+                        Matrix<CommentFlagAsInappropriate>> StorageAPI;
   StorageAPI storage_;
 
   const std::map<std::string, RESPONSE> valid_responses_ = {{"CTFO", RESPONSE::CTFO},
@@ -869,7 +878,8 @@ class CTFOServer final {
                                                             {"UNFAV", RESPONSE::UNFAV_CARD},
                                                             {"UNFAV_CARD", RESPONSE::UNFAV_CARD},
                                                             {"LIKE_COMMENT", RESPONSE::LIKE_COMMENT},
-                                                            {"UNLIKE_COMMENT", RESPONSE::UNLIKE_COMMENT}};
+                                                            {"UNLIKE_COMMENT", RESPONSE::UNLIKE_COMMENT},
+                                                            {"FLAG_COMMENT", RESPONSE::FLAG_COMMENT}};
 
   void DebugPrint(const std::string& message) {
     if (debug_print_) {
@@ -919,11 +929,11 @@ class CTFOServer final {
           card_entry.author_uid = UIDToString(author_uid);
           card_entry.is_my_card = (uid == author_uid);
         }
-      } catch (yoda::SubscriptException<CardAuthor>) {
+      } catch (const yoda::SubscriptException<CardAuthor>&) {
       }
       try {
         card_entry.number_of_comments = comments[card.cid].size();
-      } catch (yoda::SubscriptException<Comment>) {
+      } catch (const yoda::SubscriptException<Comment>&) {
         // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
       }
       card_entry.text = card.text;
@@ -1098,7 +1108,8 @@ class CTFOServer final {
                                   UIDToString(uid).c_str(),
                                   CIDToString(cid).c_str(),
                                   (response == RESPONSE::FAV_CARD) ? "Favorite" : "Unfavorite"));
-              } else if (response == RESPONSE::LIKE_COMMENT || response == RESPONSE::UNLIKE_COMMENT) {
+              } else if (response == RESPONSE::LIKE_COMMENT || response == RESPONSE::UNLIKE_COMMENT ||
+                         response == RESPONSE::FLAG_COMMENT) {
                 if (oid == OID::INVALID_COMMENT) {
                   DebugPrint("[UpdateStateOnEvent] No OID.");
                   return;
@@ -1114,17 +1125,25 @@ class CTFOServer final {
                   like.oid = oid;
                   like.uid = uid;
                   data.Add(like);
-                } else {
+                } else if (response == RESPONSE::UNLIKE_COMMENT) {
                   DebugPrint(Printf(
                       "[UpdateStateOnEvent] Unlike comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
                   Matrix<CommentLike>::Mutator(data).Delete(oid, uid);
+                } else if (response == RESPONSE::FLAG_COMMENT) {
+                  DebugPrint(
+                      Printf("[UpdateStateOnEvent] Flag comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
+                  CommentFlagAsInappropriate flag;
+                  flag.oid = oid;
+                  flag.uid = uid;
+                  data.Add(flag);
+                } else {
+                  DebugPrint(
+                      Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
+                             static_cast<int>(response),
+                             uid_str.c_str(),
+                             cid_str.c_str(),
+                             token.c_str()));
                 }
-              } else {
-                DebugPrint(Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
-                                  static_cast<int>(response),
-                                  uid_str.c_str(),
-                                  cid_str.c_str(),
-                                  token.c_str()));
               }
             } else {
               DebugPrint(Printf("[UpdateStateOnEvent] Not valid token '%s' found in event.", token.c_str()));

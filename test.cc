@@ -42,6 +42,7 @@ CEREAL_REGISTER_TYPE(Answer);
 CEREAL_REGISTER_TYPE(Favorite);
 CEREAL_REGISTER_TYPE(Comment);
 CEREAL_REGISTER_TYPE(CommentLike);
+CEREAL_REGISTER_TYPE(CommentFlagAsInappropriate);
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(api_port, 8383, "Port to spawn CTFO RESTful server on.");
@@ -816,6 +817,45 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("Meh.", comments[3].text);
     EXPECT_EQ(0u, comments[3].number_of_likes);
     EXPECT_FALSE(comments[3].liked);
+  }
+
+  // Flag the comment.
+  {
+    iOSGenericEvent flag_comment_event;
+    flag_comment_event.event = "FLAG_COMMENT";
+    flag_comment_event.fields["uid"] = actual_uid;
+    flag_comment_event.fields["token"] = actual_token;
+    flag_comment_event.fields["oid"] = added_nested_comment_1_oid;
+    const auto reponse = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                   WithBaseType<MidichloriansEvent>(flag_comment_event)));
+    EXPECT_EQ(200, static_cast<int>(reponse.code));
+    EXPECT_EQ("OK\n", reponse.body);
+  }
+
+  // Confirm the flagged comment is now hidden.
+  {
+    const auto comments =
+        ParseJSON<ResponseComments>(HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                                                    FLAGS_api_port,
+                                                    actual_uid.c_str(),
+                                                    actual_token.c_str(),
+                                                    added_card_cid.c_str()))).body).comments;
+    ASSERT_EQ(3u, comments.size());
+
+    EXPECT_EQ(added_second_comment_oid, comments[0].oid);
+    EXPECT_EQ("Bla.", comments[0].text);
+    EXPECT_EQ(0u, comments[0].number_of_likes);
+    EXPECT_FALSE(comments[0].liked);
+
+    EXPECT_EQ(added_nested_comment_2_oid, comments[1].oid);
+    EXPECT_EQ("real?", comments[1].text);
+    EXPECT_EQ(0u, comments[1].number_of_likes);
+    EXPECT_FALSE(comments[1].liked);
+
+    EXPECT_EQ(added_comment_oid, comments[2].oid);
+    EXPECT_EQ("Meh.", comments[2].text);
+    EXPECT_EQ(0u, comments[2].number_of_likes);
+    EXPECT_FALSE(comments[2].liked);
   }
 
   // Delete the top-level comment with no second level comments,
