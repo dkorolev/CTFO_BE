@@ -41,6 +41,7 @@ CEREAL_REGISTER_TYPE(CardAuthor);
 CEREAL_REGISTER_TYPE(Answer);
 CEREAL_REGISTER_TYPE(Favorite);
 CEREAL_REGISTER_TYPE(Comment);
+CEREAL_REGISTER_TYPE(CommentLike);
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(api_port, 8383, "Port to spawn CTFO RESTful server on.");
@@ -635,24 +636,40 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(actual_uid, response.comments[0].author_uid);
     EXPECT_EQ("Bla.", response.comments[0].text);
     EXPECT_EQ(105001u, response.comments[0].ms);
+    EXPECT_EQ(actual_uid, response.comments[0].author_uid);
+    EXPECT_EQ(0u, response.comments[0].author_level);
+    EXPECT_EQ(0u, response.comments[0].number_of_likes);
+    EXPECT_FALSE(response.comments[0].liked);
 
     EXPECT_EQ(added_nested_comment_1_oid, response.comments[1].oid);
     EXPECT_EQ(added_second_comment_oid, response.comments[1].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[1].author_uid);
     EXPECT_EQ("for", response.comments[1].text);
     EXPECT_EQ(107001u, response.comments[1].ms);
+    EXPECT_EQ(actual_uid, response.comments[1].author_uid);
+    EXPECT_EQ(0u, response.comments[1].author_level);
+    EXPECT_EQ(0u, response.comments[1].number_of_likes);
+    EXPECT_FALSE(response.comments[1].liked);
 
     EXPECT_EQ(added_nested_comment_2_oid, response.comments[2].oid);
     EXPECT_EQ(added_second_comment_oid, response.comments[2].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[2].author_uid);
     EXPECT_EQ("real?", response.comments[2].text);
     EXPECT_EQ(108001u, response.comments[2].ms);
+    EXPECT_EQ(actual_uid, response.comments[2].author_uid);
+    EXPECT_EQ(0u, response.comments[2].author_level);
+    EXPECT_EQ(0u, response.comments[2].number_of_likes);
+    EXPECT_FALSE(response.comments[2].liked);
 
     EXPECT_EQ(added_comment_oid, response.comments[3].oid);
     EXPECT_EQ("", response.comments[3].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[3].author_uid);
     EXPECT_EQ("Meh.", response.comments[3].text);
     EXPECT_EQ(102001u, response.comments[3].ms);
+    EXPECT_EQ(actual_uid, response.comments[3].author_uid);
+    EXPECT_EQ(0u, response.comments[3].author_level);
+    EXPECT_EQ(0u, response.comments[3].number_of_likes);
+    EXPECT_FALSE(response.comments[3].liked);
   }
 
   // Confirm the card payload lists the number of comments as "4" now.
@@ -713,10 +730,98 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("NEED EMPTY OR VALID PARENT_OID\n", post_comment_response.body);
   }
 
+  // Like the comment.
+  {
+    iOSGenericEvent like_comment_event;
+    like_comment_event.event = "LIKE_COMMENT";
+    like_comment_event.fields["uid"] = actual_uid;
+    like_comment_event.fields["token"] = actual_token;
+    like_comment_event.fields["oid"] = added_nested_comment_1_oid;
+    const auto reponse = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                   WithBaseType<MidichloriansEvent>(like_comment_event)));
+    EXPECT_EQ(200, static_cast<int>(reponse.code));
+    EXPECT_EQ("OK\n", reponse.body);
+  }
+
+  // Confirm the comment got liked.
+  {
+    const auto comments =
+        ParseJSON<ResponseComments>(HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                                                    FLAGS_api_port,
+                                                    actual_uid.c_str(),
+                                                    actual_token.c_str(),
+                                                    added_card_cid.c_str()))).body).comments;
+    ASSERT_EQ(4u, comments.size());
+
+    EXPECT_EQ(added_second_comment_oid, comments[0].oid);
+    EXPECT_EQ("Bla.", comments[0].text);
+    EXPECT_EQ(0u, comments[0].number_of_likes);
+    EXPECT_FALSE(comments[0].liked);
+
+    EXPECT_EQ(added_nested_comment_1_oid, comments[1].oid);
+    EXPECT_EQ("for", comments[1].text);
+    EXPECT_EQ(1u, comments[1].number_of_likes);
+    EXPECT_TRUE(comments[1].liked);
+
+    EXPECT_EQ(added_nested_comment_2_oid, comments[2].oid);
+    EXPECT_EQ("real?", comments[2].text);
+    EXPECT_EQ(0u, comments[2].number_of_likes);
+    EXPECT_FALSE(comments[2].liked);
+
+    EXPECT_EQ(added_comment_oid, comments[3].oid);
+    EXPECT_EQ("Meh.", comments[3].text);
+    EXPECT_EQ(0u, comments[3].number_of_likes);
+    EXPECT_FALSE(comments[3].liked);
+  }
+
+  // Unlike the comment.
+  {
+    iOSGenericEvent unlike_comment_event;
+    unlike_comment_event.event = "UNLIKE_COMMENT";
+    unlike_comment_event.fields["uid"] = actual_uid;
+    unlike_comment_event.fields["token"] = actual_token;
+    unlike_comment_event.fields["oid"] = added_nested_comment_1_oid;
+    const auto reponse = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                   WithBaseType<MidichloriansEvent>(unlike_comment_event)));
+    EXPECT_EQ(200, static_cast<int>(reponse.code));
+    EXPECT_EQ("OK\n", reponse.body);
+  }
+
+  // Confirm the comment got unliked.
+  {
+    const auto comments =
+        ParseJSON<ResponseComments>(HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                                                    FLAGS_api_port,
+                                                    actual_uid.c_str(),
+                                                    actual_token.c_str(),
+                                                    added_card_cid.c_str()))).body).comments;
+    ASSERT_EQ(4u, comments.size());
+
+    EXPECT_EQ(added_second_comment_oid, comments[0].oid);
+    EXPECT_EQ("Bla.", comments[0].text);
+    EXPECT_EQ(0u, comments[0].number_of_likes);
+    EXPECT_FALSE(comments[0].liked);
+
+    EXPECT_EQ(added_nested_comment_1_oid, comments[1].oid);
+    EXPECT_EQ("for", comments[1].text);
+    EXPECT_EQ(0u, comments[1].number_of_likes);
+    EXPECT_FALSE(comments[1].liked);
+
+    EXPECT_EQ(added_nested_comment_2_oid, comments[2].oid);
+    EXPECT_EQ("real?", comments[2].text);
+    EXPECT_EQ(0u, comments[2].number_of_likes);
+    EXPECT_FALSE(comments[2].liked);
+
+    EXPECT_EQ(added_comment_oid, comments[3].oid);
+    EXPECT_EQ("Meh.", comments[3].text);
+    EXPECT_EQ(0u, comments[3].number_of_likes);
+    EXPECT_FALSE(comments[3].liked);
+  }
+
   // Delete the top-level comment with no second level comments,
   // and confirm that the number of comments goes down from 4 to 3.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(111001));
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(600001));
     const auto delete_comment_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
                            FLAGS_api_port,
@@ -726,7 +831,7 @@ TEST(CTFO, SmokeTest) {
                            added_comment_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
     const auto payload = ParseJSON<DeleteCommentResponse>(delete_comment_response.body);
-    EXPECT_EQ(111001u, payload.ms);
+    EXPECT_EQ(600001u, payload.ms);
 
     EXPECT_EQ(3u,
               ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
@@ -788,7 +893,7 @@ TEST(CTFO, SmokeTest) {
   // Delete the remaining top-level comment, and confirm that the number of comments
   // goes down from 2 to 0, since deleting the top-level comments deletes its children.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(113001));
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(601001));
     const auto delete_comment_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
                            FLAGS_api_port,
@@ -798,7 +903,7 @@ TEST(CTFO, SmokeTest) {
                            added_second_comment_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
     const auto payload = ParseJSON<DeleteCommentResponse>(delete_comment_response.body);
-    EXPECT_EQ(113001u, payload.ms);
+    EXPECT_EQ(601001u, payload.ms);
 
     EXPECT_EQ(0u,
               ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
@@ -819,7 +924,7 @@ TEST(CTFO, SmokeTest) {
                                                          actual_uid.c_str(),
                                                          actual_token.c_str()))).body).cards.size());
 
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(201001));
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(602001));
     const auto delete_card_response = HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
                                                          FLAGS_api_port,
                                                          actual_uid.c_str(),
@@ -827,7 +932,7 @@ TEST(CTFO, SmokeTest) {
                                                          added_card_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_card_response.code));
     const auto payload = ParseJSON<DeleteCardResponse>(delete_card_response.body);
-    EXPECT_EQ(201001u, payload.ms);
+    EXPECT_EQ(602001u, payload.ms);
 
     EXPECT_EQ(2u,
               ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",

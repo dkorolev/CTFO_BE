@@ -374,7 +374,23 @@ struct Comment : yoda::Padawan {
   }
 };
 
-// Data structures for generating RESTful response.
+struct CommentLike : yoda::Padawan {
+  OID oid;
+  UID uid;
+
+  OID row() const { return oid; }
+  void set_row(const OID value) { oid = value; }
+  UID col() const { return uid; }
+  void set_col(UID value) { uid = value; }
+
+  template <typename A>
+  void serialize(A& ar) {
+    Padawan::serialize(ar);
+    ar(CEREAL_NVP(oid), CEREAL_NVP(uid));
+  }
+};
+
+// Data structures for generating RESTful responses.
 struct ResponseUserEntry {
   std::string uid = "uINVALID";    // User id, format 'u01XXX...'.
   std::string token = "";          // User token.
@@ -545,6 +561,8 @@ struct ResponseComment {
   std::string author_uid = "uINVALID";  // User id, format 'u01XXX...'.
   uint8_t author_level = 0u;            // Author user level, [0, 9].
   std::string text;                     // Comment text.
+  size_t number_of_likes = 0u;          // Number of likes in this comment.
+  bool liked = false;                   // Whether the current user has liked this comment.
   uint64_t ms;                          // Comment timestamp, milliseconds from epoch.
   // TODO(dkorolev): User name? Tier status?
   // TODO(dkorolev): Color?
@@ -556,6 +574,8 @@ struct ResponseComment {
        CEREAL_NVP(author_uid),
        CEREAL_NVP(author_level),
        CEREAL_NVP(text),
+       CEREAL_NVP(number_of_likes),
+       CEREAL_NVP(liked),
        CEREAL_NVP(ms));
   }
 };
@@ -577,8 +597,10 @@ enum class RESPONSE : int {
   SKIP = static_cast<int>(ANSWER::SKIP),
   CTFO = static_cast<int>(ANSWER::CTFO),
   TFU = static_cast<int>(ANSWER::TFU),
-  FAV = 101,
-  UNFAV = 102
+  FAV_CARD = 101,
+  UNFAV_CARD = 102,
+  LIKE_COMMENT = 201,
+  UNLIKE_COMMENT = 202,
 };
 
 #endif  // CTFO_SCHEMA_H

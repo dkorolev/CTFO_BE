@@ -662,6 +662,7 @@ class CTFOServer final {
                   }
                   const auto users_accessor = Dictionary<User>::Accessor(data);
                   const auto comments_accessor = Matrix<Comment>::Accessor(data);
+                  const auto comment_likes_accessor = Matrix<CommentLike>::Accessor(data);
                   const auto sortkey = [&comments_accessor](const Comment& c) -> std::pair<uint64_t, uint64_t> {
                     uint64_t comment_timestamp = 0u;
                     uint64_t top_level_comment_timestamp = 0u;
@@ -698,6 +699,12 @@ class CTFOServer final {
                     c.author_uid = UIDToString(comment.author_uid);
                     c.author_level = users_accessor[uid].level;
                     c.text = comment.text;
+                    try {
+                      const auto& likers = comment_likes_accessor[comment.oid];
+                      c.number_of_likes = likers.size();
+                      c.liked = likers.Has(uid);
+                    } catch (yoda::SubscriptException<CommentLike>) {
+                    }
                     c.ms = comment.ms;
                     output_comments.push_back(std::move(c));
                   }
@@ -850,14 +857,19 @@ class CTFOServer final {
                         Matrix<CardAuthor>,
                         Matrix<Answer>,
                         Matrix<Favorite>,
-                        Matrix<Comment>> StorageAPI;
+                        Matrix<Comment>,
+                        Matrix<CommentLike>> StorageAPI;
   StorageAPI storage_;
 
   const std::map<std::string, RESPONSE> valid_responses_ = {{"CTFO", RESPONSE::CTFO},
                                                             {"TFU", RESPONSE::TFU},
                                                             {"SKIP", RESPONSE::SKIP},
-                                                            {"FAV", RESPONSE::FAV},
-                                                            {"UNFAV", RESPONSE::UNFAV}};
+                                                            {"FAV", RESPONSE::FAV_CARD},
+                                                            {"FAV_CARD", RESPONSE::FAV_CARD},
+                                                            {"UNFAV", RESPONSE::UNFAV_CARD},
+                                                            {"UNFAV_CARD", RESPONSE::UNFAV_CARD},
+                                                            {"LIKE_COMMENT", RESPONSE::LIKE_COMMENT},
+                                                            {"UNLIKE_COMMENT", RESPONSE::UNLIKE_COMMENT}};
 
   void DebugPrint(const std::string& message) {
     if (debug_print_) {
@@ -983,18 +995,22 @@ class CTFOServer final {
       const iOSGenericEvent& ge = dynamic_cast<const iOSGenericEvent&>(*event.get());
       try {
         const RESPONSE response = valid_responses_.at(ge.event);
-        const UID uid = StringToUID(ge.fields.at("uid"));
-        const CID cid = StringToCID(ge.fields.at("cid"));
         const std::string& uid_str = ge.fields.at("uid");
-        const std::string& cid_str = ge.fields.at("cid");
         const std::string token = ge.fields.at("token");
-        DebugPrint(Printf("[UpdateStateOnEvent] Event='%s', uid='%s', cid='%s', token='%s'",
+        const std::string cid_str = ge.fields.count("cid") ? ge.fields.at("cid") : "";
+        const std::string oid_str = ge.fields.count("oid") ? ge.fields.at("oid") : "";
+        const UID uid = StringToUID(uid_str);
+        const CID cid = StringToCID(cid_str);
+        const OID oid = StringToOID(oid_str);
+        DebugPrint(Printf("[UpdateStateOnEvent] Event='%s', uid='%s', cid='%s', oid='%s', token='%s'",
                           ge.event.c_str(),
                           uid_str.c_str(),
                           cid_str.c_str(),
+                          oid_str.c_str(),
                           token.c_str()));
-        if (uid != UID::INVALID_USER && cid != CID::INVALID_CARD) {
-          storage_.Transaction([this, uid, cid, uid_str, cid_str, token, response](StorageAPI::T_DATA data) {
+        if (uid != UID::INVALID_USER) {
+          storage_.Transaction([this, uid, cid, oid, uid_str, cid_str, oid_str, token, response](
+              StorageAPI::T_DATA data) {
             const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
             bool token_is_valid = false;
             if (auth_token_accessor.Cols().Has(token)) {
@@ -1010,11 +1026,15 @@ class CTFOServer final {
                 DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s' in response.", uid_str.c_str()));
                 return;
               }
-              if (!data.Has(cid)) {
-                DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in response.", cid_str.c_str()));
-                return;
-              }
               if (response == RESPONSE::SKIP || response == RESPONSE::CTFO || response == RESPONSE::TFU) {
+                if (cid == CID::INVALID_CARD) {
+                  DebugPrint("[UpdateStateOnEvent] No CID.");
+                  return;
+                }
+                if (!data.Has(cid)) {
+                  DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in response.", cid_str.c_str()));
+                  return;
+                }
                 auto answers_mutator = Matrix<Answer>::Mutator(data);
                 if (!answers_mutator.Has(uid, cid)) {  // Do not overwrite existing answers.
                   data.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
@@ -1063,13 +1083,42 @@ class CTFOServer final {
                              CIDToString(cid).c_str(),
                              static_cast<int>(static_cast<Answer>(answers_mutator.Get(uid, cid)).answer)));
                 }
-              } else if (response == RESPONSE::FAV || response == RESPONSE::UNFAV) {
+              } else if (response == RESPONSE::FAV_CARD || response == RESPONSE::UNFAV_CARD) {
+                if (cid == CID::INVALID_CARD) {
+                  DebugPrint("[UpdateStateOnEvent] No CID.");
+                  return;
+                }
+                if (!data.Has(cid)) {
+                  DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in response.", cid_str.c_str()));
+                  return;
+                }
                 auto favorites_mutator = Matrix<Favorite>::Mutator(data);
-                favorites_mutator.Add(Favorite(uid, cid, (response == RESPONSE::FAV)));
+                favorites_mutator.Add(Favorite(uid, cid, (response == RESPONSE::FAV_CARD)));
                 DebugPrint(Printf("[UpdateStateOnEvent] Added favorite: [%s, %s, %s]",
                                   UIDToString(uid).c_str(),
                                   CIDToString(cid).c_str(),
-                                  (response == RESPONSE::FAV) ? "Favorite" : "Unfavorite"));
+                                  (response == RESPONSE::FAV_CARD) ? "Favorite" : "Unfavorite"));
+              } else if (response == RESPONSE::LIKE_COMMENT || response == RESPONSE::UNLIKE_COMMENT) {
+                if (oid == OID::INVALID_COMMENT) {
+                  DebugPrint("[UpdateStateOnEvent] No OID.");
+                  return;
+                }
+                if (!Matrix<Comment>::Accessor(data).Cols().Has(oid)) {
+                  DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent OID '%s' in response.", oid_str.c_str()));
+                  return;
+                }
+                if (response == RESPONSE::LIKE_COMMENT) {
+                  DebugPrint(
+                      Printf("[UpdateStateOnEvent] Like comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
+                  CommentLike like;
+                  like.oid = oid;
+                  like.uid = uid;
+                  data.Add(like);
+                } else {
+                  DebugPrint(Printf(
+                      "[UpdateStateOnEvent] Unlike comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
+                  Matrix<CommentLike>::Mutator(data).Delete(oid, uid);
+                }
               } else {
                 DebugPrint(Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
                                   static_cast<int>(response),
@@ -1082,7 +1131,7 @@ class CTFOServer final {
             }
           });
         } else {
-          DebugPrint("[UpdateStateOnEvent] Invalid UID or CID.");
+          DebugPrint("[UpdateStateOnEvent] Invalid UID.");
         }
       } catch (const std::out_of_range& e) {
         DebugPrint(Printf("[UpdateStateOnEvent] std::out_of_range: '%s'", e.what()));
