@@ -195,11 +195,7 @@ struct User : yoda::Padawan {
   template <typename A>
   void serialize(A& ar) {
     Padawan::serialize(ar);
-    // TODO(dkorolev): We don't have UID here.
-    // If it's OK, remove CID from another place too.
-    // If it's not OK, fix it.
-    // Not urgent since we can -- and will soon! -- replay the log to update the DB!
-    ar(CEREAL_NVP(level), CEREAL_NVP(score));
+    ar(CEREAL_NVP(uid), CEREAL_NVP(level), CEREAL_NVP(score));
   }
 };
 
