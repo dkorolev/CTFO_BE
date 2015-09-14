@@ -863,6 +863,7 @@ class CTFOServer final {
                         Matrix<Favorite>,
                         Matrix<Comment>,
                         Matrix<CommentLike>,
+                        Matrix<CardFlagAsInappropriate>,
                         Matrix<CommentFlagAsInappropriate>> StorageAPI;
   StorageAPI storage_;
 
@@ -875,7 +876,8 @@ class CTFOServer final {
                                                             {"UNFAV_CARD", RESPONSE::UNFAV_CARD},
                                                             {"LIKE_COMMENT", RESPONSE::LIKE_COMMENT},
                                                             {"UNLIKE_COMMENT", RESPONSE::UNLIKE_COMMENT},
-                                                            {"FLAG_COMMENT", RESPONSE::FLAG_COMMENT}};
+                                                            {"FLAG_COMMENT", RESPONSE::FLAG_COMMENT},
+                                                            {"FLAG_CARD", RESPONSE::FLAG_CARD}};
 
   void DebugPrint(const std::string& message) {
     if (debug_print_) {
@@ -902,6 +904,7 @@ class CTFOServer final {
 
     const auto cards = Dictionary<Card>::Accessor(data);
     const auto answers = Matrix<Answer>::Accessor(data);
+    const auto flagged_cards = Matrix<CardFlagAsInappropriate>::Accessor(data);
     const auto favorites = Matrix<Favorite>::Accessor(data);
 
     std::set<std::pair<double, CID>> hot_cards;
@@ -910,8 +913,7 @@ class CTFOServer final {
 
     const uint64_t now = static_cast<uint64_t>(bricks::time::Now());
     for (const auto& card : cards) {
-      // TODO(dkorolev): Remove flagged cards along with the cards that the user has cast their vote on.
-      if (!answers.Has(uid, card.cid)) {
+      if (!answers.Has(uid, card.cid) && !flagged_cards.Has(card.cid, uid)) {
         // For the recent feed, relevance is the function of the age of he card.
         // Added just now => 1.00. Added 24 hour ago => 0.99. Added 48 hours ago => 0.99^2. Etc.
         const double time_key = std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
@@ -1050,7 +1052,7 @@ class CTFOServer final {
             }
             if (token_is_valid) {
               if (!data.Has(uid)) {
-                DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s' in response.", uid_str.c_str()));
+                DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s'.", uid_str.c_str()));
                 return;
               }
               if (response == RESPONSE::SKIP || response == RESPONSE::CTFO || response == RESPONSE::TFU) {
@@ -1059,7 +1061,8 @@ class CTFOServer final {
                   return;
                 }
                 if (!data.Has(cid)) {
-                  DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in response.", cid_str.c_str()));
+                  DebugPrint(
+                      Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in SKIP/CTFO/TFU.", cid_str.c_str()));
                   return;
                 }
                 auto answers_mutator = Matrix<Answer>::Mutator(data);
@@ -1116,7 +1119,7 @@ class CTFOServer final {
                   return;
                 }
                 if (!data.Has(cid)) {
-                  DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in response.", cid_str.c_str()));
+                  DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' FAV/UNFAV.", cid_str.c_str()));
                   return;
                 }
                 auto favorites_mutator = Matrix<Favorite>::Mutator(data);
@@ -1132,7 +1135,8 @@ class CTFOServer final {
                   return;
                 }
                 if (!Matrix<Comment>::Accessor(data).Cols().Has(oid)) {
-                  DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent OID '%s' in response.", oid_str.c_str()));
+                  DebugPrint(
+                      Printf("[UpdateStateOnEvent] Nonexistent OID '%s' LIKE/UNLIKE/FLAG.", oid_str.c_str()));
                   return;
                 }
                 if (response == RESPONSE::LIKE_COMMENT) {
@@ -1161,6 +1165,28 @@ class CTFOServer final {
                              cid_str.c_str(),
                              token.c_str()));
                 }
+              } else if (response == RESPONSE::FLAG_CARD) {
+                if (cid == CID::INVALID_CARD) {
+                  DebugPrint("[UpdateStateOnEvent] No CID.");
+                  return;
+                }
+                if (!Dictionary<Card>::Accessor(data).Has(cid)) {
+                  DebugPrint(
+                      Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in FLAG_CARD.", cid_str.c_str()));
+                  return;
+                }
+                DebugPrint(
+                    Printf("[UpdateStateOnEvent] Flag card '%s' '%s'.", uid_str.c_str(), cid_str.c_str()));
+                CardFlagAsInappropriate flag;
+                flag.cid = cid;
+                flag.uid = uid;
+                data.Add(flag);
+              } else {
+                DebugPrint(Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
+                                  static_cast<int>(response),
+                                  uid_str.c_str(),
+                                  cid_str.c_str(),
+                                  token.c_str()));
               }
             } else {
               DebugPrint(Printf("[UpdateStateOnEvent] Not valid token '%s' found in event.", token.c_str()));

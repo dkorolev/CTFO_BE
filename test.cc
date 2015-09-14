@@ -42,6 +42,7 @@ CEREAL_REGISTER_TYPE(Answer);
 CEREAL_REGISTER_TYPE(Favorite);
 CEREAL_REGISTER_TYPE(Comment);
 CEREAL_REGISTER_TYPE(CommentLike);
+CEREAL_REGISTER_TYPE(CardFlagAsInappropriate);
 CEREAL_REGISTER_TYPE(CommentFlagAsInappropriate);
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
@@ -1072,7 +1073,6 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("Bar.", feed_recent[1].text);
   }
 
-#if 0  // Coming in the next commit.
   // Flag one of the cards.
   {
     iOSGenericEvent flag_card_event;
@@ -1096,7 +1096,6 @@ TEST(CTFO, SmokeTest) {
     ASSERT_EQ(1u, feed_recent.size());
     EXPECT_EQ("Bar.", feed_recent[0].text);
   }
-#endif
 }
 
 TEST(CTFO, StrictAuth) {

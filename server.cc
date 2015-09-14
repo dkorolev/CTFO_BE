@@ -36,6 +36,7 @@ CEREAL_REGISTER_TYPE(Answer);
 CEREAL_REGISTER_TYPE(Favorite);
 CEREAL_REGISTER_TYPE(Comment);
 CEREAL_REGISTER_TYPE(CommentLike);
+CEREAL_REGISTER_TYPE(CardFlagAsInappropriate);
 CEREAL_REGISTER_TYPE(CommentFlagAsInappropriate);
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");

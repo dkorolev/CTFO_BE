@@ -390,6 +390,22 @@ struct CommentLike : yoda::Padawan {
   }
 };
 
+struct CardFlagAsInappropriate : yoda::Padawan {
+  CID cid;
+  UID uid;
+
+  CID row() const { return cid; }
+  void set_row(const CID value) { cid = value; }
+  UID col() const { return uid; }
+  void set_col(UID value) { uid = value; }
+
+  template <typename A>
+  void serialize(A& ar) {
+    Padawan::serialize(ar);
+    ar(CEREAL_NVP(cid), CEREAL_NVP(uid));
+  }
+};
+
 struct CommentFlagAsInappropriate : yoda::Padawan {
   OID oid;
   UID uid;
@@ -617,7 +633,8 @@ enum class RESPONSE : int {
   UNFAV_CARD = 102,
   LIKE_COMMENT = 201,
   UNLIKE_COMMENT = 202,
-  FLAG_COMMENT = 203
+  FLAG_COMMENT = 203,
+  FLAG_CARD = 301
 };
 
 #endif  // CTFO_SCHEMA_H
