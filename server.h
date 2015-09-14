@@ -656,12 +656,7 @@ class CTFOServer final {
                   try {
                     const auto comments = Matrix<Comment>::Accessor(data);
                     for (const auto& comment : comments[cid]) {
-                      try {
-                        if (!comment_flagged_accessor[uid].Has(comment.oid)) {
-                          proto_comments.push_back(comment);
-                        }
-                      } catch (const yoda::SubscriptException<CommentFlagAsInappropriate>&) {
-                        // TODO(dkorolev): An `Optional<>`-like accessor would eliminate the need in this.
+                      if (!comment_flagged_accessor.Has(comment.oid, uid)) {
                         proto_comments.push_back(comment);
                       }
                     }
