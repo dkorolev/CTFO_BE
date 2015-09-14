@@ -190,7 +190,7 @@ struct User : yoda::Padawan {
   uint64_t score = 0u;  // User score.
 
   UID key() const { return uid; }
-  void set_key(UID value) { uid = value; }
+  void set_key(const UID value) { uid = value; }
 
   template <typename A>
   void serialize(A& ar) {
@@ -252,7 +252,7 @@ struct AuthKeyUIDPair : yoda::Padawan {
   const AuthKey& row() const { return auth_key; }
   void set_row(const AuthKey& value) { auth_key = value; }
   UID col() const { return uid; }
-  void set_col(UID value) { uid = value; }
+  void set_col(const UID value) { uid = value; }
 
   template <typename A>
   void serialize(A& ar) {
@@ -274,7 +274,7 @@ struct Card : yoda::Padawan {
   Card(CID cid, const std::string& text, const Color& color) : cid(cid), text(text), color(color) {}
 
   CID key() const { return cid; }
-  void set_key(CID value) { cid = value; }
+  void set_key(const CID value) { cid = value; }
 
   template <typename A>
   void serialize(A& ar) {
@@ -297,9 +297,9 @@ struct CardAuthor : yoda::Padawan {
   CardAuthor(CID cid, UID uid) : cid(cid), uid(uid) {}
 
   CID row() const { return cid; }
-  void set_row(CID value) { cid = value; }
+  void set_row(const CID value) { cid = value; }
   UID col() const { return uid; }
-  void set_col(UID value) { uid = value; }
+  void set_col(const UID value) { uid = value; }
 
   template <typename A>
   void serialize(A& ar) {
@@ -318,9 +318,9 @@ struct Answer : yoda::Padawan {
   Answer(UID uid, CID cid, ANSWER answer) : uid(uid), cid(cid), answer(answer) {}
 
   UID row() const { return uid; }
-  void set_row(UID value) { uid = value; }
+  void set_row(const UID value) { uid = value; }
   CID col() const { return cid; }
-  void set_col(CID value) { cid = value; }
+  void set_col(const CID value) { cid = value; }
 
   template <typename A>
   void serialize(A& ar) {
@@ -340,7 +340,7 @@ struct Favorite : yoda::Padawan {
   UID row() const { return uid; }
   void set_row(const UID value) { uid = value; }
   CID col() const { return cid; }
-  void set_col(CID value) { cid = value; }
+  void set_col(const CID value) { cid = value; }
 
   template <typename A>
   void serialize(A& ar) {
@@ -365,7 +365,7 @@ struct Comment : yoda::Padawan {
   CID row() const { return cid; }
   void set_row(const CID value) { cid = value; }
   OID col() const { return oid; }
-  void set_col(OID value) { oid = value; }
+  void set_col(const OID value) { oid = value; }
 
   template <typename A>
   void serialize(A& ar) {
@@ -381,7 +381,7 @@ struct CommentLike : yoda::Padawan {
   OID row() const { return oid; }
   void set_row(const OID value) { oid = value; }
   UID col() const { return uid; }
-  void set_col(UID value) { uid = value; }
+  void set_col(const UID value) { uid = value; }
 
   template <typename A>
   void serialize(A& ar) {
@@ -397,7 +397,7 @@ struct CardFlagAsInappropriate : yoda::Padawan {
   CID row() const { return cid; }
   void set_row(const CID value) { cid = value; }
   UID col() const { return uid; }
-  void set_col(UID value) { uid = value; }
+  void set_col(const UID value) { uid = value; }
 
   template <typename A>
   void serialize(A& ar) {
@@ -413,7 +413,7 @@ struct CommentFlagAsInappropriate : yoda::Padawan {
   OID row() const { return oid; }
   void set_row(const OID value) { oid = value; }
   UID col() const { return uid; }
-  void set_col(UID value) { uid = value; }
+  void set_col(const UID value) { uid = value; }
 
   template <typename A>
   void serialize(A& ar) {
