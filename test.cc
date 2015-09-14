@@ -145,21 +145,6 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(40u, hot_texts.size());
     EXPECT_EQ(40u, recent_cids.size());
     EXPECT_EQ(40u, recent_texts.size());
-
-    std::vector<std::string> cids_intersection;
-    std::set_intersection(hot_cids.begin(),
-                          hot_cids.end(),
-                          recent_cids.begin(),
-                          recent_cids.end(),
-                          std::back_inserter(cids_intersection));
-    EXPECT_EQ(0u, cids_intersection.size());
-    std::vector<std::string> texts_intersection;
-    std::set_intersection(hot_texts.begin(),
-                          hot_texts.end(),
-                          recent_texts.begin(),
-                          recent_texts.end(),
-                          std::back_inserter(texts_intersection));
-    EXPECT_EQ(0u, texts_intersection.size());
   }
 
   // Add two cards to favorites.
@@ -302,6 +287,60 @@ TEST(CTFO, SmokeTest) {
     added_card_cid = add_card_response.cid;
   }
 
+  // Confirm the freshly added card tops the "Recent" feed. And that its age matters.
+  {
+    {
+      const auto feed_recent =
+          ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
+                                                  FLAGS_api_port,
+                                                  actual_uid.c_str(),
+                                                  actual_token.c_str()))).body).feed_recent;
+      ASSERT_EQ(1u, feed_recent.size());
+      EXPECT_EQ(added_card_cid, feed_recent[0].cid);
+      EXPECT_EQ("Foo.", feed_recent[0].text);
+      EXPECT_TRUE(feed_recent[0].is_my_card);
+      EXPECT_EQ(0u, feed_recent[0].number_of_comments);
+      EXPECT_EQ(1.0, feed_recent[0].relevance);
+    }
+
+    {
+      // Request recent cards 24 hours later.
+      bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(16001 + 1000 * 60 * 60 * 24));
+
+      const auto feed_recent =
+          ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
+                                                  FLAGS_api_port,
+                                                  actual_uid.c_str(),
+                                                  actual_token.c_str()))).body).feed_recent;
+      EXPECT_EQ(1u, feed_recent.size());
+      EXPECT_EQ(added_card_cid, feed_recent[0].cid);
+      EXPECT_EQ("Foo.", feed_recent[0].text);
+      EXPECT_TRUE(feed_recent[0].is_my_card);
+      EXPECT_EQ(0u, feed_recent[0].number_of_comments);
+      EXPECT_DOUBLE_EQ(0.99, feed_recent[0].relevance);
+    }
+
+    {
+      // Request recent cards 48 hours later.
+      bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(16001 + 1000 * 60 * 60 * 48));
+
+      const auto feed_recent =
+          ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
+                                                  FLAGS_api_port,
+                                                  actual_uid.c_str(),
+                                                  actual_token.c_str()))).body).feed_recent;
+      EXPECT_EQ(1u, feed_recent.size());
+      EXPECT_EQ(added_card_cid, feed_recent[0].cid);
+      EXPECT_EQ("Foo.", feed_recent[0].text);
+      EXPECT_TRUE(feed_recent[0].is_my_card);
+      EXPECT_EQ(0u, feed_recent[0].number_of_comments);
+      EXPECT_DOUBLE_EQ(0.99 * 0.99, feed_recent[0].relevance);
+    }
+
+    // Restore the time back.
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(16001));
+  }
+
   // Confirm this new card is not favorited by default.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(17001));
@@ -424,6 +463,25 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(16001u, my_cards_response.cards[2].ms);
   }
 
+  // Confirm that three recently added cards are on the top of the recent feed.
+  {
+    const auto feed_recent =
+        ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=3",
+                                                FLAGS_api_port,
+                                                actual_uid.c_str(),
+                                                actual_token.c_str()))).body).feed_recent;
+    ASSERT_EQ(3u, feed_recent.size());
+    EXPECT_EQ("Meh.", feed_recent[0].text);
+    EXPECT_TRUE(feed_recent[0].is_my_card);
+    EXPECT_EQ(0u, feed_recent[0].number_of_comments);
+    EXPECT_EQ("Bar.", feed_recent[1].text);
+    EXPECT_TRUE(feed_recent[1].is_my_card);
+    EXPECT_EQ(0u, feed_recent[1].number_of_comments);
+    EXPECT_EQ("Foo.", feed_recent[2].text);
+    EXPECT_TRUE(feed_recent[2].is_my_card);
+    EXPECT_EQ(0u, feed_recent[2].number_of_comments);
+  }
+
   // Get comments for a non-exising card, expecting an error.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(100001));
@@ -493,6 +551,25 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("Foo.", my_cards_response.cards[2].text);
     EXPECT_EQ(16001u, my_cards_response.cards[2].ms);
     EXPECT_EQ(1u, my_cards_response.cards[2].number_of_comments);
+  }
+
+  // Confirm that the recent feed also mentiones that this card has one comment.
+  {
+    const auto feed_recent =
+        ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=3",
+                                                FLAGS_api_port,
+                                                actual_uid.c_str(),
+                                                actual_token.c_str()))).body).feed_recent;
+    ASSERT_EQ(3u, feed_recent.size());
+    EXPECT_EQ("Meh.", feed_recent[0].text);
+    EXPECT_TRUE(feed_recent[0].is_my_card);
+    EXPECT_EQ(0u, feed_recent[0].number_of_comments);
+    EXPECT_EQ("Bar.", feed_recent[1].text);
+    EXPECT_TRUE(feed_recent[1].is_my_card);
+    EXPECT_EQ(0u, feed_recent[1].number_of_comments);
+    EXPECT_EQ("Foo.", feed_recent[2].text);
+    EXPECT_TRUE(feed_recent[2].is_my_card);
+    EXPECT_EQ(1u, feed_recent[2].number_of_comments);
   }
 
   // Get comments for the card where the comment was added, expecting one.
@@ -982,6 +1059,44 @@ TEST(CTFO, SmokeTest) {
   }
 
   // TODO(dkorolev): Test that I can only delete my own cards.
+
+  // Confirm that the recent feed still contains two of mine cards as the most recently added ones.
+  {
+    const auto feed_recent =
+        ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=2",
+                                                FLAGS_api_port,
+                                                actual_uid.c_str(),
+                                                actual_token.c_str()))).body).feed_recent;
+    ASSERT_EQ(2u, feed_recent.size());
+    EXPECT_EQ("Meh.", feed_recent[0].text);
+    EXPECT_EQ("Bar.", feed_recent[1].text);
+  }
+
+#if 0  // Coming in the next commit.
+  // Flag one of the cards.
+  {
+    iOSGenericEvent flag_card_event;
+    flag_card_event.event = "FLAG_CARD";
+    flag_card_event.fields["uid"] = actual_uid;
+    flag_card_event.fields["token"] = actual_token;
+    flag_card_event.fields["cid"] = added_card3_cid;
+    const auto reponse = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                   WithBaseType<MidichloriansEvent>(flag_card_event)));
+    EXPECT_EQ(200, static_cast<int>(reponse.code));
+    EXPECT_EQ("OK\n", reponse.body);
+  }
+
+  // Confirm that the flagged card is not returned as part of the feed.
+  {
+    const auto feed_recent =
+        ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
+                                                FLAGS_api_port,
+                                                actual_uid.c_str(),
+                                                actual_token.c_str()))).body).feed_recent;
+    ASSERT_EQ(1u, feed_recent.size());
+    EXPECT_EQ("Bar.", feed_recent[0].text);
+  }
+#endif
 }
 
 TEST(CTFO, StrictAuth) {

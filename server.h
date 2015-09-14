@@ -30,6 +30,7 @@ SOFTWARE.
 #include <cstdlib>
 #include <functional>
 #include <random>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -899,17 +900,31 @@ class CTFOServer final {
     const size_t max_count = std::min(feed_size, FEED_SIZE_LIMIT);
     response.user = user_entry;
 
-    std::vector<CID> candidates;
-    const UID uid = StringToUID(response.user.uid);
     const auto cards = Dictionary<Card>::Accessor(data);
     const auto answers = Matrix<Answer>::Accessor(data);
     const auto favorites = Matrix<Favorite>::Accessor(data);
+
+    std::set<std::pair<double, CID>> hot_cards;
+    std::set<std::pair<double, CID>> recent_cards;
+    const UID uid = StringToUID(response.user.uid);
+
+    const uint64_t now = static_cast<uint64_t>(bricks::time::Now());
     for (const auto& card : cards) {
+      // TODO(dkorolev): Remove flagged cards along with the cards that the user has cast their vote on.
       if (!answers.Has(uid, card.cid)) {
-        candidates.push_back(card.cid);
+        // For the recent feed, relevance is the function of the age of he card.
+        // Added just now => 1.00. Added 24 hour ago => 0.99. Added 48 hours ago => 0.99^2. Etc.
+        const double time_key = std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+        hot_cards.insert(std::make_pair(RandomDouble(0.2, 0.4), card.cid));
+        recent_cards.insert(std::make_pair(time_key, card.cid));
+        if (hot_cards.size() > max_count) {
+          hot_cards.erase(*hot_cards.begin());
+        }
+        if (recent_cards.size() > max_count) {
+          recent_cards.erase(*recent_cards.begin());
+        }
       }
     }
-    std::shuffle(candidates.begin(), candidates.end(), mt19937_64_tls());
 
     const auto card_authors = Matrix<CardAuthor>::Accessor(data);
     const auto comments = Matrix<Comment>::Accessor(data);
@@ -960,13 +975,20 @@ class CTFOServer final {
       return card_entry;
     };
 
+    // Copy the cards back, top scorers first.
+    std::vector<std::reference_wrapper<std::set<std::pair<double, CID>>>> prepared_cards;
+    prepared_cards.push_back(hot_cards);
+    prepared_cards.push_back(recent_cards);
+
     std::vector<std::reference_wrapper<std::vector<ResponseCardEntry>>> feeds;
     feeds.push_back(response.feed_hot);
     feeds.push_back(response.feed_recent);
-    for (size_t i = 0; i < candidates.size() && (max_count ? (i < max_count * 2) : true); ++i) {
-      auto& feed = feeds[i % 2].get();
-      const CID cid = candidates[i];
-      feed.push_back(GenerateCardForFeed(data.Get(cid)));
+
+    for (size_t i = 0; i < 2; ++i) {
+      for (auto cit = prepared_cards[i].get().rbegin(); cit != prepared_cards[i].get().rend(); ++cit) {
+        feeds[i].get().push_back(GenerateCardForFeed(data.Get(cit->second)));
+        feeds[i].get().back().relevance = cit->first;
+      }
     }
 
     response.ms = static_cast<uint64_t>(bricks::time::Now());
