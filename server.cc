@@ -35,6 +35,9 @@ CEREAL_REGISTER_TYPE(CardAuthor);
 CEREAL_REGISTER_TYPE(Answer);
 CEREAL_REGISTER_TYPE(Favorite);
 CEREAL_REGISTER_TYPE(Comment);
+CEREAL_REGISTER_TYPE(CommentLike);
+CEREAL_REGISTER_TYPE(CardFlagAsInappropriate);
+CEREAL_REGISTER_TYPE(CommentFlagAsInappropriate);
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(port, 8383, "Port to spawn CTFO RESTful server on.");

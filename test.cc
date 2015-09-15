@@ -41,6 +41,9 @@ CEREAL_REGISTER_TYPE(CardAuthor);
 CEREAL_REGISTER_TYPE(Answer);
 CEREAL_REGISTER_TYPE(Favorite);
 CEREAL_REGISTER_TYPE(Comment);
+CEREAL_REGISTER_TYPE(CommentLike);
+CEREAL_REGISTER_TYPE(CardFlagAsInappropriate);
+CEREAL_REGISTER_TYPE(CommentFlagAsInappropriate);
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(api_port, 8383, "Port to spawn CTFO RESTful server on.");
@@ -143,21 +146,6 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(40u, hot_texts.size());
     EXPECT_EQ(40u, recent_cids.size());
     EXPECT_EQ(40u, recent_texts.size());
-
-    std::vector<std::string> cids_intersection;
-    std::set_intersection(hot_cids.begin(),
-                          hot_cids.end(),
-                          recent_cids.begin(),
-                          recent_cids.end(),
-                          std::back_inserter(cids_intersection));
-    EXPECT_EQ(0u, cids_intersection.size());
-    std::vector<std::string> texts_intersection;
-    std::set_intersection(hot_texts.begin(),
-                          hot_texts.end(),
-                          recent_texts.begin(),
-                          recent_texts.end(),
-                          std::back_inserter(texts_intersection));
-    EXPECT_EQ(0u, texts_intersection.size());
   }
 
   // Add two cards to favorites.
@@ -300,6 +288,60 @@ TEST(CTFO, SmokeTest) {
     added_card_cid = add_card_response.cid;
   }
 
+  // Confirm the freshly added card tops the "Recent" feed. And that its age matters.
+  {
+    {
+      const auto feed_recent =
+          ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
+                                                  FLAGS_api_port,
+                                                  actual_uid.c_str(),
+                                                  actual_token.c_str()))).body).feed_recent;
+      ASSERT_EQ(1u, feed_recent.size());
+      EXPECT_EQ(added_card_cid, feed_recent[0].cid);
+      EXPECT_EQ("Foo.", feed_recent[0].text);
+      EXPECT_TRUE(feed_recent[0].is_my_card);
+      EXPECT_EQ(0u, feed_recent[0].number_of_comments);
+      EXPECT_EQ(1.0, feed_recent[0].relevance);
+    }
+
+    {
+      // Request recent cards 24 hours later.
+      bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(16001 + 1000 * 60 * 60 * 24));
+
+      const auto feed_recent =
+          ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
+                                                  FLAGS_api_port,
+                                                  actual_uid.c_str(),
+                                                  actual_token.c_str()))).body).feed_recent;
+      EXPECT_EQ(1u, feed_recent.size());
+      EXPECT_EQ(added_card_cid, feed_recent[0].cid);
+      EXPECT_EQ("Foo.", feed_recent[0].text);
+      EXPECT_TRUE(feed_recent[0].is_my_card);
+      EXPECT_EQ(0u, feed_recent[0].number_of_comments);
+      EXPECT_DOUBLE_EQ(0.99, feed_recent[0].relevance);
+    }
+
+    {
+      // Request recent cards 48 hours later.
+      bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(16001 + 1000 * 60 * 60 * 48));
+
+      const auto feed_recent =
+          ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
+                                                  FLAGS_api_port,
+                                                  actual_uid.c_str(),
+                                                  actual_token.c_str()))).body).feed_recent;
+      EXPECT_EQ(1u, feed_recent.size());
+      EXPECT_EQ(added_card_cid, feed_recent[0].cid);
+      EXPECT_EQ("Foo.", feed_recent[0].text);
+      EXPECT_TRUE(feed_recent[0].is_my_card);
+      EXPECT_EQ(0u, feed_recent[0].number_of_comments);
+      EXPECT_DOUBLE_EQ(0.99 * 0.99, feed_recent[0].relevance);
+    }
+
+    // Restore the time back.
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(16001));
+  }
+
   // Confirm this new card is not favorited by default.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(17001));
@@ -422,6 +464,25 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(16001u, my_cards_response.cards[2].ms);
   }
 
+  // Confirm that three recently added cards are on the top of the recent feed.
+  {
+    const auto feed_recent =
+        ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=3",
+                                                FLAGS_api_port,
+                                                actual_uid.c_str(),
+                                                actual_token.c_str()))).body).feed_recent;
+    ASSERT_EQ(3u, feed_recent.size());
+    EXPECT_EQ("Meh.", feed_recent[0].text);
+    EXPECT_TRUE(feed_recent[0].is_my_card);
+    EXPECT_EQ(0u, feed_recent[0].number_of_comments);
+    EXPECT_EQ("Bar.", feed_recent[1].text);
+    EXPECT_TRUE(feed_recent[1].is_my_card);
+    EXPECT_EQ(0u, feed_recent[1].number_of_comments);
+    EXPECT_EQ("Foo.", feed_recent[2].text);
+    EXPECT_TRUE(feed_recent[2].is_my_card);
+    EXPECT_EQ(0u, feed_recent[2].number_of_comments);
+  }
+
   // Get comments for a non-exising card, expecting an error.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(100001));
@@ -491,6 +552,25 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("Foo.", my_cards_response.cards[2].text);
     EXPECT_EQ(16001u, my_cards_response.cards[2].ms);
     EXPECT_EQ(1u, my_cards_response.cards[2].number_of_comments);
+  }
+
+  // Confirm that the recent feed also mentions that this card has one comment.
+  {
+    const auto feed_recent =
+        ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=3",
+                                                FLAGS_api_port,
+                                                actual_uid.c_str(),
+                                                actual_token.c_str()))).body).feed_recent;
+    ASSERT_EQ(3u, feed_recent.size());
+    EXPECT_EQ("Meh.", feed_recent[0].text);
+    EXPECT_TRUE(feed_recent[0].is_my_card);
+    EXPECT_EQ(0u, feed_recent[0].number_of_comments);
+    EXPECT_EQ("Bar.", feed_recent[1].text);
+    EXPECT_TRUE(feed_recent[1].is_my_card);
+    EXPECT_EQ(0u, feed_recent[1].number_of_comments);
+    EXPECT_EQ("Foo.", feed_recent[2].text);
+    EXPECT_TRUE(feed_recent[2].is_my_card);
+    EXPECT_EQ(1u, feed_recent[2].number_of_comments);
   }
 
   // Get comments for the card where the comment was added, expecting one.
@@ -635,24 +715,40 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(actual_uid, response.comments[0].author_uid);
     EXPECT_EQ("Bla.", response.comments[0].text);
     EXPECT_EQ(105001u, response.comments[0].ms);
+    EXPECT_EQ(actual_uid, response.comments[0].author_uid);
+    EXPECT_EQ(0u, response.comments[0].author_level);
+    EXPECT_EQ(0u, response.comments[0].number_of_likes);
+    EXPECT_FALSE(response.comments[0].liked);
 
     EXPECT_EQ(added_nested_comment_1_oid, response.comments[1].oid);
     EXPECT_EQ(added_second_comment_oid, response.comments[1].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[1].author_uid);
     EXPECT_EQ("for", response.comments[1].text);
     EXPECT_EQ(107001u, response.comments[1].ms);
+    EXPECT_EQ(actual_uid, response.comments[1].author_uid);
+    EXPECT_EQ(0u, response.comments[1].author_level);
+    EXPECT_EQ(0u, response.comments[1].number_of_likes);
+    EXPECT_FALSE(response.comments[1].liked);
 
     EXPECT_EQ(added_nested_comment_2_oid, response.comments[2].oid);
     EXPECT_EQ(added_second_comment_oid, response.comments[2].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[2].author_uid);
     EXPECT_EQ("real?", response.comments[2].text);
     EXPECT_EQ(108001u, response.comments[2].ms);
+    EXPECT_EQ(actual_uid, response.comments[2].author_uid);
+    EXPECT_EQ(0u, response.comments[2].author_level);
+    EXPECT_EQ(0u, response.comments[2].number_of_likes);
+    EXPECT_FALSE(response.comments[2].liked);
 
     EXPECT_EQ(added_comment_oid, response.comments[3].oid);
     EXPECT_EQ("", response.comments[3].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[3].author_uid);
     EXPECT_EQ("Meh.", response.comments[3].text);
     EXPECT_EQ(102001u, response.comments[3].ms);
+    EXPECT_EQ(actual_uid, response.comments[3].author_uid);
+    EXPECT_EQ(0u, response.comments[3].author_level);
+    EXPECT_EQ(0u, response.comments[3].number_of_likes);
+    EXPECT_FALSE(response.comments[3].liked);
   }
 
   // Confirm the card payload lists the number of comments as "4" now.
@@ -713,10 +809,137 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("NEED EMPTY OR VALID PARENT_OID\n", post_comment_response.body);
   }
 
+  // Like the comment.
+  {
+    iOSGenericEvent like_comment_event;
+    like_comment_event.event = "LIKE_COMMENT";
+    like_comment_event.fields["uid"] = actual_uid;
+    like_comment_event.fields["token"] = actual_token;
+    like_comment_event.fields["oid"] = added_nested_comment_1_oid;
+    const auto reponse = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                   WithBaseType<MidichloriansEvent>(like_comment_event)));
+    EXPECT_EQ(200, static_cast<int>(reponse.code));
+    EXPECT_EQ("OK\n", reponse.body);
+  }
+
+  // Confirm the comment got liked.
+  {
+    const auto comments =
+        ParseJSON<ResponseComments>(HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                                                    FLAGS_api_port,
+                                                    actual_uid.c_str(),
+                                                    actual_token.c_str(),
+                                                    added_card_cid.c_str()))).body).comments;
+    ASSERT_EQ(4u, comments.size());
+
+    EXPECT_EQ(added_second_comment_oid, comments[0].oid);
+    EXPECT_EQ("Bla.", comments[0].text);
+    EXPECT_EQ(0u, comments[0].number_of_likes);
+    EXPECT_FALSE(comments[0].liked);
+
+    EXPECT_EQ(added_nested_comment_1_oid, comments[1].oid);
+    EXPECT_EQ("for", comments[1].text);
+    EXPECT_EQ(1u, comments[1].number_of_likes);
+    EXPECT_TRUE(comments[1].liked);
+
+    EXPECT_EQ(added_nested_comment_2_oid, comments[2].oid);
+    EXPECT_EQ("real?", comments[2].text);
+    EXPECT_EQ(0u, comments[2].number_of_likes);
+    EXPECT_FALSE(comments[2].liked);
+
+    EXPECT_EQ(added_comment_oid, comments[3].oid);
+    EXPECT_EQ("Meh.", comments[3].text);
+    EXPECT_EQ(0u, comments[3].number_of_likes);
+    EXPECT_FALSE(comments[3].liked);
+  }
+
+  // Unlike the comment.
+  {
+    iOSGenericEvent unlike_comment_event;
+    unlike_comment_event.event = "UNLIKE_COMMENT";
+    unlike_comment_event.fields["uid"] = actual_uid;
+    unlike_comment_event.fields["token"] = actual_token;
+    unlike_comment_event.fields["oid"] = added_nested_comment_1_oid;
+    const auto reponse = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                   WithBaseType<MidichloriansEvent>(unlike_comment_event)));
+    EXPECT_EQ(200, static_cast<int>(reponse.code));
+    EXPECT_EQ("OK\n", reponse.body);
+  }
+
+  // Confirm the comment got unliked.
+  {
+    const auto comments =
+        ParseJSON<ResponseComments>(HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                                                    FLAGS_api_port,
+                                                    actual_uid.c_str(),
+                                                    actual_token.c_str(),
+                                                    added_card_cid.c_str()))).body).comments;
+    ASSERT_EQ(4u, comments.size());
+
+    EXPECT_EQ(added_second_comment_oid, comments[0].oid);
+    EXPECT_EQ("Bla.", comments[0].text);
+    EXPECT_EQ(0u, comments[0].number_of_likes);
+    EXPECT_FALSE(comments[0].liked);
+
+    EXPECT_EQ(added_nested_comment_1_oid, comments[1].oid);
+    EXPECT_EQ("for", comments[1].text);
+    EXPECT_EQ(0u, comments[1].number_of_likes);
+    EXPECT_FALSE(comments[1].liked);
+
+    EXPECT_EQ(added_nested_comment_2_oid, comments[2].oid);
+    EXPECT_EQ("real?", comments[2].text);
+    EXPECT_EQ(0u, comments[2].number_of_likes);
+    EXPECT_FALSE(comments[2].liked);
+
+    EXPECT_EQ(added_comment_oid, comments[3].oid);
+    EXPECT_EQ("Meh.", comments[3].text);
+    EXPECT_EQ(0u, comments[3].number_of_likes);
+    EXPECT_FALSE(comments[3].liked);
+  }
+
+  // Flag the comment.
+  {
+    iOSGenericEvent flag_comment_event;
+    flag_comment_event.event = "FLAG_COMMENT";
+    flag_comment_event.fields["uid"] = actual_uid;
+    flag_comment_event.fields["token"] = actual_token;
+    flag_comment_event.fields["oid"] = added_nested_comment_1_oid;
+    const auto reponse = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                   WithBaseType<MidichloriansEvent>(flag_comment_event)));
+    EXPECT_EQ(200, static_cast<int>(reponse.code));
+    EXPECT_EQ("OK\n", reponse.body);
+  }
+
+  // Confirm the flagged comment is now hidden.
+  {
+    const auto comments =
+        ParseJSON<ResponseComments>(HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                                                    FLAGS_api_port,
+                                                    actual_uid.c_str(),
+                                                    actual_token.c_str(),
+                                                    added_card_cid.c_str()))).body).comments;
+    ASSERT_EQ(3u, comments.size());
+
+    EXPECT_EQ(added_second_comment_oid, comments[0].oid);
+    EXPECT_EQ("Bla.", comments[0].text);
+    EXPECT_EQ(0u, comments[0].number_of_likes);
+    EXPECT_FALSE(comments[0].liked);
+
+    EXPECT_EQ(added_nested_comment_2_oid, comments[1].oid);
+    EXPECT_EQ("real?", comments[1].text);
+    EXPECT_EQ(0u, comments[1].number_of_likes);
+    EXPECT_FALSE(comments[1].liked);
+
+    EXPECT_EQ(added_comment_oid, comments[2].oid);
+    EXPECT_EQ("Meh.", comments[2].text);
+    EXPECT_EQ(0u, comments[2].number_of_likes);
+    EXPECT_FALSE(comments[2].liked);
+  }
+
   // Delete the top-level comment with no second level comments,
   // and confirm that the number of comments goes down from 4 to 3.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(111001));
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(600001));
     const auto delete_comment_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
                            FLAGS_api_port,
@@ -726,7 +949,7 @@ TEST(CTFO, SmokeTest) {
                            added_comment_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
     const auto payload = ParseJSON<DeleteCommentResponse>(delete_comment_response.body);
-    EXPECT_EQ(111001u, payload.ms);
+    EXPECT_EQ(600001u, payload.ms);
 
     EXPECT_EQ(3u,
               ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
@@ -788,7 +1011,7 @@ TEST(CTFO, SmokeTest) {
   // Delete the remaining top-level comment, and confirm that the number of comments
   // goes down from 2 to 0, since deleting the top-level comments deletes its children.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(113001));
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(601001));
     const auto delete_comment_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
                            FLAGS_api_port,
@@ -798,7 +1021,7 @@ TEST(CTFO, SmokeTest) {
                            added_second_comment_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
     const auto payload = ParseJSON<DeleteCommentResponse>(delete_comment_response.body);
-    EXPECT_EQ(113001u, payload.ms);
+    EXPECT_EQ(601001u, payload.ms);
 
     EXPECT_EQ(0u,
               ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
@@ -819,7 +1042,7 @@ TEST(CTFO, SmokeTest) {
                                                          actual_uid.c_str(),
                                                          actual_token.c_str()))).body).cards.size());
 
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(201001));
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(602001));
     const auto delete_card_response = HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
                                                          FLAGS_api_port,
                                                          actual_uid.c_str(),
@@ -827,7 +1050,7 @@ TEST(CTFO, SmokeTest) {
                                                          added_card_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_card_response.code));
     const auto payload = ParseJSON<DeleteCardResponse>(delete_card_response.body);
-    EXPECT_EQ(201001u, payload.ms);
+    EXPECT_EQ(602001u, payload.ms);
 
     EXPECT_EQ(2u,
               ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
@@ -837,6 +1060,42 @@ TEST(CTFO, SmokeTest) {
   }
 
   // TODO(dkorolev): Test that I can only delete my own cards.
+
+  // Confirm that the recent feed still contains two of my cards as the most recently added ones.
+  {
+    const auto feed_recent =
+        ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=2",
+                                                FLAGS_api_port,
+                                                actual_uid.c_str(),
+                                                actual_token.c_str()))).body).feed_recent;
+    ASSERT_EQ(2u, feed_recent.size());
+    EXPECT_EQ("Meh.", feed_recent[0].text);
+    EXPECT_EQ("Bar.", feed_recent[1].text);
+  }
+
+  // Flag one of the cards.
+  {
+    iOSGenericEvent flag_card_event;
+    flag_card_event.event = "FLAG_CARD";
+    flag_card_event.fields["uid"] = actual_uid;
+    flag_card_event.fields["token"] = actual_token;
+    flag_card_event.fields["cid"] = added_card3_cid;
+    const auto reponse = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                   WithBaseType<MidichloriansEvent>(flag_card_event)));
+    EXPECT_EQ(200, static_cast<int>(reponse.code));
+    EXPECT_EQ("OK\n", reponse.body);
+  }
+
+  // Confirm that the flagged card is not returned as part of the feed.
+  {
+    const auto feed_recent =
+        ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
+                                                FLAGS_api_port,
+                                                actual_uid.c_str(),
+                                                actual_token.c_str()))).body).feed_recent;
+    ASSERT_EQ(1u, feed_recent.size());
+    EXPECT_EQ("Bar.", feed_recent[0].text);
+  }
 }
 
 TEST(CTFO, StrictAuth) {
