@@ -917,7 +917,7 @@ class CTFOServer final {
         // For the recent feed, relevance is the function of the age of he card.
         // Added just now => 1.00. Added 24 hour ago => 0.99. Added 48 hours ago => 0.99^2. Etc.
         const double time_key = std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
-        hot_cards.insert(std::make_pair(RandomDouble(0.2, 0.4), card.cid));
+        hot_cards.emplace(RandomDouble(0.2, 0.4), card.cid);
         recent_cards.emplace(time_key, card.cid);
         if (hot_cards.size() > max_count) {
           hot_cards.erase(hot_cards.begin());
