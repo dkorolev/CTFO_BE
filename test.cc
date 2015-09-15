@@ -554,7 +554,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(1u, my_cards_response.cards[2].number_of_comments);
   }
 
-  // Confirm that the recent feed also mentiones that this card has one comment.
+  // Confirm that the recent feed also mentions that this card has one comment.
   {
     const auto feed_recent =
         ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=3",
@@ -1061,7 +1061,7 @@ TEST(CTFO, SmokeTest) {
 
   // TODO(dkorolev): Test that I can only delete my own cards.
 
-  // Confirm that the recent feed still contains two of mine cards as the most recently added ones.
+  // Confirm that the recent feed still contains two of my cards as the most recently added ones.
   {
     const auto feed_recent =
         ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=2",

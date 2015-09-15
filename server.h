@@ -82,7 +82,7 @@ class CTFOServer final {
                            }
                          }).Go();
 
-    HTTP(port_).Register("/ctfo/auth/ios", BindToThis(&CTFOServer::RouteAuth));
+    HTTP(port_).Register("/ctfo/auth/ios", BindToThis(&CTFOServer::RouteAuthiOS));
     HTTP(port_).Register("/ctfo/feed", BindToThis(&CTFOServer::RouteFeed));
     HTTP(port_).Register("/ctfo/favs", BindToThis(&CTFOServer::RouteFavorites));
     HTTP(port_).Register("/ctfo/my_cards", BindToThis(&CTFOServer::RouteMyCards));
@@ -111,7 +111,7 @@ class CTFOServer final {
     return std::bind(handler, this, std::placeholders::_1);
   };
 
-  void RouteAuth(Request r) {
+  void RouteAuthiOS(Request r) {
     if (r.method != "POST") {
       DebugPrint(Printf("[/ctfo/auth/ios] Wrong method '%s'. Requested URL = '%s'",
                         r.method.c_str(),
@@ -914,7 +914,7 @@ class CTFOServer final {
     const uint64_t now = static_cast<uint64_t>(bricks::time::Now());
     for (const auto& card : cards) {
       if (!answers.Has(uid, card.cid) && !flagged_cards.Has(card.cid, uid)) {
-        // For the recent feed, relevance is the function of the age of he card.
+        // For the recent feed, relevance is the function of the age of the card.
         // Added just now => 1.00. Added 24 hour ago => 0.99. Added 48 hours ago => 0.99^2. Etc.
         const double time_key = std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
         hot_cards.emplace(RandomDouble(0.2, 0.4), card.cid);
