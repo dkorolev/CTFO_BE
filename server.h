@@ -701,7 +701,7 @@ class CTFOServer final {
                       c.parent_oid = OIDToString(comment.parent_oid);
                     }
                     c.author_uid = UIDToString(comment.author_uid);
-                    c.author_level = users_accessor[uid].level;
+                    c.author_level = users_accessor[comment.author_uid].level;
                     c.text = comment.text;
                     try {
                       const auto& likers = comment_likes_accessor[comment.oid];
