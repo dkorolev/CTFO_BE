@@ -78,9 +78,11 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
                                  log_file,
                                  static_cast<bricks::time::MILLISECONDS_INTERVAL>(100)
 #ifdef CTFO_DEBUG
+                                 // clang-format off
                                  ,
                                  true  // Debug print.
 #endif
+                                 // clang-format on
                                  );
 }
 
