@@ -295,7 +295,7 @@ class CTFOServer final {
 
                                    // And publish them.
                                    const auto card_authors = Matrix<CardAuthor>::Accessor(data);
-                                   const auto comments = Matrix<Comment>::Accessor(data);
+                                   const auto comments = Matrix<CardComment>::Accessor(data);
                                    const auto GenerateCardForFavs =
                                        [this, uid, &answers, &card_authors, &comments](const Card& card) {
                                      ResponseCardEntry card_entry;
@@ -311,7 +311,7 @@ class CTFOServer final {
                                      }
                                      try {
                                        card_entry.number_of_comments = comments[card.cid].size();
-                                     } catch (const yoda::SubscriptException<Comment>&) {
+                                     } catch (const yoda::SubscriptException<CardComment>&) {
                                        // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
                                      }
                                      card_entry.text = card.text;
@@ -412,7 +412,7 @@ class CTFOServer final {
 
                   // And publish them.
                   const auto card_authors = Matrix<CardAuthor>::Accessor(data);
-                  const auto comments = Matrix<Comment>::Accessor(data);
+                  const auto comments = Matrix<CardComment>::Accessor(data);
                   const auto GenerateCardForMyCards =
                       [this, uid, &answers, &favorites, &card_authors, &comments](const Card& card) {
                     ResponseCardEntry card_entry;
@@ -428,7 +428,7 @@ class CTFOServer final {
                     }
                     try {
                       card_entry.number_of_comments = comments[card.cid].size();
-                    } catch (const yoda::SubscriptException<Comment>&) {
+                    } catch (const yoda::SubscriptException<CardComment>&) {
                       // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
                     }
                     card_entry.text = card.text;
@@ -585,16 +585,16 @@ class CTFOServer final {
                 auto card_authors_mutator = Matrix<CardAuthor>::Mutator(data);
                 card_authors_mutator.Delete(cid, uid);
                 try {
-                  auto comments_mutator = Matrix<Comment>::Mutator(data);
+                  auto comments_mutator = Matrix<CardComment>::Mutator(data);
                   std::vector<OID> oids_to_delete;
-                  for (const Comment& c : comments_mutator[cid]) {
+                  for (const CardComment& c : comments_mutator[cid]) {
                     oids_to_delete.push_back(c.oid);
                   }
                   for (const OID& o : oids_to_delete) {
                     comments_mutator.Delete(cid, o);
                   }
-                } catch (const yoda::SubscriptException<Comment>&) {
-                  DebugPrint(Printf("[/ctfo/card] yoda::SubscriptException<Comment>, Requested URL = '%s'",
+                } catch (const yoda::SubscriptException<CardComment>&) {
+                  DebugPrint(Printf("[/ctfo/card] yoda::SubscriptException<CardComment>, Requested URL = '%s'",
                                     requested_url.c_str()));
                 }
                 DeleteCardResponse response;
@@ -650,22 +650,22 @@ class CTFOServer final {
                   return Response("NEED VALID USER\n", HTTPResponseCode.Unauthorized);
                 } else {
                   const auto users_accessor = Dictionary<User>::Accessor(data);
-                  const auto comments_accessor = Matrix<Comment>::Accessor(data);
+                  const auto comments_accessor = Matrix<CardComment>::Accessor(data);
                   const auto comment_likes_accessor = Matrix<CommentLike>::Accessor(data);
                   const auto comment_flagged_accessor = Matrix<CommentFlagAsInappropriate>::Accessor(data);
-                  std::vector<Comment> proto_comments;
+                  std::vector<CardComment> proto_comments;
                   try {
-                    const auto comments = Matrix<Comment>::Accessor(data);
+                    const auto comments = Matrix<CardComment>::Accessor(data);
                     for (const auto& comment : comments[cid]) {
                       if (!comment_flagged_accessor.Has(comment.oid, uid)) {
                         proto_comments.push_back(comment);
                       }
                     }
-                  } catch (const yoda::SubscriptException<Comment>&) {
-                    DebugPrint(Printf("[/ctfo/comments] yoda:SubscriptException<Comment>, Requested URL = '%s'",
+                  } catch (const yoda::SubscriptException<CardComment>&) {
+                    DebugPrint(Printf("[/ctfo/comments] yoda:SubscriptException<CardComment>, Requested URL = '%s'",
                                       requested_url.c_str()));
                   }
-                  const auto sortkey = [&comments_accessor](const Comment& c) -> std::pair<uint64_t, uint64_t> {
+                  const auto sortkey = [&comments_accessor](const CardComment& c) -> std::pair<uint64_t, uint64_t> {
                     uint64_t comment_timestamp = 0u;
                     uint64_t top_level_comment_timestamp = 0u;
                     if (c.parent_oid == OID::INVALID_COMMENT) {
@@ -679,7 +679,7 @@ class CTFOServer final {
                         if (iterable.size() == 1u) {
                           top_level_comment_timestamp = (*iterable.begin()).ms;
                         }
-                      } catch (const yoda::SubscriptException<Comment>&) {
+                      } catch (const yoda::SubscriptException<CardComment>&) {
                       }
                     }
                     // Top-level comments reverse chronologically, 2nd level comments chronologically.
@@ -687,13 +687,13 @@ class CTFOServer final {
                   };
                   std::sort(proto_comments.begin(),
                             proto_comments.end(),
-                            [&sortkey](const Comment& lhs,
-                                       const Comment& rhs) { return sortkey(lhs) < sortkey(rhs); });
+                            [&sortkey](const CardComment& lhs,
+                                       const CardComment& rhs) { return sortkey(lhs) < sortkey(rhs); });
                   ResponseComments response;
                   response.ms = static_cast<uint64_t>(bricks::time::Now());
                   std::vector<ResponseComment>& output_comments = response.comments;
                   for (const auto& comment : proto_comments) {
-                    // TODO(dkorolev): Need a function to convert `Comment` into `ResponseComment`.
+                    // TODO(dkorolev): Need a function to convert `CardComment` into `ResponseComment`.
                     ResponseComment c;
                     c.oid = OIDToString(comment.oid);
                     if (comment.parent_oid != OID::INVALID_COMMENT) {
@@ -751,9 +751,9 @@ class CTFOServer final {
                       Printf("[/ctfo/comments] Token validated. Requested URL = '%s'", requested_url.c_str()));
                   const auto now = static_cast<uint64_t>(bricks::time::Now());
 
-                  auto comments_mutator = Matrix<Comment>::Mutator(data);
+                  auto comments_mutator = Matrix<CardComment>::Mutator(data);
 
-                  Comment comment;
+                  CardComment comment;
                   comment.cid = cid;
                   comment.oid = oid;
                   comment.author_uid = uid;
@@ -769,7 +769,7 @@ class CTFOServer final {
                       } else if ((*iterable.begin()).parent_oid != OID::INVALID_COMMENT) {
                         return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n", HTTPResponseCode.BadRequest);
                       }
-                    } catch (const yoda::SubscriptException<Comment>&) {
+                    } catch (const yoda::SubscriptException<CardComment>&) {
                       return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
                     }
                   }
@@ -818,10 +818,10 @@ class CTFOServer final {
                       Printf("[/ctfo/comments] Token validated. Requested URL = '%s'", requested_url.c_str()));
                   // TODO(dkorolev): Do something smart about non-existing comments.
                   try {
-                    auto comments_mutator = Matrix<Comment>::Mutator(data);
+                    auto comments_mutator = Matrix<CardComment>::Mutator(data);
                     std::vector<OID> oids_to_delete;
                     oids_to_delete.push_back(oid);
-                    for (const Comment& c : comments_mutator[cid]) {
+                    for (const CardComment& c : comments_mutator[cid]) {
                       if (c.parent_oid == oid) {
                         oids_to_delete.push_back(c.oid);
                       }
@@ -829,7 +829,7 @@ class CTFOServer final {
                     for (const OID& o : oids_to_delete) {
                       comments_mutator.Delete(cid, o);
                     }
-                  } catch (const yoda::SubscriptException<Comment>&) {
+                  } catch (const yoda::SubscriptException<CardComment>&) {
                   }
                   DeleteCommentResponse response;
                   response.ms = static_cast<uint64_t>(bricks::time::Now());
@@ -861,7 +861,7 @@ class CTFOServer final {
                         Matrix<CardAuthor>,
                         Matrix<Answer>,
                         Matrix<Favorite>,
-                        Matrix<Comment>,
+                        Matrix<CardComment>,
                         Matrix<CommentLike>,
                         Matrix<CardFlagAsInappropriate>,
                         Matrix<CommentFlagAsInappropriate>> StorageAPI;
@@ -929,7 +929,7 @@ class CTFOServer final {
     }
 
     const auto card_authors = Matrix<CardAuthor>::Accessor(data);
-    const auto comments = Matrix<Comment>::Accessor(data);
+    const auto comments = Matrix<CardComment>::Accessor(data);
     const auto GenerateCardForFeed =
         [this, uid, &answers, &favorites, &comments, &card_authors](const Card& card) {
       ResponseCardEntry card_entry;
@@ -945,7 +945,7 @@ class CTFOServer final {
       }
       try {
         card_entry.number_of_comments = comments[card.cid].size();
-      } catch (const yoda::SubscriptException<Comment>&) {
+      } catch (const yoda::SubscriptException<CardComment>&) {
         // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
       }
       card_entry.text = card.text;
@@ -1134,7 +1134,7 @@ class CTFOServer final {
                   DebugPrint("[UpdateStateOnEvent] No OID.");
                   return;
                 }
-                if (!Matrix<Comment>::Accessor(data).Cols().Has(oid)) {
+                if (!Matrix<CardComment>::Accessor(data).Cols().Has(oid)) {
                   DebugPrint(
                       Printf("[UpdateStateOnEvent] Nonexistent OID '%s' LIKE/UNLIKE/FLAG.", oid_str.c_str()));
                   return;

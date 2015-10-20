@@ -349,7 +349,7 @@ struct Favorite : yoda::Padawan {
   }
 };
 
-struct Comment : yoda::Padawan {
+struct CardComment : yoda::Padawan {
   CID cid = CID::INVALID_CARD;     // Row key: Card ID.
   OID oid = OID::INVALID_COMMENT;  // Col key: Comment ID.
 
@@ -358,8 +358,8 @@ struct Comment : yoda::Padawan {
   UID author_uid = UID::INVALID_USER;
   std::string text;
 
-  Comment() = default;
-  Comment(const CID cid, const OID oid, const OID parent_oid, const UID author_uid, const std::string& text)
+  CardComment() = default;
+  CardComment(const CID cid, const OID oid, const OID parent_oid, const UID author_uid, const std::string& text)
       : cid(cid), oid(oid), parent_oid(parent_oid), author_uid(author_uid), text(text) {}
 
   CID row() const { return cid; }
