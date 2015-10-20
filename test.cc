@@ -40,7 +40,7 @@ CEREAL_REGISTER_TYPE(Card);
 CEREAL_REGISTER_TYPE(CardAuthor);
 CEREAL_REGISTER_TYPE(Answer);
 CEREAL_REGISTER_TYPE(Favorite);
-CEREAL_REGISTER_TYPE(Comment);
+CEREAL_REGISTER_TYPE(CardComment);
 CEREAL_REGISTER_TYPE(CommentLike);
 CEREAL_REGISTER_TYPE(CardFlagAsInappropriate);
 CEREAL_REGISTER_TYPE(CommentFlagAsInappropriate);
@@ -78,9 +78,11 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
                                  log_file,
                                  static_cast<bricks::time::MILLISECONDS_INTERVAL>(100)
 #ifdef CTFO_DEBUG
+                                 // clang-format off
                                  ,
                                  true  // Debug print.
 #endif
+                                 // clang-format on
                                  );
 }
 
@@ -836,21 +838,25 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("Bla.", comments[0].text);
     EXPECT_EQ(0u, comments[0].number_of_likes);
     EXPECT_FALSE(comments[0].liked);
+    EXPECT_FALSE(comments[0].flagged_inappropriate);
 
     EXPECT_EQ(added_nested_comment_1_oid, comments[1].oid);
     EXPECT_EQ("for", comments[1].text);
     EXPECT_EQ(1u, comments[1].number_of_likes);
     EXPECT_TRUE(comments[1].liked);
+    EXPECT_FALSE(comments[1].flagged_inappropriate);
 
     EXPECT_EQ(added_nested_comment_2_oid, comments[2].oid);
     EXPECT_EQ("real?", comments[2].text);
     EXPECT_EQ(0u, comments[2].number_of_likes);
     EXPECT_FALSE(comments[2].liked);
+    EXPECT_FALSE(comments[2].flagged_inappropriate);
 
     EXPECT_EQ(added_comment_oid, comments[3].oid);
     EXPECT_EQ("Meh.", comments[3].text);
     EXPECT_EQ(0u, comments[3].number_of_likes);
     EXPECT_FALSE(comments[3].liked);
+    EXPECT_FALSE(comments[3].flagged_inappropriate);
   }
 
   // Unlike the comment.
@@ -880,21 +886,25 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("Bla.", comments[0].text);
     EXPECT_EQ(0u, comments[0].number_of_likes);
     EXPECT_FALSE(comments[0].liked);
+    EXPECT_FALSE(comments[0].flagged_inappropriate);
 
     EXPECT_EQ(added_nested_comment_1_oid, comments[1].oid);
     EXPECT_EQ("for", comments[1].text);
     EXPECT_EQ(0u, comments[1].number_of_likes);
     EXPECT_FALSE(comments[1].liked);
+    EXPECT_FALSE(comments[1].flagged_inappropriate);
 
     EXPECT_EQ(added_nested_comment_2_oid, comments[2].oid);
     EXPECT_EQ("real?", comments[2].text);
     EXPECT_EQ(0u, comments[2].number_of_likes);
     EXPECT_FALSE(comments[2].liked);
+    EXPECT_FALSE(comments[2].flagged_inappropriate);
 
     EXPECT_EQ(added_comment_oid, comments[3].oid);
     EXPECT_EQ("Meh.", comments[3].text);
     EXPECT_EQ(0u, comments[3].number_of_likes);
     EXPECT_FALSE(comments[3].liked);
+    EXPECT_FALSE(comments[3].flagged_inappropriate);
   }
 
   // Flag the comment.
@@ -910,7 +920,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("OK\n", reponse.body);
   }
 
-  // Confirm the flagged comment is now hidden.
+  // Confirm the flagged comment has the corresponding flag in the response.
   {
     const auto comments =
         ParseJSON<ResponseComments>(HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
@@ -918,22 +928,28 @@ TEST(CTFO, SmokeTest) {
                                                     actual_uid.c_str(),
                                                     actual_token.c_str(),
                                                     added_card_cid.c_str()))).body).comments;
-    ASSERT_EQ(3u, comments.size());
+    ASSERT_EQ(4u, comments.size());
 
     EXPECT_EQ(added_second_comment_oid, comments[0].oid);
     EXPECT_EQ("Bla.", comments[0].text);
     EXPECT_EQ(0u, comments[0].number_of_likes);
     EXPECT_FALSE(comments[0].liked);
 
-    EXPECT_EQ(added_nested_comment_2_oid, comments[1].oid);
-    EXPECT_EQ("real?", comments[1].text);
+    EXPECT_EQ(added_nested_comment_1_oid, comments[1].oid);
+    EXPECT_EQ("for", comments[1].text);
     EXPECT_EQ(0u, comments[1].number_of_likes);
     EXPECT_FALSE(comments[1].liked);
+    EXPECT_TRUE(comments[1].flagged_inappropriate);
 
-    EXPECT_EQ(added_comment_oid, comments[2].oid);
-    EXPECT_EQ("Meh.", comments[2].text);
+    EXPECT_EQ(added_nested_comment_2_oid, comments[2].oid);
+    EXPECT_EQ("real?", comments[2].text);
     EXPECT_EQ(0u, comments[2].number_of_likes);
     EXPECT_FALSE(comments[2].liked);
+
+    EXPECT_EQ(added_comment_oid, comments[3].oid);
+    EXPECT_EQ("Meh.", comments[3].text);
+    EXPECT_EQ(0u, comments[3].number_of_likes);
+    EXPECT_FALSE(comments[3].liked);
   }
 
   // Delete the top-level comment with no second level comments,

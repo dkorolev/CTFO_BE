@@ -349,7 +349,7 @@ struct Favorite : yoda::Padawan {
   }
 };
 
-struct Comment : yoda::Padawan {
+struct CardComment : yoda::Padawan {
   CID cid = CID::INVALID_CARD;     // Row key: Card ID.
   OID oid = OID::INVALID_COMMENT;  // Col key: Comment ID.
 
@@ -358,8 +358,8 @@ struct Comment : yoda::Padawan {
   UID author_uid = UID::INVALID_USER;
   std::string text;
 
-  Comment() = default;
-  Comment(const CID cid, const OID oid, const OID parent_oid, const UID author_uid, const std::string& text)
+  CardComment() = default;
+  CardComment(const CID cid, const OID oid, const OID parent_oid, const UID author_uid, const std::string& text)
       : cid(cid), oid(oid), parent_oid(parent_oid), author_uid(author_uid), text(text) {}
 
   CID row() const { return cid; }
@@ -595,6 +595,7 @@ struct ResponseComment {
   std::string text;                     // Comment text.
   size_t number_of_likes = 0u;          // Number of likes in this comment.
   bool liked = false;                   // Whether the current user has liked this comment.
+  bool flagged_inappropriate = false;   // Whether the current user has flagged this comment as inappropriate.
   uint64_t ms;                          // Comment timestamp, milliseconds from epoch.
   // TODO(dkorolev): User name? Tier status?
   // TODO(dkorolev): Color?
@@ -608,6 +609,7 @@ struct ResponseComment {
        CEREAL_NVP(text),
        CEREAL_NVP(number_of_likes),
        CEREAL_NVP(liked),
+       CEREAL_NVP(flagged_inappropriate),
        CEREAL_NVP(ms));
   }
 };
