@@ -595,6 +595,7 @@ struct ResponseComment {
   std::string text;                     // Comment text.
   size_t number_of_likes = 0u;          // Number of likes in this comment.
   bool liked = false;                   // Whether the current user has liked this comment.
+  bool flagged_inappropriate = false;   // Whether the current user has flagged this comment as inappropriate.
   uint64_t ms;                          // Comment timestamp, milliseconds from epoch.
   // TODO(dkorolev): User name? Tier status?
   // TODO(dkorolev): Color?
@@ -608,6 +609,7 @@ struct ResponseComment {
        CEREAL_NVP(text),
        CEREAL_NVP(number_of_likes),
        CEREAL_NVP(liked),
+       CEREAL_NVP(flagged_inappropriate),
        CEREAL_NVP(ms));
   }
 };

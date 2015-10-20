@@ -640,12 +640,14 @@ class CTFOServer final {
               const auto comment_likes_accessor = Matrix<CommentLike>::Accessor(data);
               const auto comment_flagged_accessor = Matrix<CommentFlagAsInappropriate>::Accessor(data);
               std::vector<CardComment> proto_comments;
+              std::set<OID> flagged_comments;
               try {
                 const auto comments = Matrix<CardComment>::Accessor(data);
                 for (const auto& comment : comments[cid]) {
-                  if (!comment_flagged_accessor.Has(comment.oid, uid)) {
-                    proto_comments.push_back(comment);
+                  if (comment_flagged_accessor.Has(comment.oid, uid)) {
+                    flagged_comments.insert(comment.oid);
                   }
+                  proto_comments.push_back(comment);
                 }
               } catch (const yoda::SubscriptException<CardComment>&) {
                 DebugPrint(Printf("[/ctfo/comments] yoda:SubscriptException<CardComment>, Requested URL = '%s'",
@@ -696,6 +698,7 @@ class CTFOServer final {
                   c.liked = likers.Has(uid);
                 } catch (const yoda::SubscriptException<CommentLike>&) {
                 }
+                c.flagged_inappropriate = flagged_comments.count(comment.oid);
                 c.ms = comment.ms;
                 output_comments.push_back(std::move(c));
               }
