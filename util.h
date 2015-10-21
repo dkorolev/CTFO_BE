@@ -33,6 +33,7 @@ SOFTWARE.
 using namespace bricks::random;
 using namespace bricks::strings;
 
+namespace CTFO {
 static constexpr uint64_t ID_RANGE = static_cast<uint64_t>(1e18);
 
 inline UID RandomUID() { return static_cast<UID>(RandomUInt64(1 * ID_RANGE + 1, 2 * ID_RANGE - 1)); }
@@ -77,5 +78,6 @@ inline OID StringToOID(const std::string& s) {
   }
   return OID::INVALID_COMMENT;
 }
+}  // namespace CTFO
 
 #endif  // CTFO_UTIL_H

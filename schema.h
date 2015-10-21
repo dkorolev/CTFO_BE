@@ -32,6 +32,7 @@ SOFTWARE.
 #include "../Current/Bricks/cerealize/cerealize.h"
 #include "../Current/Yoda/yoda.h"
 
+namespace CTFO {
 // Common data structures.
 struct Color {
   uint8_t red;
@@ -349,7 +350,7 @@ struct Favorite : yoda::Padawan {
   }
 };
 
-struct CardComment : yoda::Padawan {
+struct Comment : yoda::Padawan {
   CID cid = CID::INVALID_CARD;     // Row key: Card ID.
   OID oid = OID::INVALID_COMMENT;  // Col key: Comment ID.
 
@@ -358,8 +359,8 @@ struct CardComment : yoda::Padawan {
   UID author_uid = UID::INVALID_USER;
   std::string text;
 
-  CardComment() = default;
-  CardComment(const CID cid, const OID oid, const OID parent_oid, const UID author_uid, const std::string& text)
+  Comment() = default;
+  Comment(const CID cid, const OID oid, const OID parent_oid, const UID author_uid, const std::string& text)
       : cid(cid), oid(oid), parent_oid(parent_oid), author_uid(author_uid), text(text) {}
 
   CID row() const { return cid; }
@@ -638,17 +639,18 @@ enum class RESPONSE : int {
   FLAG_COMMENT = 203,
   FLAG_CARD = 301
 };
+}  // namespace CTFO
 
-CEREAL_REGISTER_TYPE(User);
-CEREAL_REGISTER_TYPE(AuthKeyTokenPair);
-CEREAL_REGISTER_TYPE(AuthKeyUIDPair);
-CEREAL_REGISTER_TYPE(Card);
-CEREAL_REGISTER_TYPE(CardAuthor);
-CEREAL_REGISTER_TYPE(Answer);
-CEREAL_REGISTER_TYPE(Favorite);
-CEREAL_REGISTER_TYPE(CardComment);
-CEREAL_REGISTER_TYPE(CommentLike);
-CEREAL_REGISTER_TYPE(CardFlagAsInappropriate);
-CEREAL_REGISTER_TYPE(CommentFlagAsInappropriate);
+CEREAL_REGISTER_TYPE(CTFO::User);
+CEREAL_REGISTER_TYPE(CTFO::AuthKeyTokenPair);
+CEREAL_REGISTER_TYPE(CTFO::AuthKeyUIDPair);
+CEREAL_REGISTER_TYPE(CTFO::Card);
+CEREAL_REGISTER_TYPE(CTFO::CardAuthor);
+CEREAL_REGISTER_TYPE(CTFO::Answer);
+CEREAL_REGISTER_TYPE(CTFO::Favorite);
+CEREAL_REGISTER_TYPE(CTFO::Comment);
+CEREAL_REGISTER_TYPE(CTFO::CommentLike);
+CEREAL_REGISTER_TYPE(CTFO::CardFlagAsInappropriate);
+CEREAL_REGISTER_TYPE(CTFO::CommentFlagAsInappropriate);
 
 #endif  // CTFO_SCHEMA_H

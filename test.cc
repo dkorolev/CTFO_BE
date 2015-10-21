@@ -37,6 +37,8 @@ DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(api_port, 8383, "Port to spawn CTFO RESTful server on.");
 DEFINE_int32(event_log_port, 8384, "Port to spawn event collector on.");
 
+using namespace CTFO;
+
 // Uncomment the following line to have the unit test dump debug information to console.
 // #define CTFO_DEBUG
 
