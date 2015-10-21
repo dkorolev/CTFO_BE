@@ -33,18 +33,6 @@ SOFTWARE.
 #include "../Current/Bricks/dflags/dflags.h"
 #include "../Current/3rdparty/gtest/gtest-main-with-dflags.h"
 
-CEREAL_REGISTER_TYPE(User);
-CEREAL_REGISTER_TYPE(AuthKeyTokenPair);
-CEREAL_REGISTER_TYPE(AuthKeyUIDPair);
-CEREAL_REGISTER_TYPE(Card);
-CEREAL_REGISTER_TYPE(CardAuthor);
-CEREAL_REGISTER_TYPE(Answer);
-CEREAL_REGISTER_TYPE(Favorite);
-CEREAL_REGISTER_TYPE(CardComment);
-CEREAL_REGISTER_TYPE(CommentLike);
-CEREAL_REGISTER_TYPE(CardFlagAsInappropriate);
-CEREAL_REGISTER_TYPE(CommentFlagAsInappropriate);
-
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(api_port, 8383, "Port to spawn CTFO RESTful server on.");
 DEFINE_int32(event_log_port, 8384, "Port to spawn event collector on.");

@@ -29,8 +29,6 @@ SOFTWARE.
 #include "util.h"
 #include "schema.h"
 
-CEREAL_REGISTER_TYPE(Card);
-
 using namespace bricks::strings;
 
 DEFINE_string(in, "cards.txt", "Default input file in raw text format.");
