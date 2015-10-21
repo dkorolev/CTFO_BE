@@ -27,6 +27,8 @@ SOFTWARE.
 
 #include "../Current/Bricks/dflags/dflags.h"
 
+using namespace CTFO;
+
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(port, 8383, "Port to spawn CTFO RESTful server on.");
 DEFINE_string(storage_file, "./db.json", "The file to store the snapshot of the database in.");

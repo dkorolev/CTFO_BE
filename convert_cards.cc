@@ -30,6 +30,7 @@ SOFTWARE.
 #include "schema.h"
 
 using namespace bricks::strings;
+using namespace CTFO;
 
 DEFINE_string(in, "cards.txt", "Default input file in raw text format.");
 DEFINE_string(out, "cards.json", "Default output file in JSON format.");
