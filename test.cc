@@ -82,15 +82,33 @@ TEST(CTFO, SmokeTest) {
   const auto server_scope = SpawnTestServer("smoke");
 
   // Get authentication `uid` and `token`.
+  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(101));
   const char* const auth_id = "A_BUNCH_OF_DIGITS";
   const char* const auth_key = "1234567890abcdef";
   const auto auth_http_response = HTTP(
       POST(Printf("http://localhost:%d/ctfo/auth/ios?id=%s&key=%s", FLAGS_api_port, auth_id, auth_key), ""));
   EXPECT_EQ(200, static_cast<int>(auth_http_response.code));
   const auto auth_response = ParseJSON<ResponseFeed>(auth_http_response.body);
-  EXPECT_EQ(1u, auth_response.ms);
+  EXPECT_EQ(101u, auth_response.ms);
   const std::string actual_uid = auth_response.user.uid;
   const std::string actual_token = auth_response.user.token;
+
+  // Get authentication `uid` and `token` for another user.
+  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(201));
+  const char* const another_auth_id = "ANOTHER_BUNCH_OF_DIGITS";
+  const char* const another_auth_key = "abcdef1234567890";
+  const auto another_auth_http_response = HTTP(POST(
+      Printf(
+          "http://localhost:%d/ctfo/auth/ios?id=%s&key=%s", FLAGS_api_port, another_auth_id, another_auth_key),
+      ""));
+  EXPECT_EQ(200, static_cast<int>(another_auth_http_response.code));
+  const auto another_auth_response = ParseJSON<ResponseFeed>(another_auth_http_response.body);
+  EXPECT_EQ(201u, another_auth_response.ms);
+  const std::string another_actual_uid = another_auth_response.user.uid;
+  const std::string another_actual_token = another_auth_response.user.token;
+
+  EXPECT_NE(actual_uid, another_actual_uid);
+  EXPECT_NE(actual_token, another_actual_token);
 
   bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(1001));
 
@@ -1048,6 +1066,16 @@ TEST(CTFO, SmokeTest) {
                                                          actual_uid.c_str(),
                                                          actual_token.c_str()))).body).cards.size());
 
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(601501));
+    const auto wrong_delete_card_response =
+        HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
+                           FLAGS_api_port,
+                           another_actual_uid.c_str(),
+                           another_actual_token.c_str(),
+                           added_card_cid.c_str())));
+    EXPECT_EQ(401, static_cast<int>(wrong_delete_card_response.code));
+    EXPECT_EQ("NOT YOUR CARD BRO\n", wrong_delete_card_response.body);
+
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(602001));
     const auto delete_card_response = HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
                                                          FLAGS_api_port,
@@ -1063,6 +1091,16 @@ TEST(CTFO, SmokeTest) {
                                                          FLAGS_api_port,
                                                          actual_uid.c_str(),
                                                          actual_token.c_str()))).body).cards.size());
+
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(602501));
+    const auto another_wrong_delete_card_response =
+        HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
+                           FLAGS_api_port,
+                           actual_uid.c_str(),
+                           actual_token.c_str(),
+                           added_card_cid.c_str())));
+    EXPECT_EQ(400, static_cast<int>(another_wrong_delete_card_response.code));
+    EXPECT_EQ("NO SUCH CARD\n", another_wrong_delete_card_response.body);
   }
 
   // TODO(dkorolev): Test that I can only delete my own cards.

@@ -568,27 +568,39 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint(Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
-            // TODO(dkorolev): Do something smart about non-existing cards.
             auto cards_mutator = Dictionary<Card>::Mutator(data);
-            cards_mutator.Delete(cid);
             auto card_authors_mutator = Matrix<CardAuthor>::Mutator(data);
-            card_authors_mutator.Delete(cid, uid);
             try {
-              auto comments_mutator = Matrix<Comment>::Mutator(data);
-              std::vector<OID> oids_to_delete;
-              for (const Comment& c : comments_mutator[cid]) {
-                oids_to_delete.push_back(c.oid);
+              const auto card_author_accessor = card_authors_mutator[cid];
+              if (card_author_accessor.size() != 1u) {
+                return Response("SOMETHING WENT WRONG\n", HTTPResponseCode.InternalServerError);
+              } else {
+                const UID author_uid = (*card_author_accessor.begin()).uid;
+                if (author_uid != uid) {
+                  return Response("NOT YOUR CARD BRO\n", HTTPResponseCode.Unauthorized);
+                } else {
+                  cards_mutator.Delete(cid);
+                  card_authors_mutator.Delete(cid, uid);
+                  try {
+                    auto comments_mutator = Matrix<Comment>::Mutator(data);
+                    std::vector<OID> oids_to_delete;
+                    for (const Comment& c : comments_mutator[cid]) {
+                      oids_to_delete.push_back(c.oid);
+                    }
+                    for (const OID& o : oids_to_delete) {
+                      comments_mutator.Delete(cid, o);
+                    }
+                  } catch (const yoda::SubscriptException<Comment>&) {
+                    // This card has no comments to delete.
+                  }
+                  DeleteCardResponse response;
+                  response.ms = static_cast<uint64_t>(bricks::time::Now());
+                  return Response(response, "deleted");
+                }
               }
-              for (const OID& o : oids_to_delete) {
-                comments_mutator.Delete(cid, o);
-              }
-            } catch (const yoda::SubscriptException<Comment>&) {
-              DebugPrint(Printf("[/ctfo/card] yoda::SubscriptException<Comment>, Requested URL = '%s'",
-                                requested_url.c_str()));
+            } catch (const yoda::SubscriptException<CardAuthor>&) {
+              return Response("NO SUCH CARD\n", HTTPResponseCode.BadRequest);
             }
-            DeleteCardResponse response;
-            response.ms = static_cast<uint64_t>(bricks::time::Now());
-            return Response(response, "deleted");
           }
         }, std::move(r));
       }
