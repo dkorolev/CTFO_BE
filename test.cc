@@ -1067,14 +1067,14 @@ TEST(CTFO, SmokeTest) {
                                                          actual_token.c_str()))).body).cards.size());
 
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(601501));
-    const auto wrong_delete_card_response =
+    const auto unauthorized_delete_card_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
                            FLAGS_api_port,
                            another_actual_uid.c_str(),
                            another_actual_token.c_str(),
                            added_card_cid.c_str())));
-    EXPECT_EQ(401, static_cast<int>(wrong_delete_card_response.code));
-    EXPECT_EQ("NOT YOUR CARD BRO\n", wrong_delete_card_response.body);
+    EXPECT_EQ(401, static_cast<int>(unauthorized_delete_card_response.code));
+    EXPECT_EQ("NOT YOUR CARD BRO\n", unauthorized_delete_card_response.body);
 
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(602001));
     const auto delete_card_response = HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
@@ -1093,14 +1093,14 @@ TEST(CTFO, SmokeTest) {
                                                          actual_token.c_str()))).body).cards.size());
 
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(602501));
-    const auto another_wrong_delete_card_response =
+    const auto nonexistent_card_delete_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
                            FLAGS_api_port,
                            actual_uid.c_str(),
                            actual_token.c_str(),
                            added_card_cid.c_str())));
-    EXPECT_EQ(400, static_cast<int>(another_wrong_delete_card_response.code));
-    EXPECT_EQ("NO SUCH CARD\n", another_wrong_delete_card_response.body);
+    EXPECT_EQ(400, static_cast<int>(nonexistent_card_delete_response.code));
+    EXPECT_EQ("NO SUCH CARD\n", nonexistent_card_delete_response.body);
   }
 
   // TODO(dkorolev): Test that I can only delete my own cards.
