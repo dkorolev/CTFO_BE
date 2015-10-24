@@ -686,11 +686,10 @@ class CTFOServer final {
                 // Top-level comments reverse chronologically, 2nd level comments chronologically.
                 return std::make_pair(~top_level_comment_timestamp, comment_timestamp);
               };
-              std::sort(proto_comments.begin(),
-                        proto_comments.end(),
-                        [&sortkey](const Comment& lhs, const Comment& rhs) {
-                          return sortkey(lhs) < sortkey(rhs);
-                        });
+              std::sort(
+                  proto_comments.begin(),
+                  proto_comments.end(),
+                  [&sortkey](const Comment& lhs, const Comment& rhs) { return sortkey(lhs) < sortkey(rhs); });
               ResponseComments response;
               response.ms = static_cast<uint64_t>(bricks::time::Now());
               std::vector<ResponseComment>& output_comments = response.comments;
