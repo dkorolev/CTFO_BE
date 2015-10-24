@@ -76,6 +76,21 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
                                  );
 }
 
+TEST(CTFO, IDsRangeTest) {
+  EXPECT_EQ("c00000000000000000042", CIDToString(static_cast<CID>(42)));
+  EXPECT_TRUE(static_cast<int>(42) == static_cast<int>(StringToCID(CIDToString(static_cast<CID>(42)))));
+
+  EXPECT_EQ("u00000000000000000042", UIDToString(static_cast<UID>(42)));
+  EXPECT_TRUE(static_cast<int>(42) == static_cast<int>(StringToUID(UIDToString(static_cast<UID>(42)))));
+
+  EXPECT_EQ("o00000000000000000042", OIDToString(static_cast<OID>(42)));
+  EXPECT_TRUE(static_cast<int>(42) == static_cast<int>(StringToOID(OIDToString(static_cast<OID>(42)))));
+
+  EXPECT_NE(CIDToString(static_cast<CID>(42)), UIDToString(static_cast<UID>(42)));
+  EXPECT_NE(CIDToString(static_cast<CID>(42)), OIDToString(static_cast<OID>(42)));
+  EXPECT_NE(UIDToString(static_cast<UID>(42)), OIDToString(static_cast<OID>(42)));
+}
+
 // TODO(dkorolev): Strictly speaking, this test is flaky, since Midichlorians logs processing is async.
 // TODO(dkorolev): Fix it.
 TEST(CTFO, SmokeTest) {
@@ -158,15 +173,48 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(40u, recent_texts.size());
   }
 
-  // Add two cards to favorites.
-  iOSGenericEvent favorite_event;
+  // Extract card CID-s
   std::string cid1;
   std::string cid2;
+  {
+    cid1 = *hot_cids.begin();
+    cid2 = *(++hot_cids.begin());
+  }
+
+  // Confirm that GET /ctfo/card does the job.
+  {
+    {
+      const auto get_card_response =
+          HTTP(GET(Printf("http://localhost:%d/ctfo/card?cid=%s", FLAGS_api_port, cid1.c_str())));
+      EXPECT_EQ(200, static_cast<int>(get_card_response.code));
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
+      EXPECT_EQ(card_entry.cid, cid1);
+      EXPECT_FALSE(card_entry.favorited);
+      EXPECT_FALSE(card_entry.is_my_card);
+    }
+    {
+      const auto get_card_response = HTTP(GET(Printf(
+          "http://localhost:%d/ctfo/card?uid=%s&cid=%s", FLAGS_api_port, actual_uid.c_str(), cid1.c_str())));
+      EXPECT_EQ(200, static_cast<int>(get_card_response.code));
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
+      EXPECT_EQ(card_entry.cid, cid1);
+      EXPECT_FALSE(card_entry.favorited);
+      EXPECT_FALSE(card_entry.is_my_card);
+    }
+    {
+      const auto get_card_response = HTTP(GET(Printf("http://localhost:%d/ctfo/card?cid=%s",
+                                                     FLAGS_api_port,
+                                                     CIDToString(static_cast<CID>(987654321)).c_str())));
+      EXPECT_EQ(404, static_cast<int>(get_card_response.code));
+      EXPECT_EQ("NO SUCH CARD\n", get_card_response.body);
+    }
+  }
+
+  // Add two cards to favorites.
+  iOSGenericEvent favorite_event;
 
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(10001));
-    cid1 = *hot_cids.begin();
-    cid2 = *(++hot_cids.begin());
     favorite_event.event = "FAV";
     favorite_event.fields["uid"] = actual_uid;
     favorite_event.fields["cid"] = cid1;
@@ -186,9 +234,40 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("OK\n", post_favorite_response_2.body);
   }
 
-  // Attempt to add a non-existing card to favorites.
+  // Confirm that GET /ctfo/card returns card favorite status given the `uid`.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(10003));
+    {
+      const auto get_card_response = HTTP(GET(Printf(
+          "http://localhost:%d/ctfo/card?uid=%s&cid=%s", FLAGS_api_port, actual_uid.c_str(), cid1.c_str())));
+      EXPECT_EQ(200, static_cast<int>(get_card_response.code));
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
+      EXPECT_EQ(card_entry.cid, cid1);
+      EXPECT_TRUE(card_entry.favorited);
+    }
+    {
+      const auto get_card_response = HTTP(GET(Printf("http://localhost:%d/ctfo/card?uid=%s&cid=%s",
+                                                     FLAGS_api_port,
+                                                     another_actual_uid.c_str(),
+                                                     cid1.c_str())));
+      EXPECT_EQ(200, static_cast<int>(get_card_response.code));
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
+      EXPECT_EQ(card_entry.cid, cid1);
+      EXPECT_FALSE(card_entry.favorited);  // Since the `uid` of another user was passed in.
+    }
+    {
+      const auto get_card_response =
+          HTTP(GET(Printf("http://localhost:%d/ctfo/card?cid=%s", FLAGS_api_port, cid1.c_str())));
+      EXPECT_EQ(200, static_cast<int>(get_card_response.code));
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
+      EXPECT_EQ(card_entry.cid, cid1);
+      EXPECT_FALSE(card_entry.favorited);  // Since no `uid` was passed in.
+    }
+  }
+
+  // Attempt to add a non-existing card to favorites.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(10004));
     favorite_event.fields["cid"] = CIDToString(static_cast<CID>(987654321));  // A non-existent ID.
     const auto post_favorite_response_3 =
         HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
@@ -298,6 +377,37 @@ TEST(CTFO, SmokeTest) {
     added_card_cid = add_card_response.cid;
   }
 
+  // Confirm card ownership is reported by GET /card when the `uid` is provided.
+  {
+    {
+      const auto get_card_response = HTTP(GET(Printf("http://localhost:%d/ctfo/card?uid=%s&cid=%s",
+                                                     FLAGS_api_port,
+                                                     actual_uid.c_str(),
+                                                     added_card_cid.c_str())));
+      EXPECT_EQ(200, static_cast<int>(get_card_response.code));
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
+      EXPECT_EQ(card_entry.cid, added_card_cid);
+      EXPECT_TRUE(card_entry.is_my_card);
+    }
+    {
+      const auto get_card_response = HTTP(GET(Printf("http://localhost:%d/ctfo/card?uid=%s&cid=%s",
+                                                     FLAGS_api_port,
+                                                     another_actual_uid.c_str(),
+                                                     added_card_cid.c_str())));
+      EXPECT_EQ(200, static_cast<int>(get_card_response.code));
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
+      EXPECT_EQ(card_entry.cid, added_card_cid);
+      EXPECT_FALSE(card_entry.is_my_card);  // Since `another_actual_uid` != `actual_uid`.
+    }
+    {
+      const auto get_card_response =
+          HTTP(GET(Printf("http://localhost:%d/ctfo/card?cid=%s", FLAGS_api_port, added_card_cid.c_str())));
+      EXPECT_EQ(200, static_cast<int>(get_card_response.code));
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
+      EXPECT_EQ(card_entry.cid, added_card_cid);
+      EXPECT_FALSE(card_entry.is_my_card);  // Since `uid` is not passed in.
+    }
+  }
   // Confirm the freshly added card tops the "Recent" feed. And that its age matters.
   {
     {
@@ -496,13 +606,14 @@ TEST(CTFO, SmokeTest) {
   // Get comments for a non-exising card, expecting an error.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(100001));
-    const auto get_comments_response = HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=",
-                                                       FLAGS_api_port,
-                                                       actual_uid.c_str(),
-                                                       actual_token.c_str(),
-                                                       CIDToString(RandomCID()).c_str())));
-    EXPECT_EQ(400, static_cast<int>(get_comments_response.code));
-    EXPECT_EQ("NEED VALID CID\n", get_comments_response.body);
+    const auto get_comments_response =
+        HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                        FLAGS_api_port,
+                        actual_uid.c_str(),
+                        actual_token.c_str(),
+                        CIDToString(RandomCID()).c_str())));
+    EXPECT_EQ(404, static_cast<int>(get_comments_response.code));
+    EXPECT_EQ("NO SUCH CARD\n", get_comments_response.body);
   }
 
   // Get comments for the actual card, expecting valid response with no comments.
@@ -1099,7 +1210,7 @@ TEST(CTFO, SmokeTest) {
                            actual_uid.c_str(),
                            actual_token.c_str(),
                            added_card_cid.c_str())));
-    EXPECT_EQ(400, static_cast<int>(nonexistent_card_delete_response.code));
+    EXPECT_EQ(404, static_cast<int>(nonexistent_card_delete_response.code));
     EXPECT_EQ("NO SUCH CARD\n", nonexistent_card_delete_response.body);
   }
 
