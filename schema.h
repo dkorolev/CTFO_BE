@@ -664,9 +664,16 @@ struct Notification : yoda::Padawan {
   UID uid;
   ComparableNonHashableTimestamp timestamp;
   std::unique_ptr<AbstractNotification> notification;
+
   Notification() = default;
   Notification(UID uid, uint64_t ms, std::unique_ptr<AbstractNotification> notification)
       : uid(uid), timestamp(ms), notification(std::move(notification)) {}
+
+  UID row() const { return uid; }
+  void set_row(UID value) { uid = value; }
+  const ComparableNonHashableTimestamp& col() const { return timestamp; }
+  void set_col(const ComparableNonHashableTimestamp& value) { timestamp = value; }
+
   ResponseNotification BuildResponseNotification() const {
     ResponseNotification result;
     result.ms = timestamp.ms;

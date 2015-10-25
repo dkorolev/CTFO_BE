@@ -935,7 +935,8 @@ class CTFOServer final {
                         Matrix<Comment>,
                         Matrix<CommentLike>,
                         Matrix<CardFlagAsInappropriate>,
-                        Matrix<CommentFlagAsInappropriate>> StorageAPI;
+                        Matrix<CommentFlagAsInappropriate>,
+                        Matrix<Notification>> StorageAPI;
   StorageAPI storage_;
 
   const std::map<std::string, RESPONSE> valid_responses_ = {{"CTFO", RESPONSE::CTFO},
