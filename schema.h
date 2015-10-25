@@ -470,19 +470,6 @@ struct ResponseCardEntry {
   }
 };
 
-// Universal response structure, combining user info & cards payload.
-struct ResponseFeed {
-  uint64_t ms;                                 // Server timestamp, milliseconds from epoch.
-  ResponseUserEntry user;                      // User information.
-  std::vector<ResponseCardEntry> feed_hot;     // "Hot" cards feeds.
-  std::vector<ResponseCardEntry> feed_recent;  // "Recent" cards feeds.
-
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(ms), CEREAL_NVP(user), CEREAL_NVP(feed_hot), CEREAL_NVP(feed_recent));
-  }
-};
-
 // Favorites response schema.
 struct ResponseFavs {
   uint64_t ms;                           // Server timestamp, milliseconds from epoch.
@@ -641,6 +628,24 @@ struct ResponseNotification {
        CEREAL_NVP(oid),
        CEREAL_NVP(text),
        CEREAL_NVP(n));
+  }
+};
+
+// Universal response structure, combining user info & cards payload.
+struct ResponseFeed {
+  uint64_t ms;                                      // Server timestamp, milliseconds from epoch.
+  ResponseUserEntry user;                           // User information.
+  std::vector<ResponseCardEntry> feed_hot;          // "Hot" cards feeds.
+  std::vector<ResponseCardEntry> feed_recent;       // "Recent" cards feeds.
+  std::vector<ResponseNotification> notifications;  // Notifications.
+
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms),
+       CEREAL_NVP(user),
+       CEREAL_NVP(feed_hot),
+       CEREAL_NVP(feed_recent),
+       CEREAL_NVP(notifications));
   }
 };
 
