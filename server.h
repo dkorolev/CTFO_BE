@@ -1097,6 +1097,26 @@ class CTFOServer final {
       }
     }
 
+    if (notifications_since != static_cast<uint64_t>(-1)) {
+      // TODO(dkorolev): `upper_bound`, not go through all notifications for this user.
+      try {
+        size_t appended_so_far = 0u;
+        for (const Notification& notification : Matrix<Notification>::Accessor(data)[uid]) {
+          if (notification.timestamp.ms > notifications_since) {
+            response.notifications.push_back(notification.BuildResponseNotification());
+            ++appended_so_far;
+            // TODO(dkorolev): Command line flag or parameter instead of bare `50`.
+            if (appended_so_far >= 50u) {
+              break;
+            }
+          }
+        }
+        std::reverse(response.notifications.begin(), response.notifications.end());
+      } catch (const yoda::SubscriptException<Notification>&) {
+        // No notifications for this user.
+      }
+    }
+
     response.ms = static_cast<uint64_t>(bricks::time::Now());
     DebugPrint(Printf("[RespondWithFeed] Generated response for UID '%s' with %u 'hot' and %u 'recent' cards",
                       response.user.uid.c_str(),
