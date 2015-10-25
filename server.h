@@ -266,7 +266,7 @@ class CTFOServer final {
             DebugPrint("[/ctfo/favs] Token validated.");
             const auto user = data.Get(uid);
             if (!user) {
-              return Response("NEED VALID USER\n", HTTPResponseCode.Unauthorized);
+              return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
               ResponseFavs rfavs;
               CopyUserInfoToResponseEntry(user, rfavs.user);
@@ -382,7 +382,7 @@ class CTFOServer final {
             DebugPrint("[/ctfo/my_cards] Token validated.");
             const auto user = data.Get(uid);
             if (!user) {
-              return Response("NEED VALID USER\n", HTTPResponseCode.Unauthorized);
+              return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
               ResponseMyCards r_my_cards;
               CopyUserInfoToResponseEntry(user, r_my_cards.user);
@@ -468,10 +468,81 @@ class CTFOServer final {
   }
 
   void RouteCard(Request r) {
-    // POST to add a card.
-    const UID uid = StringToUID(r.url.query["uid"]);
-    const std::string token = r.url.query["token"];
-    if (r.method == "POST") {
+    if (r.method == "GET") {
+      // For GET /ctfo/card, don't bother checking user and/or token, just return the card.
+      const std::string& uid_as_string = r.url.query["uid"];  // OK if not provided.
+      const CID cid = StringToCID(r.url.query["cid"]);
+      const UID uid = StringToUID(uid_as_string);
+      if (cid == CID::INVALID_CARD) {
+        DebugPrint(Printf("[/ctfo/card] Wrong CID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+        r("NEED VALID CID\n", HTTPResponseCode.BadRequest);
+      } else if (!uid_as_string.empty() && uid == UID::INVALID_USER) {
+        DebugPrint(
+            Printf("[/ctfo/card] Non-empty yet invalid UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
+        r("NEED EMPTY OR VALID UID\n", HTTPResponseCode.BadRequest);
+      } else {
+        storage_.Transaction([this, cid, uid](StorageAPI::T_DATA data) {
+          const auto card_wrapper = data.Get(cid);
+          if (!card_wrapper) {
+            return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
+          } else {
+            const Card& card = card_wrapper;
+            const auto answers = Matrix<Answer>::Accessor(data);
+            const auto comments = Matrix<Comment>::Accessor(data);
+            const auto favorites = Matrix<Favorite>::Accessor(data);
+            const auto card_authors = Matrix<CardAuthor>::Accessor(data);
+            // TODO(dkorolev): This beautiful copy-paste will eventually go away.
+            ResponseCardEntry card_entry;
+            card_entry.cid = CIDToString(card.cid);
+            try {
+              const auto& iterable = card_authors[card.cid];
+              if (iterable.size() == 1u) {
+                const UID author_uid = (*iterable.begin()).uid;
+                card_entry.author_uid = UIDToString(author_uid);
+                card_entry.is_my_card = (uid == UID::INVALID_USER ? false : (uid == author_uid));
+              }
+            } catch (const yoda::SubscriptException<CardAuthor>&) {
+            }
+            try {
+              card_entry.number_of_comments = comments[card.cid].size();
+            } catch (const yoda::SubscriptException<Comment>&) {
+              // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
+            }
+            card_entry.text = card.text;
+            card_entry.ms = card.ms;
+            card_entry.color = card.color;
+            card_entry.relevance = RandomDouble(0, 1);
+            card_entry.ctfo_score = 50u;
+            card_entry.tfu_score = 50u;
+            card_entry.ctfo_count = card.ctfo_count;
+            card_entry.tfu_count = card.tfu_count;
+            card_entry.skip_count = card.skip_count;
+
+            card_entry.vote = "";
+            card_entry.favorited = false;
+            if (uid != UID::INVALID_USER) {
+              const EntryWrapper<Answer> answer = answers.Get(uid, card.cid);
+              if (answer) {
+                const ANSWER vote = static_cast<Answer>(answer).answer;
+                if (vote == ANSWER::CTFO) {
+                  card_entry.vote = "CTFO";
+                } else if (vote == ANSWER::TFU) {
+                  card_entry.vote = "TFU";
+                }
+              }
+              const EntryWrapper<Favorite> fav = favorites.Get(uid, card.cid);
+              if (fav) {
+                card_entry.favorited = static_cast<Favorite>(fav).favorited;
+              }
+            }
+
+            return Response(card_entry, "card");
+          }
+        }, std::move(r));
+      }
+    } else if (r.method == "POST") {
+      const UID uid = StringToUID(r.url.query["uid"]);
+      const std::string token = r.url.query["token"];
       if (uid == UID::INVALID_USER) {
         DebugPrint(Printf("[/ctfo/card] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
@@ -544,10 +615,12 @@ class CTFOServer final {
         }
       }
     } else if (r.method == "DELETE") {
+      const UID uid = StringToUID(r.url.query["uid"]);
+      const std::string token = r.url.query["token"];
       const CID cid = StringToCID(r.url.query["cid"]);
       if (cid == CID::INVALID_CARD) {
         DebugPrint(Printf("[/ctfo/card] Wrong CID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
-        r("NEED VALID OID\n", HTTPResponseCode.BadRequest);
+        r("NEED VALID CID\n", HTTPResponseCode.BadRequest);
       } else {
         const std::string requested_url = r.url.ComposeURL();
         storage_.Transaction([this, requested_url, uid, cid, token](StorageAPI::T_DATA data) {
@@ -599,7 +672,7 @@ class CTFOServer final {
                 }
               }
             } catch (const yoda::SubscriptException<CardAuthor>&) {
-              return Response("NO SUCH CARD\n", HTTPResponseCode.BadRequest);
+              return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
             }
           }
         }, std::move(r));
@@ -644,9 +717,12 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint("[/ctfo/comments] Token validated.");
+            if (!data.Get(cid)) {
+              return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
+            }
             const auto user = data.Get(uid);
             if (!user) {
-              return Response("NEED VALID USER\n", HTTPResponseCode.Unauthorized);
+              return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
               const auto users_accessor = Dictionary<User>::Accessor(data);
               const auto comments_accessor = Matrix<Comment>::Accessor(data);
