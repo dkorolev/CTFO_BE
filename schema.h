@@ -663,11 +663,15 @@ struct AbstractNotification : yoda::Padawan {
 struct Notification : yoda::Padawan {
   UID uid;
   ComparableNonHashableTimestamp timestamp;
-  std::unique_ptr<AbstractNotification> notification;
+  std::shared_ptr<AbstractNotification> notification;
 
   Notification() = default;
-  Notification(UID uid, uint64_t ms, std::unique_ptr<AbstractNotification> notification)
-      : uid(uid), timestamp(ms), notification(std::move(notification)) {}
+  Notification(UID uid, uint64_t ms, std::shared_ptr<AbstractNotification> notification)
+      : uid(uid), timestamp(ms), notification(notification) {}
+
+  // Commented out until we support `std::move` or `Emplace` in Yoda. For now, use `shared_ptr`. -- D.K.
+  // Notification(Notification&& rhs)
+  //     : uid(rhs.uid), timestamp(rhs.timestamp), notification(std::move(rhs.notification)) {}
 
   UID row() const { return uid; }
   void set_row(UID value) { uid = value; }
@@ -694,6 +698,8 @@ struct NotificationMyCardNewComment : AbstractNotification {
   NotificationMyCardNewComment() = default;
   NotificationMyCardNewComment(UID uid, CID cid, OID oid, std::string text)
       : uid(uid), cid(cid), oid(oid), text(text) {}
+  NotificationMyCardNewComment(const Comment& comment)
+      : uid(comment.author_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
   template <typename A>
   void serialize(A& ar) {
     ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(text));

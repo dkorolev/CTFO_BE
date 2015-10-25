@@ -826,7 +826,18 @@ class CTFOServer final {
                   Printf("[/ctfo/comments] Token validated. Requested URL = '%s'", requested_url.c_str()));
               const auto now = static_cast<uint64_t>(bricks::time::Now());
 
+              UID card_author_uid = UID::INVALID_USER;
+              try {
+                const auto card_authors = Matrix<CardAuthor>::Accessor(data);
+                const auto& iterable = card_authors[cid];
+                if (iterable.size() == 1u) {
+                  card_author_uid = (*iterable.begin()).uid;
+                }
+              } catch (const yoda::SubscriptException<CardAuthor>&) {
+              }
+
               auto comments_mutator = Matrix<Comment>::Mutator(data);
+              auto notifications_mutator = Matrix<Notification>::Mutator(data);
 
               Comment comment;
               comment.cid = cid;
@@ -850,6 +861,12 @@ class CTFOServer final {
               }
 
               comments_mutator.Add(comment);
+
+              // TODO(dkorolev)+TODO(mzhurovich): `Emplace` in the new Yoda?
+              if (card_author_uid != UID::INVALID_USER) {
+                notifications_mutator.Add(
+                    Notification(card_author_uid, now, make_unique<NotificationMyCardNewComment>(comment)));
+              }
 
               AddCommentResponse response;
               response.ms = now;

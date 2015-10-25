@@ -1296,7 +1296,7 @@ TEST(CTFO, NotificationsSerializeWellInYoda) {
   const CID cid = static_cast<CID>(2);
   const OID oid = static_cast<OID>(3);
   const Notification notification(
-      me, 12345ull, make_unique<NotificationMyCardNewComment>(uid, cid, oid, "foo"));
+      me, 12345ull, std::make_shared<NotificationMyCardNewComment>(uid, cid, oid, "foo"));
   const std::string user_facing_json = JSON(notification.BuildResponseNotification());
   EXPECT_EQ(
       "{\"data\":{\"type\":\"MyCardNewComment\",\"ms\":12345,\"uid\":\"u00000000000000000001\",\"cid\":"
@@ -1305,8 +1305,8 @@ TEST(CTFO, NotificationsSerializeWellInYoda) {
   const std::string stream_stored_json = JSON(notification);
   EXPECT_EQ(
       "{\"data\":{\"uid\":42,\"timestamp\":{\"ms\":12345},\"notification\":{\"polymorphic_id\":2147483649,"
-      "\"polymorphic_name\":\"NotificationMyCardNewComment\",\"ptr_wrapper\":{\"valid\":1,\"data\":{\"uid\":1,"
-      "\"cid\":2,\"oid\":3,\"text\":\"foo\"}}}}}",
+      "\"polymorphic_name\":\"NotificationMyCardNewComment\",\"ptr_wrapper\":{\"id\":2147483649,\"data\":{"
+      "\"uid\":1,\"cid\":2,\"oid\":3,\"text\":\"foo\"}}}}}",
       stream_stored_json);
   EXPECT_EQ(stream_stored_json, JSON(ParseJSON<Notification>(stream_stored_json)));
 }
