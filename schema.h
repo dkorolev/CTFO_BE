@@ -29,6 +29,9 @@ SOFTWARE.
 #include <vector>
 #include <string>
 
+#include "schema_base.h"
+#include "util.h"
+
 #include "../Current/Bricks/cerealize/cerealize.h"
 #include "../Current/Yoda/yoda.h"
 
@@ -177,13 +180,6 @@ const std::vector<Color> CARD_COLORS{{0x0A, 0xB2, 0xCB},
                                      {0xFF, 0xAC, 0x26},
                                      {0xF0, 0xB2, 0x4F},
                                      {0xF5, 0xC6, 0x7A}};
-
-// Data structures for internal storage.
-enum class UID : uint64_t { INVALID_USER = 0u };
-enum class CID : uint64_t { INVALID_CARD = 0u };
-enum class OID : uint64_t { INVALID_COMMENT = 0u };
-enum class ANSWER : int { UNSEEN = 0, CTFO = 1, TFU = 2, SKIP = -1 };
-enum class AUTH_TYPE : int { UNDEFINED = 0, IOS };
 
 struct User : yoda::Padawan {
   UID uid = UID::INVALID_USER;
@@ -627,18 +623,83 @@ struct ResponseComments {
 
 // TODO(dkorolev): Constraints on comment length when adding them?
 
-// To parse incoming Midichlorians logs.
-enum class RESPONSE : int {
-  SKIP = static_cast<int>(ANSWER::SKIP),
-  CTFO = static_cast<int>(ANSWER::CTFO),
-  TFU = static_cast<int>(ANSWER::TFU),
-  FAV_CARD = 101,
-  UNFAV_CARD = 102,
-  LIKE_COMMENT = 201,
-  UNLIKE_COMMENT = 202,
-  FLAG_COMMENT = 203,
-  FLAG_CARD = 301
+struct ResponseNotification {
+  std::string type;
+  uint64_t ms;
+  std::string uid;
+  std::string cid;
+  std::string oid;
+  std::string text;
+  size_t n = 1u;
+
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(type),
+       CEREAL_NVP(ms),
+       CEREAL_NVP(uid),
+       CEREAL_NVP(cid),
+       CEREAL_NVP(oid),
+       CEREAL_NVP(text),
+       CEREAL_NVP(n));
+  }
 };
+
+// Ensure the notifications are ordered by time; force Yoda to choose map over hashmap.
+struct ComparableNonHashableTimestamp {
+  uint64_t ms;
+  ComparableNonHashableTimestamp(uint64_t ms = 0ull) : ms(ms) {}
+  bool operator<(const ComparableNonHashableTimestamp& rhs) const { return ms < rhs.ms; }
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms));
+  }
+};
+
+struct AbstractNotification : yoda::Padawan {
+  virtual ~AbstractNotification() {}
+  virtual void PopulateResponseNotification(ResponseNotification& output) const = 0;
+};
+
+struct Notification : yoda::Padawan {
+  UID uid;
+  ComparableNonHashableTimestamp timestamp;
+  std::unique_ptr<AbstractNotification> notification;
+  Notification() = default;
+  Notification(UID uid, uint64_t ms, std::unique_ptr<AbstractNotification> notification)
+      : uid(uid), timestamp(ms), notification(std::move(notification)) {}
+  ResponseNotification BuildResponseNotification() const {
+    ResponseNotification result;
+    result.ms = timestamp.ms;
+    notification->PopulateResponseNotification(result);
+    return result;
+  }
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(uid), CEREAL_NVP(timestamp), CEREAL_NVP(notification));
+  }
+};
+
+struct NotificationMyCardNewComment : AbstractNotification {
+  UID uid;
+  CID cid;
+  OID oid;
+  std::string text;
+  NotificationMyCardNewComment() = default;
+  NotificationMyCardNewComment(UID uid, CID cid, OID oid, std::string text)
+      : uid(uid), cid(cid), oid(oid), text(text) {}
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(text));
+  }
+  void PopulateResponseNotification(ResponseNotification& output) const override {
+    output.type = "MyCardNewComment";
+    output.uid = UIDToString(uid);
+    output.cid = CIDToString(cid);
+    output.oid = OIDToString(oid);
+    output.text = text;
+  }
+};
+
 }  // namespace CTFO
 
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::User, "User");
@@ -652,5 +713,7 @@ CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Comment, "Comment");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CommentLike, "CommentLike");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CardFlagAsInappropriate, "CardFlagAsInappropriate");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CommentFlagAsInappropriate, "CommentFlagAsInappropriate");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Notification, "Notification");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCardNewComment, "NotificationMyCardNewComment");
 
 #endif  // CTFO_SCHEMA_H

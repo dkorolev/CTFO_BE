@@ -28,7 +28,7 @@ SOFTWARE.
 #include "../Current/Bricks/strings/strings.h"
 #include "../Current/Bricks/util/random.h"
 
-#include "schema.h"
+#include "schema_base.h"
 
 using namespace bricks::random;
 using namespace bricks::strings;
