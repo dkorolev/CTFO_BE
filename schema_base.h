@@ -32,6 +32,7 @@ namespace CTFO {
 enum class UID : uint64_t { INVALID_USER = 0u };
 enum class CID : uint64_t { INVALID_CARD = 0u };
 enum class OID : uint64_t { INVALID_COMMENT = 0u };
+enum class NID : uint64_t { INVALID_NOTIFICATION = 0u };
 enum class ANSWER : int { UNSEEN = 0, CTFO = 1, TFU = 2, SKIP = -1 };
 enum class AUTH_TYPE : int { UNDEFINED = 0, IOS };
 

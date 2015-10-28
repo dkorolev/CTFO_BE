@@ -611,6 +611,7 @@ struct ResponseComments {
 // TODO(dkorolev): Constraints on comment length when adding them?
 
 struct ResponseNotification {
+  std::string nid;
   std::string type;
   uint64_t ms;
   std::string uid;
@@ -621,7 +622,8 @@ struct ResponseNotification {
 
   template <typename A>
   void serialize(A& ar) {
-    ar(CEREAL_NVP(type),
+    ar(CEREAL_NVP(nid),
+       CEREAL_NVP(type),
        CEREAL_NVP(ms),
        CEREAL_NVP(uid),
        CEREAL_NVP(cid),
@@ -686,6 +688,7 @@ struct Notification : yoda::Padawan {
   ResponseNotification BuildResponseNotification() const {
     ResponseNotification result;
     result.ms = timestamp.ms;
+    result.nid = NIDToString(static_cast<NID>(ID_RANGE * 5 + timestamp.ms * 1000ull));
     notification->PopulateResponseNotification(result);
     return result;
   }

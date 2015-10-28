@@ -46,6 +46,8 @@ inline std::string RandomToken() {
 
 inline OID RandomOID() { return static_cast<OID>(RandomUInt64(4 * ID_RANGE + 1, 5 * ID_RANGE - 1)); }
 
+// "05" followed by 18 digits <=> NID, notification ID.
+
 inline std::string UIDToString(const UID uid) {
   return bricks::strings::Printf("u%020llu", static_cast<uint64_t>(uid));
 }
@@ -77,6 +79,17 @@ inline OID StringToOID(const std::string& s) {
     return static_cast<OID>(FromString<uint64_t>(s.substr(1)));
   }
   return OID::INVALID_COMMENT;
+}
+
+inline std::string NIDToString(const NID nid) {
+  return bricks::strings::Printf("n%020llu", static_cast<uint64_t>(nid));
+}
+
+inline NID StringToNID(const std::string& s) {
+  if (s.length() == 21 && s[0] == 'n') {  // 'n' + 20 digits of `uint64_t` decimal representation.
+    return static_cast<NID>(FromString<uint64_t>(s.substr(1)));
+  }
+  return NID::INVALID_NOTIFICATION;
 }
 }  // namespace CTFO
 
