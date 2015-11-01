@@ -877,7 +877,7 @@ class CTFOServer final {
               // TODO(dkorolev)+TODO(mzhurovich): `Emplace` in the new Yoda?
               if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
                 notifications_mutator.Add(
-                    Notification(card_author_uid, now, make_unique<NotificationMyCardNewComment>(comment)));
+                    Notification(card_author_uid, now, std::make_shared<NotificationMyCardNewComment>(comment)));
               }
 
               AddCommentResponse response;
