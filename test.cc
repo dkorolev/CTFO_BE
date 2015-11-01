@@ -1143,6 +1143,67 @@ TEST(CTFO, SmokeTest) {
                   .number_of_comments);
   }
 
+  // Confirm that another user adding a comment results in the user who added a card being notified.
+  {
+    // Should be no notifications.
+    {
+      const auto feed_http_response =
+          HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&notifications_since=0",
+                          FLAGS_api_port,
+                          actual_uid.c_str(),
+                          actual_token.c_str())));
+      EXPECT_EQ(200, static_cast<int>(feed_http_response.code));
+      const auto feed_response = ParseJSON<ResponseFeed>(feed_http_response.body);
+      EXPECT_EQ(0u, feed_response.notifications.size());
+    }
+    // Add a comment to generate a notification.
+    std::string comment_to_be_notified_about_oid;
+    {
+      AddCommentRequest add_comment_request;
+      add_comment_request.text = "Ding!";
+      const auto post_comment_response =
+          HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
+                           FLAGS_api_port,
+                           another_actual_uid.c_str(),
+                           another_actual_token.c_str(),
+                           added_card_cid.c_str()),
+                    add_comment_request));
+      EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
+      const auto add_comment_response = ParseJSON<AddCommentResponse>(post_comment_response.body);
+
+      comment_to_be_notified_about_oid = add_comment_response.oid;
+    }
+    // Should be one notification.
+    {
+      const auto feed_http_response =
+          HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&notifications_since=0",
+                          FLAGS_api_port,
+                          actual_uid.c_str(),
+                          actual_token.c_str())));
+      EXPECT_EQ(200, static_cast<int>(feed_http_response.code));
+      const auto feed_response = ParseJSON<ResponseFeed>(feed_http_response.body);
+      ASSERT_EQ(1u, feed_response.notifications.size());
+      EXPECT_EQ("MyCardNewComment", feed_response.notifications[0].type);
+      EXPECT_EQ(another_actual_uid, feed_response.notifications[0].uid);
+      EXPECT_EQ(added_card_cid, feed_response.notifications[0].cid);
+      EXPECT_EQ(comment_to_be_notified_about_oid, feed_response.notifications[0].oid);
+      EXPECT_EQ("Ding!", feed_response.notifications[0].text);
+      EXPECT_EQ(1u, feed_response.notifications[0].n);
+    }
+    // Delete that comment.
+    {
+      const auto delete_comment_response =
+          HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
+                             FLAGS_api_port,
+                             another_actual_uid.c_str(),
+                             another_actual_token.c_str(),
+                             added_card_cid.c_str(),
+                             comment_to_be_notified_about_oid.c_str())));
+      EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
+      ParseJSON<DeleteCommentResponse>(delete_comment_response.body);
+    }
+  }
+
   // Delete the remaining top-level comment, and confirm that the number of comments
   // goes down from 2 to 0, since deleting the top-level comments deletes its children.
   {
@@ -1288,4 +1349,25 @@ TEST(CTFO, UseRightHTTPVerbs) {
   const auto post_feed = HTTP(POST(Printf("http://localhost:%d/ctfo/feed", FLAGS_api_port), ""));
   EXPECT_EQ(405, static_cast<int>(post_feed.code));
   EXPECT_EQ("METHOD NOT ALLOWED\n", post_feed.body);
+}
+
+TEST(CTFO, NotificationsSerializeWellInYoda) {
+  const UID me = static_cast<UID>(42);
+  const UID uid = static_cast<UID>(1);
+  const CID cid = static_cast<CID>(2);
+  const OID oid = static_cast<OID>(3);
+  const Notification notification(
+      me, 12345ull, std::make_shared<NotificationMyCardNewComment>(uid, cid, oid, "foo"));
+  const std::string user_facing_json = JSON(notification.BuildResponseNotification());
+  EXPECT_EQ(
+      "{\"data\":{\"type\":\"MyCardNewComment\",\"ms\":12345,\"uid\":\"u00000000000000000001\",\"cid\":"
+      "\"c00000000000000000002\",\"oid\":\"o00000000000000000003\",\"text\":\"foo\",\"n\":1}}",
+      user_facing_json);
+  const std::string stream_stored_json = JSON(notification);
+  EXPECT_EQ(
+      "{\"data\":{\"uid\":42,\"timestamp\":{\"ms\":12345},\"notification\":{\"polymorphic_id\":2147483649,"
+      "\"polymorphic_name\":\"NotificationMyCardNewComment\",\"ptr_wrapper\":{\"id\":2147483649,\"data\":{"
+      "\"uid\":1,\"cid\":2,\"oid\":3,\"text\":\"foo\"}}}}}",
+      stream_stored_json);
+  EXPECT_EQ(stream_stored_json, JSON(ParseJSON<Notification>(stream_stored_json)));
 }

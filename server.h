@@ -121,6 +121,10 @@ class CTFOServer final {
     } else {
       const std::string device_id = r.url.query.get("id", "");
       const std::string app_key = r.url.query.get("key", "");
+      const std::string& notifications_since_as_string = r.url.query["notifications_since"];
+      const uint64_t notifications_since = notifications_since_as_string.empty()
+                                               ? static_cast<uint64_t>(-1)
+                                               : FromString<uint64_t>(notifications_since_as_string);
       if (device_id.empty() || app_key.empty()) {
         DebugPrint(Printf("[/ctfo/auth/ios] Wrong query parameters. Requested URL = '%s'",
                           r.url.ComposeURL().c_str()));
@@ -128,67 +132,73 @@ class CTFOServer final {
       } else {
         const size_t feed_count = FromString<size_t>(r.url.query.get("feed_count", "20"));
         // Searching for users with the corresponding authentication key.
-        storage_.Transaction([this, device_id, app_key, feed_count](StorageAPI::T_DATA data) {
-          AuthKey auth_key("iOS::" + device_id + "::" + app_key, AUTH_TYPE::IOS);
-          UID uid = UID::INVALID_USER;
-          User user;
-          ResponseUserEntry user_entry;
-          std::string token;
+        storage_.Transaction(
+            [this, device_id, app_key, feed_count, notifications_since](StorageAPI::T_DATA data) {
+              AuthKey auth_key("iOS::" + device_id + "::" + app_key, AUTH_TYPE::IOS);
+              UID uid = UID::INVALID_USER;
+              User user;
+              ResponseUserEntry user_entry;
+              std::string token;
 
-          const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
-          if (auth_uid_accessor.Rows().Has(auth_key)) {
-            // Something went terribly wrong
-            // if we have more than one UID for authentication key.
-            assert(auth_uid_accessor[auth_key].size() == 1);
-            uid = auth_uid_accessor[auth_key].begin()->uid;
-          }
+              const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+              if (auth_uid_accessor.Rows().Has(auth_key)) {
+                // Something went terribly wrong
+                // if we have more than one UID for authentication key.
+                assert(auth_uid_accessor[auth_key].size() == 1);
+                uid = auth_uid_accessor[auth_key].begin()->uid;
+              }
 
-          auto auth_token_mutator = Matrix<AuthKeyTokenPair>::Mutator(data);
-          if (uid != UID::INVALID_USER) {
-            // User exists => invalidate all tokens.
-            for (const auto& auth_token : auth_token_mutator[auth_key]) {
-              auth_token_mutator.Add(AuthKeyTokenPair(auth_key, auth_token.token, false));
-            }
-            user = data.Get(uid);
-          }
+              auto auth_token_mutator = Matrix<AuthKeyTokenPair>::Mutator(data);
+              if (uid != UID::INVALID_USER) {
+                // User exists => invalidate all tokens.
+                for (const auto& auth_token : auth_token_mutator[auth_key]) {
+                  auth_token_mutator.Add(AuthKeyTokenPair(auth_key, auth_token.token, false));
+                }
+                user = data.Get(uid);
+              }
 
-          // Generate a new token.
-          do {
-            token = RandomToken();
-          } while (auth_token_mutator.Cols().Has(token));
-          auth_token_mutator.Add(AuthKeyTokenPair(auth_key, token, true));
+              // Generate a new token.
+              do {
+                token = RandomToken();
+              } while (auth_token_mutator.Cols().Has(token));
+              auth_token_mutator.Add(AuthKeyTokenPair(auth_key, token, true));
 
-          if (uid != UID::INVALID_USER) {  // Existing user.
-            user_entry.score = user.score;
-            DebugPrint(
-                Printf("[/ctfo/auth/ios] Existing user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
-                       UIDToString(uid).c_str(),
-                       device_id.c_str(),
-                       app_key.c_str(),
-                       token.c_str()));
-          } else {  // New user.
-            uid = RandomUID();
-            user.uid = uid;
-            data.Add(user);
-            data.Add(AuthKeyUIDPair(auth_key, user.uid));
-          }
-          DebugPrint(Printf("[/ctfo/auth/ios] New user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
-                            UIDToString(uid).c_str(),
-                            device_id.c_str(),
-                            app_key.c_str(),
-                            token.c_str()));
+              if (uid != UID::INVALID_USER) {  // Existing user.
+                user_entry.score = user.score;
+                DebugPrint(
+                    Printf("[/ctfo/auth/ios] Existing user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
+                           UIDToString(uid).c_str(),
+                           device_id.c_str(),
+                           app_key.c_str(),
+                           token.c_str()));
+              } else {  // New user.
+                uid = RandomUID();
+                user.uid = uid;
+                data.Add(user);
+                data.Add(AuthKeyUIDPair(auth_key, user.uid));
+              }
+              DebugPrint(Printf("[/ctfo/auth/ios] New user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
+                                UIDToString(uid).c_str(),
+                                device_id.c_str(),
+                                app_key.c_str(),
+                                token.c_str()));
 
-          CopyUserInfoToResponseEntry(user, user_entry);
-          user_entry.token = token;
+              CopyUserInfoToResponseEntry(user, user_entry);
+              user_entry.token = token;
 
-          ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count);
-          return Response(rfeed, "feed");
-        }, std::move(r));
+              ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
+              return Response(rfeed, "feed");
+            },
+            std::move(r));
       }
     }
   }
   void RouteFeed(Request r) {
     const UID uid = StringToUID(r.url.query["uid"]);
+    const std::string& notifications_since_as_string = r.url.query["notifications_since"];
+    const uint64_t notifications_since = notifications_since_as_string.empty()
+                                             ? static_cast<uint64_t>(-1)
+                                             : FromString<uint64_t>(notifications_since_as_string);
     const std::string token = r.url.query["token"];
     if (r.method != "GET") {
       DebugPrint(Printf("[/ctfo/feed] Wrong method '%s'. Requested URL = '%s'",
@@ -202,32 +212,34 @@ class CTFOServer final {
       } else {
         const size_t feed_count = FromString<size_t>(r.url.query.get("feed_count", "20"));
         const std::string requested_url = r.url.ComposeURL();
-        storage_.Transaction([this, uid, token, requested_url, feed_count](StorageAPI::T_DATA data) {
-          bool token_is_valid = false;
-          const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
-          if (auth_token_accessor.Cols().Has(token)) {
-            // Something went terribly wrong
-            // if we have more than one authentication key for token.
-            assert(auth_token_accessor[token].size() == 1);
-            if (auth_token_accessor[token].begin()->valid) {
-              // Double check, if the provided `uid` is correct as well.
-              const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
-              token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
-            }
-          }
-          if (!token_is_valid) {
-            DebugPrint(Printf("[/ctfo/feed] Invalid token. Requested URL = '%s'", requested_url.c_str()));
-            return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
-          } else {
-            DebugPrint(Printf("[/ctfo/feed] Token validated. Requested URL = '%s'", requested_url.c_str()));
-            const auto user = data.Get(uid);
-            ResponseUserEntry user_entry;
-            CopyUserInfoToResponseEntry(user, user_entry);
-            user_entry.token = token;
-            ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count);
-            return Response(rfeed, "feed");
-          }
-        }, std::move(r));
+        storage_.Transaction(
+            [this, uid, token, requested_url, feed_count, notifications_since](StorageAPI::T_DATA data) {
+              bool token_is_valid = false;
+              const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+              if (auth_token_accessor.Cols().Has(token)) {
+                // Something went terribly wrong
+                // if we have more than one authentication key for token.
+                assert(auth_token_accessor[token].size() == 1);
+                if (auth_token_accessor[token].begin()->valid) {
+                  // Double check, if the provided `uid` is correct as well.
+                  const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+                  token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                }
+              }
+              if (!token_is_valid) {
+                DebugPrint(Printf("[/ctfo/feed] Invalid token. Requested URL = '%s'", requested_url.c_str()));
+                return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+              } else {
+                DebugPrint(Printf("[/ctfo/feed] Token validated. Requested URL = '%s'", requested_url.c_str()));
+                const auto user = data.Get(uid);
+                ResponseUserEntry user_entry;
+                CopyUserInfoToResponseEntry(user, user_entry);
+                user_entry.token = token;
+                ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
+                return Response(rfeed, "feed");
+              }
+            },
+            std::move(r));
       }
     }
   }
@@ -826,7 +838,18 @@ class CTFOServer final {
                   Printf("[/ctfo/comments] Token validated. Requested URL = '%s'", requested_url.c_str()));
               const auto now = static_cast<uint64_t>(bricks::time::Now());
 
+              UID card_author_uid = UID::INVALID_USER;
+              try {
+                const auto card_authors = Matrix<CardAuthor>::Accessor(data);
+                const auto& iterable = card_authors[cid];
+                if (iterable.size() == 1u) {
+                  card_author_uid = (*iterable.begin()).uid;
+                }
+              } catch (const yoda::SubscriptException<CardAuthor>&) {
+              }
+
               auto comments_mutator = Matrix<Comment>::Mutator(data);
+              auto notifications_mutator = Matrix<Notification>::Mutator(data);
 
               Comment comment;
               comment.cid = cid;
@@ -850,6 +873,12 @@ class CTFOServer final {
               }
 
               comments_mutator.Add(comment);
+
+              // TODO(dkorolev)+TODO(mzhurovich): `Emplace` in the new Yoda?
+              if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
+                notifications_mutator.Add(
+                    Notification(card_author_uid, now, make_unique<NotificationMyCardNewComment>(comment)));
+              }
 
               AddCommentResponse response;
               response.ms = now;
@@ -935,7 +964,8 @@ class CTFOServer final {
                         Matrix<Comment>,
                         Matrix<CommentLike>,
                         Matrix<CardFlagAsInappropriate>,
-                        Matrix<CommentFlagAsInappropriate>> StorageAPI;
+                        Matrix<CommentFlagAsInappropriate>,
+                        Matrix<Notification>> StorageAPI;
   StorageAPI storage_;
 
   const std::map<std::string, RESPONSE> valid_responses_ = {{"CTFO", RESPONSE::CTFO},
@@ -967,7 +997,10 @@ class CTFOServer final {
     }
   }
 
-  ResponseFeed GenerateResponseFeed(StorageAPI::T_DATA& data, ResponseUserEntry user_entry, size_t feed_size) {
+  ResponseFeed GenerateResponseFeed(StorageAPI::T_DATA& data,
+                                    ResponseUserEntry user_entry,
+                                    size_t feed_size,
+                                    uint64_t notifications_since) {
     ResponseFeed response;
     constexpr size_t FEED_SIZE_LIMIT = 300ul;
     const size_t max_count = std::min(feed_size, FEED_SIZE_LIMIT);
@@ -1061,6 +1094,26 @@ class CTFOServer final {
       for (auto cit = prepared_cards[i].get().rbegin(); cit != prepared_cards[i].get().rend(); ++cit) {
         feeds[i].get().push_back(GenerateCardForFeed(data.Get(cit->second)));
         feeds[i].get().back().relevance = cit->first;
+      }
+    }
+
+    if (notifications_since != static_cast<uint64_t>(-1)) {
+      // TODO(dkorolev): `upper_bound`, not go through all notifications for this user.
+      try {
+        size_t appended_so_far = 0u;
+        for (const Notification& notification : Matrix<Notification>::Accessor(data)[uid]) {
+          if (notification.timestamp.ms > notifications_since) {
+            response.notifications.push_back(notification.BuildResponseNotification());
+            ++appended_so_far;
+            // TODO(dkorolev): Command line flag or parameter instead of bare `50`.
+            if (appended_so_far >= 50u) {
+              break;
+            }
+          }
+        }
+        std::reverse(response.notifications.begin(), response.notifications.end());
+      } catch (const yoda::SubscriptException<Notification>&) {
+        // No notifications for this user.
       }
     }
 
