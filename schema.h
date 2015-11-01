@@ -195,7 +195,7 @@ struct User : yoda::Padawan {
     ar(CEREAL_NVP(uid), CEREAL_NVP(level), CEREAL_NVP(score));
   }
 
-  using DeleterPersister = yoda::DictionaryGlobalDeleterPersister<UID, __COUNTER__>;
+  using DeleterPersister = yoda::DictionaryGlobalDeleterPersister<UID, 1>;
 };
 
 // AuthKey structure defines generic authentication key.
@@ -218,7 +218,7 @@ struct AuthKey {
     ar(CEREAL_NVP(key), CEREAL_NVP(type));
   }
 
-  using DeleterPersister = yoda::DictionaryGlobalDeleterPersister<std::string, __COUNTER__>;
+  using DeleterPersister = yoda::DictionaryGlobalDeleterPersister<std::string, 2>;
 };
 
 struct AuthKeyTokenPair : yoda::Padawan {
@@ -242,7 +242,7 @@ struct AuthKeyTokenPair : yoda::Padawan {
     ar(CEREAL_NVP(auth_key), CEREAL_NVP(token), CEREAL_NVP(valid));
   }
 
-  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<AuthKey, std::string, __COUNTER__>;
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<AuthKey, std::string, 3>;
 };
 
 struct AuthKeyUIDPair : yoda::Padawan {
@@ -263,7 +263,7 @@ struct AuthKeyUIDPair : yoda::Padawan {
     ar(CEREAL_NVP(auth_key), CEREAL_NVP(uid));
   }
 
-  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<AuthKey, UID, __COUNTER__>;
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<AuthKey, UID, 4>;
 };
 
 struct Card : yoda::Padawan {
@@ -292,7 +292,7 @@ struct Card : yoda::Padawan {
        CEREAL_NVP(skip_count));
   }
 
-  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<CID, UID, __COUNTER__>;
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<CID, UID, 4>;
 };
 
 struct CardAuthor : yoda::Padawan {
@@ -314,7 +314,7 @@ struct CardAuthor : yoda::Padawan {
     ar(CEREAL_NVP(cid), CEREAL_NVP(uid));
   }
 
-  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<CID, UID, __COUNTER__>;
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<CID, UID, 5>;
 };
 
 struct Answer : yoda::Padawan {
@@ -337,7 +337,7 @@ struct Answer : yoda::Padawan {
     ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(answer));
   }
 
-  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<UID, CID, __COUNTER__>;
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<UID, CID, 6>;
 };
 
 struct Favorite : yoda::Padawan {
@@ -359,7 +359,7 @@ struct Favorite : yoda::Padawan {
     ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(favorited));
   }
 
-  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<UID, CID, __COUNTER__>;
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<UID, CID, 7>;
 };
 
 struct Comment : yoda::Padawan {
@@ -386,7 +386,7 @@ struct Comment : yoda::Padawan {
     ar(CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(parent_oid), CEREAL_NVP(author_uid), CEREAL_NVP(text));
   }
 
-  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<CID, OID, __COUNTER__>;
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<CID, OID, 8>;
 };
 
 struct CommentLike : yoda::Padawan {
@@ -404,7 +404,7 @@ struct CommentLike : yoda::Padawan {
     ar(CEREAL_NVP(oid), CEREAL_NVP(uid));
   }
 
-  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<OID, UID, __COUNTER__>;
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<OID, UID, 9>;
 };
 
 struct CardFlagAsInappropriate : yoda::Padawan {
@@ -422,7 +422,7 @@ struct CardFlagAsInappropriate : yoda::Padawan {
     ar(CEREAL_NVP(cid), CEREAL_NVP(uid));
   }
 
-  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<CID, UID, __COUNTER__>;
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<CID, UID, 10>;
 };
 
 struct CommentFlagAsInappropriate : yoda::Padawan {
@@ -440,7 +440,7 @@ struct CommentFlagAsInappropriate : yoda::Padawan {
     ar(CEREAL_NVP(oid), CEREAL_NVP(uid));
   }
 
-  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<OID, UID, __COUNTER__>;
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<OID, UID, 11>;
 };
 
 // Data structures for generating RESTful responses.
@@ -721,7 +721,7 @@ struct Notification : yoda::Padawan {
     ar(CEREAL_NVP(uid), CEREAL_NVP(timestamp), CEREAL_NVP(notification));
   }
 
-  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<UID, ComparableNonHashableTimestamp, __COUNTER__>;
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<UID, ComparableNonHashableTimestamp, 12>;
 };
 
 struct NotificationMyCardNewComment : AbstractNotification {
