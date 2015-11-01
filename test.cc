@@ -1159,6 +1159,7 @@ TEST(CTFO, SmokeTest) {
     // Add a comment to generate a notification.
     std::string comment_to_be_notified_about_oid;
     {
+      bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(112002));
       AddCommentRequest add_comment_request;
       add_comment_request.text = "Ding!";
       const auto post_comment_response =
@@ -1175,6 +1176,7 @@ TEST(CTFO, SmokeTest) {
     }
     // Should be one notification.
     {
+      bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(112003));
       const auto feed_http_response =
           HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&notifications_since=0",
                           FLAGS_api_port,
@@ -1189,6 +1191,8 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ(comment_to_be_notified_about_oid, feed_response.notifications[0].oid);
       EXPECT_EQ("Ding!", feed_response.notifications[0].text);
       EXPECT_EQ(1u, feed_response.notifications[0].n);
+      EXPECT_EQ("n05000000000112002000", feed_response.notifications[0].nid);
+      EXPECT_EQ(112002u, feed_response.notifications[0].ms);
     }
     // Delete that comment.
     {
@@ -1360,8 +1364,9 @@ TEST(CTFO, NotificationsSerializeWellInYoda) {
       me, 12345ull, std::make_shared<NotificationMyCardNewComment>(uid, cid, oid, "foo"));
   const std::string user_facing_json = JSON(notification.BuildResponseNotification());
   EXPECT_EQ(
-      "{\"data\":{\"type\":\"MyCardNewComment\",\"ms\":12345,\"uid\":\"u00000000000000000001\",\"cid\":"
-      "\"c00000000000000000002\",\"oid\":\"o00000000000000000003\",\"text\":\"foo\",\"n\":1}}",
+      "{\"data\":{\"nid\":\"n05000000000012345000\",\"type\":\"MyCardNewComment\",\"ms\":12345,\"uid\":"
+      "\"u00000000000000000001\",\"cid\":\"c00000000000000000002\",\"oid\":\"o00000000000000000003\",\"text\":"
+      "\"foo\",\"n\":1}}",
       user_facing_json);
   const std::string stream_stored_json = JSON(notification);
   EXPECT_EQ(
