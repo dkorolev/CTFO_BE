@@ -194,6 +194,8 @@ struct User : yoda::Padawan {
     Padawan::serialize(ar);
     ar(CEREAL_NVP(uid), CEREAL_NVP(level), CEREAL_NVP(score));
   }
+
+  using DeleterPersister = yoda::DictionaryGlobalDeleterPersister<UID, __COUNTER__>;
 };
 
 // AuthKey structure defines generic authentication key.
@@ -215,6 +217,8 @@ struct AuthKey {
   void serialize(A& ar) {
     ar(CEREAL_NVP(key), CEREAL_NVP(type));
   }
+
+  using DeleterPersister = yoda::DictionaryGlobalDeleterPersister<std::string, __COUNTER__>;
 };
 
 struct AuthKeyTokenPair : yoda::Padawan {
@@ -237,6 +241,8 @@ struct AuthKeyTokenPair : yoda::Padawan {
     Padawan::serialize(ar);
     ar(CEREAL_NVP(auth_key), CEREAL_NVP(token), CEREAL_NVP(valid));
   }
+
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<AuthKey, std::string, __COUNTER__>;
 };
 
 struct AuthKeyUIDPair : yoda::Padawan {
@@ -256,6 +262,8 @@ struct AuthKeyUIDPair : yoda::Padawan {
     Padawan::serialize(ar);
     ar(CEREAL_NVP(auth_key), CEREAL_NVP(uid));
   }
+
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<AuthKey, UID, __COUNTER__>;
 };
 
 struct Card : yoda::Padawan {
@@ -283,6 +291,8 @@ struct Card : yoda::Padawan {
        CEREAL_NVP(tfu_count),
        CEREAL_NVP(skip_count));
   }
+
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<CID, UID, __COUNTER__>;
 };
 
 struct CardAuthor : yoda::Padawan {
@@ -303,6 +313,8 @@ struct CardAuthor : yoda::Padawan {
     Padawan::serialize(ar);
     ar(CEREAL_NVP(cid), CEREAL_NVP(uid));
   }
+
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<CID, UID, __COUNTER__>;
 };
 
 struct Answer : yoda::Padawan {
@@ -324,6 +336,8 @@ struct Answer : yoda::Padawan {
     Padawan::serialize(ar);
     ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(answer));
   }
+
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<UID, CID, __COUNTER__>;
 };
 
 struct Favorite : yoda::Padawan {
@@ -344,6 +358,8 @@ struct Favorite : yoda::Padawan {
     Padawan::serialize(ar);
     ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(favorited));
   }
+
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<UID, CID, __COUNTER__>;
 };
 
 struct Comment : yoda::Padawan {
@@ -369,6 +385,8 @@ struct Comment : yoda::Padawan {
     Padawan::serialize(ar);
     ar(CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(parent_oid), CEREAL_NVP(author_uid), CEREAL_NVP(text));
   }
+
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<CID, OID, __COUNTER__>;
 };
 
 struct CommentLike : yoda::Padawan {
@@ -385,6 +403,8 @@ struct CommentLike : yoda::Padawan {
     Padawan::serialize(ar);
     ar(CEREAL_NVP(oid), CEREAL_NVP(uid));
   }
+
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<OID, UID, __COUNTER__>;
 };
 
 struct CardFlagAsInappropriate : yoda::Padawan {
@@ -401,6 +421,8 @@ struct CardFlagAsInappropriate : yoda::Padawan {
     Padawan::serialize(ar);
     ar(CEREAL_NVP(cid), CEREAL_NVP(uid));
   }
+
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<CID, UID, __COUNTER__>;
 };
 
 struct CommentFlagAsInappropriate : yoda::Padawan {
@@ -417,6 +439,8 @@ struct CommentFlagAsInappropriate : yoda::Padawan {
     Padawan::serialize(ar);
     ar(CEREAL_NVP(oid), CEREAL_NVP(uid));
   }
+
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<OID, UID, __COUNTER__>;
 };
 
 // Data structures for generating RESTful responses.
@@ -696,6 +720,8 @@ struct Notification : yoda::Padawan {
   void serialize(A& ar) {
     ar(CEREAL_NVP(uid), CEREAL_NVP(timestamp), CEREAL_NVP(notification));
   }
+
+  using DeleterPersister = yoda::MatrixGlobalDeleterPersister<UID, ComparableNonHashableTimestamp, __COUNTER__>;
 };
 
 struct NotificationMyCardNewComment : AbstractNotification {
@@ -723,18 +749,33 @@ struct NotificationMyCardNewComment : AbstractNotification {
 
 }  // namespace CTFO
 
+// These types are stored in Yoda and need delete persisters.
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::User, "User");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::User::DeleterPersister, "DeleteUser");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::AuthKeyTokenPair, "AuthKeyTokenPair");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::AuthKeyTokenPair::DeleterPersister, "DeleteAuthKeyTokenPair");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::AuthKeyUIDPair, "AuthKeyUIDPair");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::AuthKeyUIDPair::DeleterPersister, "DeleteAuthKeyUIDPair");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Card, "Card");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Card::DeleterPersister, "DeleteCard");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CardAuthor, "CardAuthor");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CardAuthor::DeleterPersister, "DeleteCardAuthor");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Answer, "Answer");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Answer::DeleterPersister, "DeleteAnswer");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Favorite, "Favorite");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Favorite::DeleterPersister, "DeleteFavorite");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Comment, "Comment");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Comment::DeleterPersister, "DeleteComment");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CommentLike, "CommentLike");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CommentLike::DeleterPersister, "DeleteCommentLike");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CardFlagAsInappropriate, "CardFlagAsInappropriate");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CardFlagAsInappropriate::DeleterPersister, "DeleteCardFlagAsInappropriate");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CommentFlagAsInappropriate, "CommentFlagAsInappropriate");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CommentFlagAsInappropriate::DeleterPersister, "DeleteCommentFlagAsInappropriate");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Notification, "Notification");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Notification::DeleterPersister, "DeleteNotification");
+
+// These are inner types that have to be registered to support polymorhism, but do not need delete persisters.
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCardNewComment, "NotificationMyCardNewComment");
 
 #endif  // CTFO_SCHEMA_H
