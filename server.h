@@ -1070,9 +1070,14 @@ class CTFOServer final {
       if (!answers.Has(uid, card.cid) && !flagged_cards.Has(card.cid, uid)) {
         // For the recent feed, relevance is the function of the age of the card.
         // Added just now => 1.00. Added 24 hour ago => 0.99. Added 48 hours ago => 0.99^2. Etc.
-        const double time_key = std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
-        hot_cards.emplace(RandomDouble(0.2, 0.4), card.cid);
-        recent_cards.emplace(time_key, card.cid);
+        double time_order_key = 0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+        double hot_order_key = RandomDouble(0.2, 0.4);
+        if (card.startup_index) {
+          time_order_key = 1.0 - 1e-6 * card.startup_index;
+          hot_order_key = 1.0 - 1e-6 * card.startup_index;
+        }
+        hot_cards.emplace(hot_order_key, card.cid);
+        recent_cards.emplace(time_order_key, card.cid);
         if (hot_cards.size() > max_count) {
           hot_cards.erase(hot_cards.begin());
         }

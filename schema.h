@@ -276,11 +276,12 @@ struct AuthKeyUIDPair : Super {
 
 struct Card : Super {
   CID cid = CID::INVALID_CARD;
-  std::string text = "";     // Plain text.
-  Color color;               // Color.
-  uint64_t ctfo_count = 0u;  // Number of users, who said "CTFO" on this card.
-  uint64_t tfu_count = 0u;   // Number of users, who said "TFU" on this card.
-  uint64_t skip_count = 0u;  // Number of users, who said "SKIP" on this card.
+  std::string text = "";       // Plain text.
+  Color color;                 // Color.
+  uint64_t ctfo_count = 0u;    // Number of users, who said "CTFO" on this card.
+  uint64_t tfu_count = 0u;     // Number of users, who said "TFU" on this card.
+  uint64_t skip_count = 0u;    // Number of users, who said "SKIP" on this card.
+  double startup_index = 0.0;  // Cards where this index is nonzero will be on the top, lower index first.
 
   Card() = default;
   Card(const Card&) = default;
@@ -297,7 +298,8 @@ struct Card : Super {
        CEREAL_NVP(color),
        CEREAL_NVP(ctfo_count),
        CEREAL_NVP(tfu_count),
-       CEREAL_NVP(skip_count));
+       CEREAL_NVP(skip_count),
+       CEREAL_NVP(startup_index));
   }
 };
 

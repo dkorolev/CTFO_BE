@@ -61,15 +61,24 @@ int main(int argc, char** argv) {
 
   std::set<CID> cids;
   for (const auto& text : raw_cards) {
-    // Generate unique CID.
-    CID cid;
-    std::string addition = "";
-    do {
-      cid = CIDByHash(text + addition);
-      addition += " ";
-    } while (cids.find(cid) != cids.end());
-    cids.insert(cid);
+    if (text.length() >= 3u) {
+      // Generate a unique CID.
+      CID cid;
+      std::string addition = "";
+      do {
+        cid = CIDByHash(text + addition);
+        addition += " ";
+      } while (cids.find(cid) != cids.end());
+      cids.insert(cid);
 
-    out_json << Card(cid, text, CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()]);
+      Card c(cid, text, CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()]);
+      if (std::isdigit(text[0]) && text[1] == '\t') {
+        const int index = static_cast<double>(text[0] - '0');
+        c.text = text.substr(2);
+        c.startup_index = index;
+        c.ms = 2000000000000 - index;
+      }
+      out_json << c;
+    }
   }
 }
