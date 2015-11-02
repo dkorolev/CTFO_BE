@@ -190,7 +190,6 @@ struct Super {
 
   template <typename A>
   void serialize(A& ar) {
-    Super::serialize(ar);
     ar(CEREAL_NVP(ms));
   }
 };

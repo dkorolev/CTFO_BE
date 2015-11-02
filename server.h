@@ -190,7 +190,7 @@ class CTFOServer final {
               ResponseUserEntry user_entry;
               std::string token;
 
-              const auto auth_uid_accessor = data.auth_uid;
+              const auto& auth_uid_accessor = data.auth_uid;
               if (auth_uid_accessor.Rows().Has(auth_key)) {
                 // Something went terribly wrong
                 // if we have more than one UID for authentication key.
@@ -198,7 +198,7 @@ class CTFOServer final {
                 uid = Value(auth_uid_accessor.Rows()[auth_key]).begin()->uid;
               }
 
-              auto auth_token_mutator = data.auth_token;
+              auto& auth_token_mutator = data.auth_token;
               if (uid != UID::INVALID_USER) {
                 // User exists => invalidate all tokens.
                 for (const auto& auth_token : Value(auth_token_mutator.Rows()[auth_key])) {
@@ -265,14 +265,14 @@ class CTFOServer final {
         storage_.Transaction(
             [this, uid, token, requested_url, feed_count, notifications_since](StorageAPI::T_DATA data) {
               bool token_is_valid = false;
-              const auto auth_token_accessor = data.auth_token;
+              const auto& auth_token_accessor = data.auth_token;
               if (auth_token_accessor.Cols().Has(token)) {
                 // Something went terribly wrong
                 // if we have more than one authentication key for token.
                 assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
                 if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
                   // Double check, if the provided `uid` is correct as well.
-                  const auto auth_uid_accessor = data.auth_uid;
+                  const auto& auth_uid_accessor = data.auth_uid;
                   token_is_valid =
                       auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
                 }
@@ -311,14 +311,14 @@ class CTFOServer final {
       } else {
         storage_.Transaction([this, uid, token](StorageAPI::T_DATA data) {
           bool token_is_valid = false;
-          const auto auth_token_accessor = data.auth_token;
+          const auto& auth_token_accessor = data.auth_token;
           if (auth_token_accessor.Cols().Has(token)) {
             // Something went terribly wrong
             // if we have more than one authentication key for token.
             assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
             if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto auth_uid_accessor = data.auth_uid;
+              const auto& auth_uid_accessor = data.auth_uid;
               token_is_valid =
                   auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
             }
@@ -329,18 +329,18 @@ class CTFOServer final {
           } else {
             DebugPrint("[/ctfo/favs] Token validated.");
             const auto user = data.users[uid];
-            if (Exists(user)) {
+            if (!Exists(user)) {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
               ResponseFavs rfavs;
               CopyUserInfoToResponseEntry(Value(user), rfavs.user);
 
-              const auto answers = data.answers;
+              const auto& answers = data.answers;
 
               // Get favs.
               std::vector<std::pair<uint64_t, CID>> favs;
-              const auto favorites = data.favorites;
-              const auto per_user_favs = favorites.Rows()[uid];
+              const auto& favorites = data.favorites;
+              const auto& per_user_favs = favorites.Rows()[uid];
               if (Exists(per_user_favs)) {
                 for (const auto& fav : Value(per_user_favs)) {
                   if (fav.favorited) {
@@ -353,8 +353,8 @@ class CTFOServer final {
               std::sort(favs.rbegin(), favs.rend());
 
               // And publish them.
-              const auto card_authors = data.card_authors;
-              const auto comments = data.comments;
+              const auto& card_authors = data.card_authors;
+              const auto& comments = data.comments;
               const auto GenerateCardForFavs =
                   [this, uid, &answers, &card_authors, &comments](const Card& card) {
                     ResponseCardEntry card_entry;
@@ -430,14 +430,14 @@ class CTFOServer final {
       } else {
         storage_.Transaction([this, uid, token](StorageAPI::T_DATA data) {
           bool token_is_valid = false;
-          const auto auth_token_accessor = data.auth_token;
+          const auto& auth_token_accessor = data.auth_token;
           if (auth_token_accessor.Cols().Has(token)) {
             // Something went terribly wrong
             // if we have more than one authentication key for token.
             assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
             if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto auth_uid_accessor = data.auth_uid;
+              const auto& auth_uid_accessor = data.auth_uid;
               token_is_valid =
                   auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
             }
@@ -454,12 +454,12 @@ class CTFOServer final {
               ResponseMyCards r_my_cards;
               CopyUserInfoToResponseEntry(Value(user), r_my_cards.user);
 
-              const auto answers = data.answers;
-              const auto favorites = data.favorites;
+              const auto& answers = data.answers;
+              const auto& favorites = data.favorites;
 
               // Get my cards.
               std::vector<std::pair<uint64_t, CID>> my_cards;
-              const auto cards_by_author = data.card_authors.Cols()[uid];
+              const auto& cards_by_author = data.card_authors.Cols()[uid];
               if (Exists(cards_by_author)) {
                 for (const auto& my_card : Value(cards_by_author)) {
                   my_cards.emplace_back(my_card.ms, my_card.cid);
@@ -470,8 +470,8 @@ class CTFOServer final {
               std::sort(my_cards.rbegin(), my_cards.rend());
 
               // And publish them.
-              const auto card_authors = data.card_authors;
-              const auto comments = data.comments;
+              const auto& card_authors = data.card_authors;
+              const auto& comments = data.comments;
               const auto GenerateCardForMyCards =
                   [this, uid, &answers, &favorites, &card_authors, &comments](const Card& card) {
                     ResponseCardEntry card_entry;
@@ -554,10 +554,10 @@ class CTFOServer final {
             return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
           } else {
             const Card& card = Value(card_wrapper);
-            const auto answers = data.answers;
-            const auto comments = data.comments;
-            const auto favorites = data.favorites;
-            const auto card_authors = data.card_authors;
+            const auto& answers = data.answers;
+            const auto& comments = data.comments;
+            const auto& favorites = data.favorites;
+            const auto& card_authors = data.card_authors;
             // TODO(dkorolev): This beautiful copy-paste will eventually go away.
             ResponseCardEntry card_entry;
             card_entry.cid = CIDToString(card.cid);
@@ -626,14 +626,14 @@ class CTFOServer final {
           }
           storage_.Transaction([this, cid, uid, token, request, requested_url](StorageAPI::T_DATA data) {
             bool token_is_valid = false;
-            const auto auth_token_accessor = data.auth_token;
+            const auto& auth_token_accessor = data.auth_token;
             if (auth_token_accessor.Cols().Has(token)) {
               // Something went terribly wrong
               // if we have more than one authentication key for token.
               assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
               if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
                 // Double check, if the provided `uid` is correct as well.
-                const auto auth_uid_accessor = data.auth_uid;
+                const auto& auth_uid_accessor = data.auth_uid;
                 token_is_valid =
                     auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
               }
@@ -645,9 +645,9 @@ class CTFOServer final {
               DebugPrint(Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
               const auto now = static_cast<uint64_t>(bricks::time::Now());
 
-              auto cards_mutator = data.cards;
-              auto authors_mutator = data.card_authors;
-              auto favorites_mutator = data.favorites;
+              auto& cards_mutator = data.cards;
+              auto& authors_mutator = data.card_authors;
+              auto& favorites_mutator = data.favorites;
 
               Card card;
               card.cid = cid;
@@ -692,14 +692,14 @@ class CTFOServer final {
         const std::string requested_url = r.url.ComposeURL();
         storage_.Transaction([this, requested_url, uid, cid, token](StorageAPI::T_DATA data) {
           bool token_is_valid = false;
-          const auto auth_token_accessor = data.auth_token;
+          const auto& auth_token_accessor = data.auth_token;
           if (auth_token_accessor.Cols().Has(token)) {
             // Something went terribly wrong
             // if we have more than one authentication key for token.
             assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
             if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto auth_uid_accessor = data.auth_uid;
+              const auto& auth_uid_accessor = data.auth_uid;
               token_is_valid =
                   auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
             }
@@ -709,9 +709,9 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint(Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
-            auto cards_mutator = data.cards;
-            auto card_authors_mutator = data.card_authors;
-            const auto card_author_accessor = card_authors_mutator.Rows()[cid];
+            auto& cards_mutator = data.cards;
+            auto& card_authors_mutator = data.card_authors;
+            const auto& card_author_accessor = card_authors_mutator.Rows()[cid];
             if (Exists(card_author_accessor)) {
               const auto v = Value(card_author_accessor);
               if (v.Size() != 1u) {
@@ -723,7 +723,7 @@ class CTFOServer final {
                 } else {
                   cards_mutator.Erase(cid);
                   card_authors_mutator.Delete(cid, uid);
-                  auto comments_mutator = data.comments;
+                  auto& comments_mutator = data.comments;
                   std::vector<OID> oids_to_delete;
                   const auto comments_per_card = comments_mutator.Rows()[cid];
                   if (Exists(comments_per_card)) {
@@ -769,14 +769,14 @@ class CTFOServer final {
         const std::string requested_url = r.url.ComposeURL();
         storage_.Transaction([this, uid, cid, token, requested_url](StorageAPI::T_DATA data) {
           bool token_is_valid = false;
-          const auto auth_token_accessor = data.auth_token;
+          const auto& auth_token_accessor = data.auth_token;
           if (auth_token_accessor.Cols().Has(token)) {
             // Something went terribly wrong
             // if we have more than one authentication key for token.
             assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
             if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto auth_uid_accessor = data.auth_uid;
+              const auto& auth_uid_accessor = data.auth_uid;
               token_is_valid =
                   auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
             }
@@ -793,13 +793,13 @@ class CTFOServer final {
             if (!Exists(user)) {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
-              const auto users_accessor = data.users;
-              const auto comments_accessor = data.comments;
-              const auto comment_likes_accessor = data.comment_likes;
-              const auto comment_flagged_accessor = data.flagged_comments;
+              const auto& users_accessor = data.users;
+              const auto& comments_accessor = data.comments;
+              const auto& comment_likes_accessor = data.comment_likes;
+              const auto& comment_flagged_accessor = data.flagged_comments;
               std::vector<Comment> proto_comments;
               std::set<OID> flagged_comments;
-              const auto comments = data.comments;  // Matrix<Comment>::Accessor(data);
+              const auto& comments = data.comments;  // Matrix<Comment>::Accessor(data);
               const auto comments_per_card = comments.Rows()[cid];
               if (Exists(comments_per_card)) {
                 for (const auto& comment : Value(comments_per_card)) {
@@ -878,14 +878,14 @@ class CTFOServer final {
           }
           storage_.Transaction([this, cid, uid, oid, token, request, requested_url](StorageAPI::T_DATA data) {
             bool token_is_valid = false;
-            const auto auth_token_accessor = data.auth_token;
+            const auto& auth_token_accessor = data.auth_token;
             if (auth_token_accessor.Cols().Has(token)) {
               // Something went terribly wrong
               // if we have more than one authentication key for token.
               assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
               if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
                 // Double check, if the provided `uid` is correct as well.
-                const auto auth_uid_accessor = data.auth_uid;
+                const auto& auth_uid_accessor = data.auth_uid;
                 token_is_valid =
                     auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
               }
@@ -899,7 +899,7 @@ class CTFOServer final {
               const auto now = static_cast<uint64_t>(bricks::time::Now());
 
               UID card_author_uid = UID::INVALID_USER;
-              const auto card_authors = data.card_authors;  // Matrix<CardAuthor>::Accessor(data);
+              const auto& card_authors = data.card_authors;  // Matrix<CardAuthor>::Accessor(data);
               const auto iterable = card_authors.Rows()[cid];
               if (Exists(iterable)) {
                 const auto v = Value(iterable);
@@ -908,8 +908,8 @@ class CTFOServer final {
                 }
               }
 
-              auto comments_mutator = data.comments;
-              auto notifications_mutator = data.notifications;
+              auto& comments_mutator = data.comments;
+              auto& notifications_mutator = data.notifications;
 
               Comment comment;
               comment.cid = cid;
@@ -961,14 +961,14 @@ class CTFOServer final {
           const std::string requested_url = r.url.ComposeURL();
           storage_.Transaction([this, requested_url, uid, cid, token, oid](StorageAPI::T_DATA data) {
             bool token_is_valid = false;
-            const auto auth_token_accessor = data.auth_token;
+            const auto& auth_token_accessor = data.auth_token;
             if (auth_token_accessor.Cols().Has(token)) {
               // Something went terribly wrong
               // if we have more than one authentication key for token.
               assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
               if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
                 // Double check, if the provided `uid` is correct as well.
-                const auto auth_uid_accessor = data.auth_uid;
+                const auto& auth_uid_accessor = data.auth_uid;
                 token_is_valid =
                     auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
               }
@@ -980,7 +980,7 @@ class CTFOServer final {
               DebugPrint(
                   Printf("[/ctfo/comments] Token validated. Requested URL = '%s'", requested_url.c_str()));
               // TODO(dkorolev): Do something smart about non-existing comments.
-              auto comments_mutator = data.comments;
+              auto& comments_mutator = data.comments;
               std::vector<OID> oids_to_delete;
               oids_to_delete.push_back(oid);
               const auto comments_per_card = comments_mutator.Rows()[cid];
@@ -1056,10 +1056,10 @@ class CTFOServer final {
     const size_t max_count = std::min(feed_size, FEED_SIZE_LIMIT);
     response.user = user_entry;
 
-    const auto cards = data.cards;
-    const auto answers = data.answers;
-    const auto flagged_cards = data.flagged_cards;
-    const auto favorites = data.favorites;
+    const auto& cards = data.cards;
+    const auto& answers = data.answers;
+    const auto& flagged_cards = data.flagged_cards;
+    const auto& favorites = data.favorites;
 
     std::set<std::pair<double, CID>> hot_cards;
     std::set<std::pair<double, CID>> recent_cards;
@@ -1082,8 +1082,8 @@ class CTFOServer final {
       }
     }
 
-    const auto card_authors = data.card_authors;
-    const auto comments = data.comments;
+    const auto& card_authors = data.card_authors;
+    const auto& comments = data.comments;
     const auto GenerateCardForFeed =
         [this, uid, &answers, &favorites, &comments, &card_authors](const Card& card) {
           ResponseCardEntry card_entry;
@@ -1215,7 +1215,7 @@ class CTFOServer final {
         if (uid != UID::INVALID_USER) {
           storage_.Transaction([this, uid, cid, oid, uid_str, cid_str, oid_str, token, response](
               StorageAPI::T_DATA data) {
-            const auto auth_token_accessor = data.auth_token;
+            const auto& auth_token_accessor = data.auth_token;
             bool token_is_valid = false;
             if (auth_token_accessor.Cols().Has(token)) {
               // Something went terribly wrong
@@ -1240,7 +1240,7 @@ class CTFOServer final {
                       Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in SKIP/CTFO/TFU.", cid_str.c_str()));
                   return;
                 }
-                auto answers_mutator = data.answers;
+                auto& answers_mutator = data.answers;
                 if (!answers_mutator.Has(uid, cid)) {  // Do not overwrite existing answers.
                   data.answers.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
                   DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
@@ -1299,7 +1299,7 @@ class CTFOServer final {
                   DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' FAV/UNFAV.", cid_str.c_str()));
                   return;
                 }
-                auto favorites_mutator = data.favorites;
+                auto& favorites_mutator = data.favorites;
                 favorites_mutator.Add(Favorite(uid, cid, (response == RESPONSE::FAV_CARD)));
                 DebugPrint(Printf("[UpdateStateOnEvent] Added favorite: [%s, %s, %s]",
                                   UIDToString(uid).c_str(),
