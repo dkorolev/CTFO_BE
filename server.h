@@ -61,16 +61,16 @@ struct StorageAPIImpl {
 
   OrderedDictionary<User, POLICY> users{"users", instance};
   OrderedDictionary<Card, POLICY> cards{"cards", instance};
-  Matrix<AuthKeyTokenPair, POLICY> auth_token{"auth_token", instance};
-  Matrix<AuthKeyUIDPair, POLICY> auth_uid{"auth_uid", instance};
-  Matrix<CardAuthor, POLICY> card_authors{"card_authors", instance};
-  Matrix<Answer, POLICY> answers{"answers", instance};
-  Matrix<Favorite, POLICY> favorites{"favorites", instance};
-  Matrix<Comment, POLICY> comments{"comments", instance};
-  Matrix<CommentLike, POLICY> comment_likes{"comment_likes", instance};
-  Matrix<CardFlagAsInappropriate, POLICY> flagged_cards{"flagged_cards", instance};
-  Matrix<CommentFlagAsInappropriate, POLICY> flagged_comments{"flagged_comments", instance};
-  Matrix<Notification, POLICY> notifications{"notifications", instance};
+  LightweightMatrix<AuthKeyTokenPair, POLICY> auth_token{"auth_token", instance};
+  LightweightMatrix<AuthKeyUIDPair, POLICY> auth_uid{"auth_uid", instance};
+  LightweightMatrix<CardAuthor, POLICY> card_authors{"card_authors", instance};
+  LightweightMatrix<Answer, POLICY> answers{"answers", instance};
+  LightweightMatrix<Favorite, POLICY> favorites{"favorites", instance};
+  LightweightMatrix<Comment, POLICY> comments{"comments", instance};
+  LightweightMatrix<CommentLike, POLICY> comment_likes{"comment_likes", instance};
+  LightweightMatrix<CardFlagAsInappropriate, POLICY> flagged_cards{"flagged_cards", instance};
+  LightweightMatrix<CommentFlagAsInappropriate, POLICY> flagged_comments{"flagged_comments", instance};
+  LightweightMatrix<Notification, POLICY> notifications{"notifications", instance};
 
   // TODO(dkorolev): A templated version of the constructor.
   StorageAPIImpl(const std::string& filename) : instance(filename) { instance.Run(); }
