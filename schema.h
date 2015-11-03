@@ -33,7 +33,8 @@ SOFTWARE.
 #include "util.h"
 
 #include "../Current/Bricks/cerealize/cerealize.h"
-#include "../Current/Yoda/yoda.h"
+
+#include "../Current/PSYKHANOOL/PSYKHANOOL.h"
 
 namespace CTFO {
 // Common data structures.
@@ -181,7 +182,19 @@ const std::vector<Color> CARD_COLORS{{0x0A, 0xB2, 0xCB},
                                      {0xF0, 0xB2, 0x4F},
                                      {0xF5, 0xC6, 0x7A}};
 
-struct User : yoda::Padawan {
+struct Super {
+  uint64_t ms;
+
+  Super() : ms(static_cast<uint64_t>(bricks::time::Now())) {}
+  virtual ~Super() {}
+
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(ms));
+  }
+};
+
+struct User : Super {
   UID uid = UID::INVALID_USER;
   uint8_t level = 0u;   // User level [0, 9].
   uint64_t score = 0u;  // User score.
@@ -191,7 +204,7 @@ struct User : yoda::Padawan {
 
   template <typename A>
   void serialize(A& ar) {
-    Padawan::serialize(ar);
+    Super::serialize(ar);
     ar(CEREAL_NVP(uid), CEREAL_NVP(level), CEREAL_NVP(score));
   }
 };
@@ -208,8 +221,11 @@ struct AuthKey {
 
   AuthKey() = default;
   AuthKey(const std::string& key, AUTH_TYPE type) : key(key), type(type) {}
-  size_t Hash() const { return std::hash<std::string>()(key); }
-  bool operator==(const AuthKey& rhs) const { return key == rhs.key && type == rhs.type; }
+
+  // TODO(dkorolev): Revisit this. For now, I just assume all `key`-s are distinct.
+  // size_t Hash() const { return std::hash<std::string>()(key); }
+  // bool operator==(const AuthKey& rhs) const { return key == rhs.key && type == rhs.type; }
+  bool operator<(const AuthKey& rhs) const { return key < rhs.key; }
 
   template <typename A>
   void serialize(A& ar) {
@@ -217,7 +233,7 @@ struct AuthKey {
   }
 };
 
-struct AuthKeyTokenPair : yoda::Padawan {
+struct AuthKeyTokenPair : Super {
   AuthKey auth_key;
   std::string token = "";
   bool valid = false;
@@ -234,12 +250,12 @@ struct AuthKeyTokenPair : yoda::Padawan {
 
   template <typename A>
   void serialize(A& ar) {
-    Padawan::serialize(ar);
+    Super::serialize(ar);
     ar(CEREAL_NVP(auth_key), CEREAL_NVP(token), CEREAL_NVP(valid));
   }
 };
 
-struct AuthKeyUIDPair : yoda::Padawan {
+struct AuthKeyUIDPair : Super {
   AuthKey auth_key;
   UID uid = UID::INVALID_USER;
 
@@ -253,18 +269,19 @@ struct AuthKeyUIDPair : yoda::Padawan {
 
   template <typename A>
   void serialize(A& ar) {
-    Padawan::serialize(ar);
+    Super::serialize(ar);
     ar(CEREAL_NVP(auth_key), CEREAL_NVP(uid));
   }
 };
 
-struct Card : yoda::Padawan {
+struct Card : Super {
   CID cid = CID::INVALID_CARD;
-  std::string text = "";     // Plain text.
-  Color color;               // Color.
-  uint64_t ctfo_count = 0u;  // Number of users, who said "CTFO" on this card.
-  uint64_t tfu_count = 0u;   // Number of users, who said "TFU" on this card.
-  uint64_t skip_count = 0u;  // Number of users, who said "SKIP" on this card.
+  std::string text = "";       // Plain text.
+  Color color;                 // Color.
+  uint64_t ctfo_count = 0u;    // Number of users, who said "CTFO" on this card.
+  uint64_t tfu_count = 0u;     // Number of users, who said "TFU" on this card.
+  uint64_t skip_count = 0u;    // Number of users, who said "SKIP" on this card.
+  double startup_index = 0.0;  // Cards where this index is nonzero will be on the top, lower index first.
 
   Card() = default;
   Card(const Card&) = default;
@@ -275,17 +292,18 @@ struct Card : yoda::Padawan {
 
   template <typename A>
   void serialize(A& ar) {
-    Padawan::serialize(ar);
+    Super::serialize(ar);
     ar(CEREAL_NVP(cid),
        CEREAL_NVP(text),
        CEREAL_NVP(color),
        CEREAL_NVP(ctfo_count),
        CEREAL_NVP(tfu_count),
-       CEREAL_NVP(skip_count));
+       CEREAL_NVP(skip_count),
+       CEREAL_NVP(startup_index));
   }
 };
 
-struct CardAuthor : yoda::Padawan {
+struct CardAuthor : Super {
   CID cid = CID::INVALID_CARD;
   UID uid = UID::INVALID_USER;
 
@@ -300,12 +318,12 @@ struct CardAuthor : yoda::Padawan {
 
   template <typename A>
   void serialize(A& ar) {
-    Padawan::serialize(ar);
+    Super::serialize(ar);
     ar(CEREAL_NVP(cid), CEREAL_NVP(uid));
   }
 };
 
-struct Answer : yoda::Padawan {
+struct Answer : Super {
   UID uid = UID::INVALID_USER;
   CID cid = CID::INVALID_CARD;
   ANSWER answer = ANSWER::UNSEEN;
@@ -321,12 +339,12 @@ struct Answer : yoda::Padawan {
 
   template <typename A>
   void serialize(A& ar) {
-    Padawan::serialize(ar);
+    Super::serialize(ar);
     ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(answer));
   }
 };
 
-struct Favorite : yoda::Padawan {
+struct Favorite : Super {
   UID uid = UID::INVALID_USER;
   CID cid = CID::INVALID_CARD;
   bool favorited = false;
@@ -341,12 +359,12 @@ struct Favorite : yoda::Padawan {
 
   template <typename A>
   void serialize(A& ar) {
-    Padawan::serialize(ar);
+    Super::serialize(ar);
     ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(favorited));
   }
 };
 
-struct Comment : yoda::Padawan {
+struct Comment : Super {
   CID cid = CID::INVALID_CARD;     // Row key: Card ID.
   OID oid = OID::INVALID_COMMENT;  // Col key: Comment ID.
 
@@ -366,12 +384,12 @@ struct Comment : yoda::Padawan {
 
   template <typename A>
   void serialize(A& ar) {
-    Padawan::serialize(ar);
+    Super::serialize(ar);
     ar(CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(parent_oid), CEREAL_NVP(author_uid), CEREAL_NVP(text));
   }
 };
 
-struct CommentLike : yoda::Padawan {
+struct CommentLike : Super {
   OID oid;
   UID uid;
 
@@ -382,12 +400,12 @@ struct CommentLike : yoda::Padawan {
 
   template <typename A>
   void serialize(A& ar) {
-    Padawan::serialize(ar);
+    Super::serialize(ar);
     ar(CEREAL_NVP(oid), CEREAL_NVP(uid));
   }
 };
 
-struct CardFlagAsInappropriate : yoda::Padawan {
+struct CardFlagAsInappropriate : Super {
   CID cid;
   UID uid;
 
@@ -398,12 +416,12 @@ struct CardFlagAsInappropriate : yoda::Padawan {
 
   template <typename A>
   void serialize(A& ar) {
-    Padawan::serialize(ar);
+    Super::serialize(ar);
     ar(CEREAL_NVP(cid), CEREAL_NVP(uid));
   }
 };
 
-struct CommentFlagAsInappropriate : yoda::Padawan {
+struct CommentFlagAsInappropriate : Super {
   OID oid;
   UID uid;
 
@@ -414,7 +432,7 @@ struct CommentFlagAsInappropriate : yoda::Padawan {
 
   template <typename A>
   void serialize(A& ar) {
-    Padawan::serialize(ar);
+    Super::serialize(ar);
     ar(CEREAL_NVP(oid), CEREAL_NVP(uid));
   }
 };
@@ -662,12 +680,12 @@ struct ComparableNonHashableTimestamp {
   }
 };
 
-struct AbstractNotification : yoda::Padawan {
+struct AbstractNotification : Super {
   virtual ~AbstractNotification() {}
   virtual void PopulateResponseNotification(ResponseNotification& output) const = 0;
 };
 
-struct Notification : yoda::Padawan {
+struct Notification : Super {
   UID uid;
   ComparableNonHashableTimestamp timestamp;
   std::shared_ptr<AbstractNotification> notification;
@@ -723,18 +741,7 @@ struct NotificationMyCardNewComment : AbstractNotification {
 
 }  // namespace CTFO
 
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::User, "User");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::AuthKeyTokenPair, "AuthKeyTokenPair");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::AuthKeyUIDPair, "AuthKeyUIDPair");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Card, "Card");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CardAuthor, "CardAuthor");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Answer, "Answer");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Favorite, "Favorite");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Comment, "Comment");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CommentLike, "CommentLike");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CardFlagAsInappropriate, "CardFlagAsInappropriate");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::CommentFlagAsInappropriate, "CommentFlagAsInappropriate");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::Notification, "Notification");
+// Inner polymorphic types have to be registered. -- D.K.
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCardNewComment, "NotificationMyCardNewComment");
 
 #endif  // CTFO_SCHEMA_H

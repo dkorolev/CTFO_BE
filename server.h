@@ -50,11 +50,61 @@ SOFTWARE.
 // Structured iOS events.
 #include "../Current/Midichlorians/Dev/Beta/MidichloriansDataDictionary.h"
 
-using namespace yoda;
 using namespace bricks::random;
 using namespace bricks::strings;
 
 namespace CTFO {
+
+template <typename POLICY>
+struct StorageAPIImpl {
+  typename POLICY::Instance instance;
+
+  OrderedDictionary<User, POLICY> users{"users", instance};
+  OrderedDictionary<Card, POLICY> cards{"cards", instance};
+  LightweightMatrix<AuthKeyTokenPair, POLICY> auth_token{"auth_token", instance};
+  LightweightMatrix<AuthKeyUIDPair, POLICY> auth_uid{"auth_uid", instance};
+  LightweightMatrix<CardAuthor, POLICY> card_authors{"card_authors", instance};
+  LightweightMatrix<Answer, POLICY> answers{"answers", instance};
+  LightweightMatrix<Favorite, POLICY> favorites{"favorites", instance};
+  LightweightMatrix<Comment, POLICY> comments{"comments", instance};
+  LightweightMatrix<CommentLike, POLICY> comment_likes{"comment_likes", instance};
+  LightweightMatrix<CardFlagAsInappropriate, POLICY> flagged_cards{"flagged_cards", instance};
+  LightweightMatrix<CommentFlagAsInappropriate, POLICY> flagged_comments{"flagged_comments", instance};
+  LightweightMatrix<Notification, POLICY> notifications{"notifications", instance};
+
+  // TODO(dkorolev): A templated version of the constructor.
+  StorageAPIImpl(const std::string& filename) : instance(filename) { instance.Run(); }
+};
+
+struct StorageAPI {
+  using T_DATA_IMPL = StorageAPIImpl<ReplayFromAndAppendToFile>;
+  typedef T_DATA_IMPL& T_DATA;
+
+  T_DATA_IMPL actual_data;
+
+  // Because meh. -- D.K.
+  struct SomethingThatCanWaitAndGo {
+    void Go() {}
+    void Wait() {}
+  };
+
+  template <typename F>
+  SomethingThatCanWaitAndGo Transaction(F&& f) {
+    f(actual_data);
+    return SomethingThatCanWaitAndGo();
+  }
+
+  template <typename F1, typename F2>
+  SomethingThatCanWaitAndGo Transaction(F1&& f1, F2&& f2) {
+    f2(f1(actual_data));
+    return SomethingThatCanWaitAndGo();
+  }
+
+  StorageAPI(const char* now_useless_name, const std::string& filename) : actual_data(filename) {
+    static_cast<void>(now_useless_name);
+  }
+};
+
 class CTFOServer final {
  public:
   explicit CTFOServer(const std::string& cards_file,
@@ -78,7 +128,7 @@ class CTFOServer final {
 
     bricks::cerealize::CerealFileParser<Card, bricks::cerealize::CerealFormat::JSON> cf(cards_file);
     storage_.Transaction([&cf](StorageAPI::T_DATA data) {
-      while (cf.Next([&data](const Card& card) { data.Add(card); })) {
+      while (cf.Next([&data](const Card& card) { data.cards.Insert(card); })) {
         ;
       }
     }).Go();
@@ -140,21 +190,21 @@ class CTFOServer final {
               ResponseUserEntry user_entry;
               std::string token;
 
-              const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
+              const auto& auth_uid_accessor = data.auth_uid;
               if (auth_uid_accessor.Rows().Has(auth_key)) {
                 // Something went terribly wrong
                 // if we have more than one UID for authentication key.
-                assert(auth_uid_accessor[auth_key].size() == 1);
-                uid = auth_uid_accessor[auth_key].begin()->uid;
+                assert(Value(auth_uid_accessor.Rows()[auth_key]).Size() == 1u);
+                uid = Value(auth_uid_accessor.Rows()[auth_key]).begin()->uid;
               }
 
-              auto auth_token_mutator = Matrix<AuthKeyTokenPair>::Mutator(data);
+              auto& auth_token_mutator = data.auth_token;
               if (uid != UID::INVALID_USER) {
                 // User exists => invalidate all tokens.
-                for (const auto& auth_token : auth_token_mutator[auth_key]) {
+                for (const auto& auth_token : Value(auth_token_mutator.Rows()[auth_key])) {
                   auth_token_mutator.Add(AuthKeyTokenPair(auth_key, auth_token.token, false));
                 }
-                user = data.Get(uid);
+                user = Value(data.users[uid]);
               }
 
               // Generate a new token.
@@ -174,8 +224,8 @@ class CTFOServer final {
               } else {  // New user.
                 uid = RandomUID();
                 user.uid = uid;
-                data.Add(user);
-                data.Add(AuthKeyUIDPair(auth_key, user.uid));
+                data.users.Insert(user);
+                data.auth_uid.Add(AuthKeyUIDPair(auth_key, user.uid));
               }
               DebugPrint(Printf("[/ctfo/auth/ios] New user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
                                 UIDToString(uid).c_str(),
@@ -215,15 +265,16 @@ class CTFOServer final {
         storage_.Transaction(
             [this, uid, token, requested_url, feed_count, notifications_since](StorageAPI::T_DATA data) {
               bool token_is_valid = false;
-              const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+              const auto& auth_token_accessor = data.auth_token;
               if (auth_token_accessor.Cols().Has(token)) {
                 // Something went terribly wrong
                 // if we have more than one authentication key for token.
-                assert(auth_token_accessor[token].size() == 1);
-                if (auth_token_accessor[token].begin()->valid) {
+                assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
+                if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
                   // Double check, if the provided `uid` is correct as well.
-                  const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
-                  token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                  const auto& auth_uid_accessor = data.auth_uid;
+                  token_is_valid =
+                      auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
                 }
               }
               if (!token_is_valid) {
@@ -231,7 +282,7 @@ class CTFOServer final {
                 return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
               } else {
                 DebugPrint(Printf("[/ctfo/feed] Token validated. Requested URL = '%s'", requested_url.c_str()));
-                const auto user = data.Get(uid);
+                const auto user = Value(data.users[uid]);
                 ResponseUserEntry user_entry;
                 CopyUserInfoToResponseEntry(user, user_entry);
                 user_entry.token = token;
@@ -260,15 +311,16 @@ class CTFOServer final {
       } else {
         storage_.Transaction([this, uid, token](StorageAPI::T_DATA data) {
           bool token_is_valid = false;
-          const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+          const auto& auth_token_accessor = data.auth_token;
           if (auth_token_accessor.Cols().Has(token)) {
             // Something went terribly wrong
             // if we have more than one authentication key for token.
-            assert(auth_token_accessor[token].size() == 1);
-            if (auth_token_accessor[token].begin()->valid) {
+            assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
+            if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
-              token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+              const auto& auth_uid_accessor = data.auth_uid;
+              token_is_valid =
+                  auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
             }
           }
           if (!token_is_valid) {
@@ -276,51 +328,49 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint("[/ctfo/favs] Token validated.");
-            const auto user = data.Get(uid);
-            if (!user) {
+            const auto user = data.users[uid];
+            if (!Exists(user)) {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
               ResponseFavs rfavs;
-              CopyUserInfoToResponseEntry(user, rfavs.user);
+              CopyUserInfoToResponseEntry(Value(user), rfavs.user);
 
-              const auto answers = Matrix<Answer>::Accessor(data);
+              const auto& answers = data.answers;
 
               // Get favs.
               std::vector<std::pair<uint64_t, CID>> favs;
-              const auto favorites = Matrix<Favorite>::Accessor(data);
-              try {
-                for (const auto& fav : favorites[uid]) {
+              const auto& favorites = data.favorites;
+              const auto& per_user_favs = favorites.Rows()[uid];
+              if (Exists(per_user_favs)) {
+                for (const auto& fav : Value(per_user_favs)) {
                   if (fav.favorited) {
                     favs.emplace_back(fav.ms, fav.cid);
                   }
                 }
-              } catch (const yoda::SubscriptException<Favorite>&) {
-                // No favorites for this user.
               }
 
               // In reverse chronological order.
               std::sort(favs.rbegin(), favs.rend());
 
               // And publish them.
-              const auto card_authors = Matrix<CardAuthor>::Accessor(data);
-              const auto comments = Matrix<Comment>::Accessor(data);
+              const auto& card_authors = data.card_authors;
+              const auto& comments = data.comments;
               const auto GenerateCardForFavs =
                   [this, uid, &answers, &card_authors, &comments](const Card& card) {
                     ResponseCardEntry card_entry;
                     card_entry.cid = CIDToString(card.cid);
-                    try {
-                      const auto& iterable = card_authors[card.cid];
-                      if (iterable.size() == 1u) {
-                        const UID author_uid = (*iterable.begin()).uid;
+                    const auto iterable = card_authors.Rows()[card.cid];
+                    if (Exists(iterable)) {
+                      const auto value = Value(iterable);
+                      if (value.Size() == 1u) {
+                        const UID author_uid = (*value.begin()).uid;
                         card_entry.author_uid = UIDToString(author_uid);
                         card_entry.is_my_card = (uid == author_uid);
                       }
-                    } catch (const yoda::SubscriptException<CardAuthor>&) {
                     }
-                    try {
-                      card_entry.number_of_comments = comments[card.cid].size();
-                    } catch (const yoda::SubscriptException<Comment>&) {
-                      // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
+                    const auto comments_per_card = comments.Rows()[card.cid];
+                    if (Exists(comments_per_card)) {
+                      card_entry.number_of_comments = Value(comments_per_card).Size();
                     }
                     card_entry.text = card.text;
                     card_entry.ms = card.ms;
@@ -332,9 +382,9 @@ class CTFOServer final {
                     card_entry.tfu_count = card.tfu_count;
                     card_entry.skip_count = card.skip_count;
 
-                    const EntryWrapper<Answer> answer = answers.Get(uid, card.cid);
-                    if (answer) {
-                      const ANSWER vote = static_cast<Answer>(answer).answer;
+                    const auto answer = answers.Get(uid, card.cid);
+                    if (Exists(answer)) {
+                      const ANSWER vote = Value(answer).answer;
                       if (vote == ANSWER::CTFO) {
                         card_entry.vote = "CTFO";
                       } else if (vote == ANSWER::TFU) {
@@ -348,7 +398,11 @@ class CTFOServer final {
                   };
 
               for (const auto& c : favs) {
-                rfavs.cards.push_back(GenerateCardForFavs(data.Get(c.second)));
+                const auto card = data.cards[c.second];
+                // This might have been the bug Kolya mentioned! -- D.K.
+                if (Exists(card)) {
+                  rfavs.cards.push_back(GenerateCardForFavs(Value(card)));
+                }
               }
 
               rfavs.ms = static_cast<uint64_t>(bricks::time::Now());
@@ -376,15 +430,16 @@ class CTFOServer final {
       } else {
         storage_.Transaction([this, uid, token](StorageAPI::T_DATA data) {
           bool token_is_valid = false;
-          const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+          const auto& auth_token_accessor = data.auth_token;
           if (auth_token_accessor.Cols().Has(token)) {
             // Something went terribly wrong
             // if we have more than one authentication key for token.
-            assert(auth_token_accessor[token].size() == 1);
-            if (auth_token_accessor[token].begin()->valid) {
+            assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
+            if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
-              token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+              const auto& auth_uid_accessor = data.auth_uid;
+              token_is_valid =
+                  auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
             }
           }
           if (!token_is_valid) {
@@ -392,50 +447,47 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint("[/ctfo/my_cards] Token validated.");
-            const auto user = data.Get(uid);
-            if (!user) {
+            const auto user = data.users[uid];
+            if (!Exists(user)) {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
               ResponseMyCards r_my_cards;
-              CopyUserInfoToResponseEntry(user, r_my_cards.user);
+              CopyUserInfoToResponseEntry(Value(user), r_my_cards.user);
 
-              const auto answers = Matrix<Answer>::Accessor(data);
-              const auto favorites = Matrix<Favorite>::Accessor(data);
+              const auto& answers = data.answers;
+              const auto& favorites = data.favorites;
 
               // Get my cards.
               std::vector<std::pair<uint64_t, CID>> my_cards;
-              const auto cards_by_author = Matrix<CardAuthor>::Accessor(data);
-              try {
-                for (const auto& my_card : cards_by_author[uid]) {
+              const auto& cards_by_author = data.card_authors.Cols()[uid];
+              if (Exists(cards_by_author)) {
+                for (const auto& my_card : Value(cards_by_author)) {
                   my_cards.emplace_back(my_card.ms, my_card.cid);
                 }
-              } catch (const yoda::SubscriptException<CardAuthor>&) {
-                // No cards for this user.
               }
 
               // In reverse chronological order.
               std::sort(my_cards.rbegin(), my_cards.rend());
 
               // And publish them.
-              const auto card_authors = Matrix<CardAuthor>::Accessor(data);
-              const auto comments = Matrix<Comment>::Accessor(data);
+              const auto& card_authors = data.card_authors;
+              const auto& comments = data.comments;
               const auto GenerateCardForMyCards =
                   [this, uid, &answers, &favorites, &card_authors, &comments](const Card& card) {
                     ResponseCardEntry card_entry;
                     card_entry.cid = CIDToString(card.cid);
-                    try {
-                      const auto& iterable = card_authors[card.cid];
-                      if (iterable.size() == 1u) {
-                        const UID author_uid = (*iterable.begin()).uid;
+                    const auto card_authors_iterator = card_authors.Rows()[card.cid];
+                    if (Exists(card_authors_iterator)) {
+                      const auto value = Value(card_authors_iterator);
+                      if (value.Size() == 1u) {
+                        const UID author_uid = (*value.begin()).uid;
                         card_entry.author_uid = UIDToString(author_uid);
                         card_entry.is_my_card = (uid == author_uid);
                       }
-                    } catch (const yoda::SubscriptException<CardAuthor>&) {
                     }
-                    try {
-                      card_entry.number_of_comments = comments[card.cid].size();
-                    } catch (const yoda::SubscriptException<Comment>&) {
-                      // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
+                    const auto comments_iterator = comments.Rows()[card.cid];
+                    if (Exists(comments_iterator)) {
+                      card_entry.number_of_comments = Value(comments_iterator).Size();
                     }
                     card_entry.text = card.text;
                     card_entry.ms = card.ms;
@@ -447,9 +499,9 @@ class CTFOServer final {
                     card_entry.tfu_count = card.tfu_count;
                     card_entry.skip_count = card.skip_count;
 
-                    const EntryWrapper<Answer> answer = answers.Get(uid, card.cid);
-                    if (answer) {
-                      const ANSWER vote = static_cast<Answer>(answer).answer;
+                    const auto answer = answers.Get(uid, card.cid);
+                    if (Exists(answer)) {
+                      const ANSWER vote = Value(answer).answer;
                       if (vote == ANSWER::CTFO) {
                         card_entry.vote = "CTFO";
                       } else if (vote == ANSWER::TFU) {
@@ -458,16 +510,19 @@ class CTFOServer final {
                     }
 
                     card_entry.favorited = false;
-                    const EntryWrapper<Favorite> fav = favorites.Get(uid, card.cid);
-                    if (fav) {
-                      card_entry.favorited = static_cast<Favorite>(fav).favorited;
+                    const auto fav = favorites.Get(uid, card.cid);
+                    if (Exists(fav)) {
+                      card_entry.favorited = Value(fav).favorited;
                     }
 
                     return card_entry;
                   };
 
               for (const auto& c : my_cards) {
-                r_my_cards.cards.push_back(GenerateCardForMyCards(data.Get(c.second)));
+                const auto card = data.cards[c.second];
+                if (Exists(card)) {
+                  r_my_cards.cards.push_back(GenerateCardForMyCards(Value(card)));
+                }
               }
 
               r_my_cards.ms = static_cast<uint64_t>(bricks::time::Now());
@@ -494,31 +549,30 @@ class CTFOServer final {
         r("NEED EMPTY OR VALID UID\n", HTTPResponseCode.BadRequest);
       } else {
         storage_.Transaction([this, cid, uid](StorageAPI::T_DATA data) {
-          const auto card_wrapper = data.Get(cid);
-          if (!card_wrapper) {
+          const auto card_wrapper = data.cards[cid];
+          if (!Exists(card_wrapper)) {
             return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
           } else {
-            const Card& card = card_wrapper;
-            const auto answers = Matrix<Answer>::Accessor(data);
-            const auto comments = Matrix<Comment>::Accessor(data);
-            const auto favorites = Matrix<Favorite>::Accessor(data);
-            const auto card_authors = Matrix<CardAuthor>::Accessor(data);
+            const Card& card = Value(card_wrapper);
+            const auto& answers = data.answers;
+            const auto& comments = data.comments;
+            const auto& favorites = data.favorites;
+            const auto& card_authors = data.card_authors;
             // TODO(dkorolev): This beautiful copy-paste will eventually go away.
             ResponseCardEntry card_entry;
             card_entry.cid = CIDToString(card.cid);
-            try {
-              const auto& iterable = card_authors[card.cid];
-              if (iterable.size() == 1u) {
-                const UID author_uid = (*iterable.begin()).uid;
+            const auto iterable = card_authors.Rows()[card.cid];
+            if (Exists(iterable)) {
+              const auto v = Value(iterable);
+              if (v.Size() == 1u) {
+                const UID author_uid = (*v.begin()).uid;
                 card_entry.author_uid = UIDToString(author_uid);
                 card_entry.is_my_card = (uid == UID::INVALID_USER ? false : (uid == author_uid));
               }
-            } catch (const yoda::SubscriptException<CardAuthor>&) {
             }
-            try {
-              card_entry.number_of_comments = comments[card.cid].size();
-            } catch (const yoda::SubscriptException<Comment>&) {
-              // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
+            const auto comments_iterator = comments.Rows()[card.cid];
+            if (Exists(comments_iterator)) {
+              card_entry.number_of_comments = Value(comments_iterator).Size();
             }
             card_entry.text = card.text;
             card_entry.ms = card.ms;
@@ -533,18 +587,18 @@ class CTFOServer final {
             card_entry.vote = "";
             card_entry.favorited = false;
             if (uid != UID::INVALID_USER) {
-              const EntryWrapper<Answer> answer = answers.Get(uid, card.cid);
-              if (answer) {
-                const ANSWER vote = static_cast<Answer>(answer).answer;
+              const auto answer = answers.Get(uid, card.cid);
+              if (Exists(answer)) {
+                const ANSWER vote = Value(answer).answer;
                 if (vote == ANSWER::CTFO) {
                   card_entry.vote = "CTFO";
                 } else if (vote == ANSWER::TFU) {
                   card_entry.vote = "TFU";
                 }
               }
-              const EntryWrapper<Favorite> fav = favorites.Get(uid, card.cid);
-              if (fav) {
-                card_entry.favorited = static_cast<Favorite>(fav).favorited;
+              const auto fav = favorites.Get(uid, card.cid);
+              if (Exists(fav)) {
+                card_entry.favorited = Value(fav).favorited;
               }
             }
 
@@ -572,15 +626,16 @@ class CTFOServer final {
           }
           storage_.Transaction([this, cid, uid, token, request, requested_url](StorageAPI::T_DATA data) {
             bool token_is_valid = false;
-            const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+            const auto& auth_token_accessor = data.auth_token;
             if (auth_token_accessor.Cols().Has(token)) {
               // Something went terribly wrong
               // if we have more than one authentication key for token.
-              assert(auth_token_accessor[token].size() == 1);
-              if (auth_token_accessor[token].begin()->valid) {
+              assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
+              if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
                 // Double check, if the provided `uid` is correct as well.
-                const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
-                token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                const auto& auth_uid_accessor = data.auth_uid;
+                token_is_valid =
+                    auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
               }
             }
             if (!token_is_valid) {
@@ -590,15 +645,15 @@ class CTFOServer final {
               DebugPrint(Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
               const auto now = static_cast<uint64_t>(bricks::time::Now());
 
-              auto cards_mutator = Dictionary<Card>::Mutator(data);
-              auto authors_mutator = Matrix<CardAuthor>::Mutator(data);
-              auto favorites_mutator = Matrix<Favorite>::Mutator(data);
+              auto& cards_mutator = data.cards;
+              auto& authors_mutator = data.card_authors;
+              auto& favorites_mutator = data.favorites;
 
               Card card;
               card.cid = cid;
               card.text = request.text;
               card.color = request.color;
-              cards_mutator.Add(card);
+              cards_mutator.Insert(card);
 
               CardAuthor author;
               author.uid = uid;
@@ -637,15 +692,16 @@ class CTFOServer final {
         const std::string requested_url = r.url.ComposeURL();
         storage_.Transaction([this, requested_url, uid, cid, token](StorageAPI::T_DATA data) {
           bool token_is_valid = false;
-          const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+          const auto& auth_token_accessor = data.auth_token;
           if (auth_token_accessor.Cols().Has(token)) {
             // Something went terribly wrong
             // if we have more than one authentication key for token.
-            assert(auth_token_accessor[token].size() == 1);
-            if (auth_token_accessor[token].begin()->valid) {
+            assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
+            if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
-              token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+              const auto& auth_uid_accessor = data.auth_uid;
+              token_is_valid =
+                  auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
             }
           }
           if (!token_is_valid) {
@@ -653,37 +709,37 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint(Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
-            auto cards_mutator = Dictionary<Card>::Mutator(data);
-            auto card_authors_mutator = Matrix<CardAuthor>::Mutator(data);
-            try {
-              const auto card_author_accessor = card_authors_mutator[cid];
-              if (card_author_accessor.size() != 1u) {
+            auto& cards_mutator = data.cards;
+            auto& card_authors_mutator = data.card_authors;
+            const auto& card_author_accessor = card_authors_mutator.Rows()[cid];
+            if (Exists(card_author_accessor)) {
+              const auto v = Value(card_author_accessor);
+              if (v.Size() != 1u) {
                 return Response("SOMETHING WENT WRONG\n", HTTPResponseCode.InternalServerError);
               } else {
-                const UID author_uid = (*card_author_accessor.begin()).uid;
+                const UID author_uid = (*v.begin()).uid;
                 if (author_uid != uid) {
                   return Response("NOT YOUR CARD BRO\n", HTTPResponseCode.Unauthorized);
                 } else {
-                  cards_mutator.Delete(cid);
+                  cards_mutator.Erase(cid);
                   card_authors_mutator.Delete(cid, uid);
-                  try {
-                    auto comments_mutator = Matrix<Comment>::Mutator(data);
-                    std::vector<OID> oids_to_delete;
-                    for (const Comment& c : comments_mutator[cid]) {
+                  auto& comments_mutator = data.comments;
+                  std::vector<OID> oids_to_delete;
+                  const auto comments_per_card = comments_mutator.Rows()[cid];
+                  if (Exists(comments_per_card)) {
+                    for (const Comment& c : Value(comments_per_card)) {
                       oids_to_delete.push_back(c.oid);
                     }
-                    for (const OID& o : oids_to_delete) {
-                      comments_mutator.Delete(cid, o);
-                    }
-                  } catch (const yoda::SubscriptException<Comment>&) {
-                    // This card has no comments to delete.
+                  }
+                  for (const OID& o : oids_to_delete) {
+                    comments_mutator.Delete(cid, o);
                   }
                   DeleteCardResponse response;
                   response.ms = static_cast<uint64_t>(bricks::time::Now());
                   return Response(response, "deleted");
                 }
               }
-            } catch (const yoda::SubscriptException<CardAuthor>&) {
+            } else {
               return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
             }
           }
@@ -713,15 +769,16 @@ class CTFOServer final {
         const std::string requested_url = r.url.ComposeURL();
         storage_.Transaction([this, uid, cid, token, requested_url](StorageAPI::T_DATA data) {
           bool token_is_valid = false;
-          const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+          const auto& auth_token_accessor = data.auth_token;
           if (auth_token_accessor.Cols().Has(token)) {
             // Something went terribly wrong
             // if we have more than one authentication key for token.
-            assert(auth_token_accessor[token].size() == 1);
-            if (auth_token_accessor[token].begin()->valid) {
+            assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
+            if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
-              token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+              const auto& auth_uid_accessor = data.auth_uid;
+              token_is_valid =
+                  auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
             }
           }
           if (!token_is_valid) {
@@ -729,30 +786,28 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint("[/ctfo/comments] Token validated.");
-            if (!data.Get(cid)) {
+            if (!Exists(data.cards[cid])) {
               return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
             }
-            const auto user = data.Get(uid);
-            if (!user) {
+            const auto user = data.users[uid];
+            if (!Exists(user)) {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
-              const auto users_accessor = Dictionary<User>::Accessor(data);
-              const auto comments_accessor = Matrix<Comment>::Accessor(data);
-              const auto comment_likes_accessor = Matrix<CommentLike>::Accessor(data);
-              const auto comment_flagged_accessor = Matrix<CommentFlagAsInappropriate>::Accessor(data);
+              const auto& users_accessor = data.users;
+              const auto& comments_accessor = data.comments;
+              const auto& comment_likes_accessor = data.comment_likes;
+              const auto& comment_flagged_accessor = data.flagged_comments;
               std::vector<Comment> proto_comments;
               std::set<OID> flagged_comments;
-              try {
-                const auto comments = Matrix<Comment>::Accessor(data);
-                for (const auto& comment : comments[cid]) {
+              const auto& comments = data.comments;  // Matrix<Comment>::Accessor(data);
+              const auto comments_per_card = comments.Rows()[cid];
+              if (Exists(comments_per_card)) {
+                for (const auto& comment : Value(comments_per_card)) {
                   if (comment_flagged_accessor.Has(comment.oid, uid)) {
                     flagged_comments.insert(comment.oid);
                   }
                   proto_comments.push_back(comment);
                 }
-              } catch (const yoda::SubscriptException<Comment>&) {
-                DebugPrint(Printf("[/ctfo/comments] yoda:SubscriptException<Comment>, Requested URL = '%s'",
-                                  requested_url.c_str()));
               }
               const auto sortkey = [&comments_accessor](const Comment& c) -> std::pair<uint64_t, uint64_t> {
                 uint64_t comment_timestamp = 0u;
@@ -763,12 +818,12 @@ class CTFOServer final {
                 } else {
                   // This is a 2nd-level comment.
                   comment_timestamp = c.ms;
-                  try {
-                    const auto& iterable = comments_accessor.Cols()[c.parent_oid];
-                    if (iterable.size() == 1u) {
-                      top_level_comment_timestamp = (*iterable.begin()).ms;
+                  const auto top_level_comments = comments_accessor.Cols()[c.parent_oid];
+                  if (Exists(top_level_comments)) {
+                    const auto v = Value(top_level_comments);
+                    if (v.Size() == 1u) {
+                      top_level_comment_timestamp = (*v.begin()).ms;
                     }
-                  } catch (const yoda::SubscriptException<Comment>&) {
                   }
                 }
                 // Top-level comments reverse chronologically, 2nd level comments chronologically.
@@ -790,13 +845,17 @@ class CTFOServer final {
                   c.parent_oid = OIDToString(comment.parent_oid);
                 }
                 c.author_uid = UIDToString(comment.author_uid);
-                c.author_level = users_accessor[comment.author_uid].level;
+                c.author_level = 0;
+                const auto user_data = users_accessor[comment.author_uid];
+                if (Exists(user_data)) {
+                  c.author_level = Value(user_data).level;
+                }
                 c.text = comment.text;
-                try {
-                  const auto& likers = comment_likes_accessor[comment.oid];
-                  c.number_of_likes = likers.size();
-                  c.liked = likers.Has(uid);
-                } catch (const yoda::SubscriptException<CommentLike>&) {
+                const auto likers = comment_likes_accessor.Rows()[comment.oid];
+                if (Exists(likers)) {
+                  const auto v = Value(likers);
+                  c.number_of_likes = v.Size();
+                  c.liked = v.Has(uid);
                 }
                 c.flagged_inappropriate = flagged_comments.count(comment.oid);
                 c.ms = comment.ms;
@@ -819,15 +878,16 @@ class CTFOServer final {
           }
           storage_.Transaction([this, cid, uid, oid, token, request, requested_url](StorageAPI::T_DATA data) {
             bool token_is_valid = false;
-            const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+            const auto& auth_token_accessor = data.auth_token;
             if (auth_token_accessor.Cols().Has(token)) {
               // Something went terribly wrong
               // if we have more than one authentication key for token.
-              assert(auth_token_accessor[token].size() == 1);
-              if (auth_token_accessor[token].begin()->valid) {
+              assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
+              if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
                 // Double check, if the provided `uid` is correct as well.
-                const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
-                token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                const auto& auth_uid_accessor = data.auth_uid;
+                token_is_valid =
+                    auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
               }
             }
             if (!token_is_valid) {
@@ -839,17 +899,17 @@ class CTFOServer final {
               const auto now = static_cast<uint64_t>(bricks::time::Now());
 
               UID card_author_uid = UID::INVALID_USER;
-              try {
-                const auto card_authors = Matrix<CardAuthor>::Accessor(data);
-                const auto& iterable = card_authors[cid];
-                if (iterable.size() == 1u) {
-                  card_author_uid = (*iterable.begin()).uid;
+              const auto& card_authors = data.card_authors;  // Matrix<CardAuthor>::Accessor(data);
+              const auto iterable = card_authors.Rows()[cid];
+              if (Exists(iterable)) {
+                const auto v = Value(iterable);
+                if (v.Size() == 1u) {
+                  card_author_uid = (*v.begin()).uid;
                 }
-              } catch (const yoda::SubscriptException<CardAuthor>&) {
               }
 
-              auto comments_mutator = Matrix<Comment>::Mutator(data);
-              auto notifications_mutator = Matrix<Notification>::Mutator(data);
+              auto& comments_mutator = data.comments;
+              auto& notifications_mutator = data.notifications;
 
               Comment comment;
               comment.cid = cid;
@@ -859,15 +919,16 @@ class CTFOServer final {
 
               if (!request.parent_oid.empty()) {
                 comment.parent_oid = StringToOID(request.parent_oid);
-                try {
-                  const auto& iterable = comments_mutator.Cols()[comment.parent_oid];
-                  if (iterable.size() != 1u) {
+                const auto iterable = comments_mutator.Cols()[comment.parent_oid];
+                if (Exists(iterable)) {
+                  const auto v = Value(iterable);
+                  if (v.Size() != 1u) {
                     // TODO(dkorolev): This error is oh so wrong. Fix it.
                     return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
-                  } else if ((*iterable.begin()).parent_oid != OID::INVALID_COMMENT) {
+                  } else if ((*v.begin()).parent_oid != OID::INVALID_COMMENT) {
                     return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n", HTTPResponseCode.BadRequest);
                   }
-                } catch (const yoda::SubscriptException<Comment>&) {
+                } else {
                   return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
                 }
               }
@@ -876,8 +937,8 @@ class CTFOServer final {
 
               // TODO(dkorolev)+TODO(mzhurovich): `Emplace` in the new Yoda?
               if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
-                notifications_mutator.Add(
-                    Notification(card_author_uid, now, std::make_shared<NotificationMyCardNewComment>(comment)));
+                notifications_mutator.Add(Notification(
+                    card_author_uid, now, std::make_shared<NotificationMyCardNewComment>(comment)));
               }
 
               AddCommentResponse response;
@@ -900,15 +961,16 @@ class CTFOServer final {
           const std::string requested_url = r.url.ComposeURL();
           storage_.Transaction([this, requested_url, uid, cid, token, oid](StorageAPI::T_DATA data) {
             bool token_is_valid = false;
-            const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+            const auto& auth_token_accessor = data.auth_token;
             if (auth_token_accessor.Cols().Has(token)) {
               // Something went terribly wrong
               // if we have more than one authentication key for token.
-              assert(auth_token_accessor[token].size() == 1);
-              if (auth_token_accessor[token].begin()->valid) {
+              assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
+              if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
                 // Double check, if the provided `uid` is correct as well.
-                const auto auth_uid_accessor = Matrix<AuthKeyUIDPair>::Accessor(data);
-                token_is_valid = auth_uid_accessor.Has(auth_token_accessor[token].begin().key(), uid);
+                const auto& auth_uid_accessor = data.auth_uid;
+                token_is_valid =
+                    auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
               }
             }
             if (!token_is_valid) {
@@ -918,11 +980,12 @@ class CTFOServer final {
               DebugPrint(
                   Printf("[/ctfo/comments] Token validated. Requested URL = '%s'", requested_url.c_str()));
               // TODO(dkorolev): Do something smart about non-existing comments.
-              try {
-                auto comments_mutator = Matrix<Comment>::Mutator(data);
-                std::vector<OID> oids_to_delete;
-                oids_to_delete.push_back(oid);
-                for (const Comment& c : comments_mutator[cid]) {
+              auto& comments_mutator = data.comments;
+              std::vector<OID> oids_to_delete;
+              oids_to_delete.push_back(oid);
+              const auto comments_per_card = comments_mutator.Rows()[cid];
+              if (Exists(comments_per_card)) {
+                for (const Comment& c : Value(comments_per_card)) {
                   if (c.parent_oid == oid) {
                     oids_to_delete.push_back(c.oid);
                   }
@@ -930,7 +993,6 @@ class CTFOServer final {
                 for (const OID& o : oids_to_delete) {
                   comments_mutator.Delete(cid, o);
                 }
-              } catch (const yoda::SubscriptException<Comment>&) {
               }
               DeleteCommentResponse response;
               response.ms = static_cast<uint64_t>(bricks::time::Now());
@@ -954,18 +1016,6 @@ class CTFOServer final {
   EventCollectorHTTPServer event_collector_;
   const bool debug_print_;
 
-  typedef SingleFileAPI<Dictionary<User>,
-                        Matrix<AuthKeyTokenPair>,
-                        Matrix<AuthKeyUIDPair>,
-                        Dictionary<Card>,
-                        Matrix<CardAuthor>,
-                        Matrix<Answer>,
-                        Matrix<Favorite>,
-                        Matrix<Comment>,
-                        Matrix<CommentLike>,
-                        Matrix<CardFlagAsInappropriate>,
-                        Matrix<CommentFlagAsInappropriate>,
-                        Matrix<Notification>> StorageAPI;
   StorageAPI storage_;
 
   const std::map<std::string, RESPONSE> valid_responses_ = {{"CTFO", RESPONSE::CTFO},
@@ -997,7 +1047,7 @@ class CTFOServer final {
     }
   }
 
-  ResponseFeed GenerateResponseFeed(StorageAPI::T_DATA& data,
+  ResponseFeed GenerateResponseFeed(StorageAPI::T_DATA data,
                                     ResponseUserEntry user_entry,
                                     size_t feed_size,
                                     uint64_t notifications_since) {
@@ -1006,10 +1056,10 @@ class CTFOServer final {
     const size_t max_count = std::min(feed_size, FEED_SIZE_LIMIT);
     response.user = user_entry;
 
-    const auto cards = Dictionary<Card>::Accessor(data);
-    const auto answers = Matrix<Answer>::Accessor(data);
-    const auto flagged_cards = Matrix<CardFlagAsInappropriate>::Accessor(data);
-    const auto favorites = Matrix<Favorite>::Accessor(data);
+    const auto& cards = data.cards;
+    const auto& answers = data.answers;
+    const auto& flagged_cards = data.flagged_cards;
+    const auto& favorites = data.favorites;
 
     std::set<std::pair<double, CID>> hot_cards;
     std::set<std::pair<double, CID>> recent_cards;
@@ -1020,9 +1070,14 @@ class CTFOServer final {
       if (!answers.Has(uid, card.cid) && !flagged_cards.Has(card.cid, uid)) {
         // For the recent feed, relevance is the function of the age of the card.
         // Added just now => 1.00. Added 24 hour ago => 0.99. Added 48 hours ago => 0.99^2. Etc.
-        const double time_key = std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
-        hot_cards.emplace(RandomDouble(0.2, 0.4), card.cid);
-        recent_cards.emplace(time_key, card.cid);
+        double time_order_key = 0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+        double hot_order_key = RandomDouble(0.2, 0.4);
+        if (card.startup_index) {
+          time_order_key = 1.0 - 1e-6 * card.startup_index;
+          hot_order_key = 1.0 - 1e-6 * card.startup_index;
+        }
+        hot_cards.emplace(hot_order_key, card.cid);
+        recent_cards.emplace(time_order_key, card.cid);
         if (hot_cards.size() > max_count) {
           hot_cards.erase(hot_cards.begin());
         }
@@ -1032,25 +1087,24 @@ class CTFOServer final {
       }
     }
 
-    const auto card_authors = Matrix<CardAuthor>::Accessor(data);
-    const auto comments = Matrix<Comment>::Accessor(data);
+    const auto& card_authors = data.card_authors;
+    const auto& comments = data.comments;
     const auto GenerateCardForFeed =
         [this, uid, &answers, &favorites, &comments, &card_authors](const Card& card) {
           ResponseCardEntry card_entry;
           card_entry.cid = CIDToString(card.cid);
-          try {
-            const auto& iterable = card_authors[card.cid];
-            if (iterable.size() == 1u) {
-              const UID author_uid = (*iterable.begin()).uid;
+          const auto iterable = card_authors.Rows()[card.cid];
+          if (Exists(iterable)) {
+            const auto v = Value(iterable);
+            if (v.Size() == 1u) {
+              const UID author_uid = (*v.begin()).uid;
               card_entry.author_uid = UIDToString(author_uid);
               card_entry.is_my_card = (uid == author_uid);
             }
-          } catch (const yoda::SubscriptException<CardAuthor>&) {
           }
-          try {
-            card_entry.number_of_comments = comments[card.cid].size();
-          } catch (const yoda::SubscriptException<Comment>&) {
-            // TODO(dkorolev): MatrixSubscriptException<C, X> into Yoda?
+          const auto comments_for_card = comments.Rows()[card.cid];
+          if (Exists(comments_for_card)) {
+            card_entry.number_of_comments = Value(comments_for_card).Size();
           }
           card_entry.text = card.text;
           card_entry.ms = card.ms;
@@ -1063,9 +1117,9 @@ class CTFOServer final {
           card_entry.skip_count = card.skip_count;
 
           card_entry.vote = "";
-          const EntryWrapper<Answer> answer = answers.Get(uid, card.cid);
-          if (answer) {
-            const ANSWER vote = static_cast<Answer>(answer).answer;
+          const auto answer = answers.Get(uid, card.cid);
+          if (Exists(answer)) {
+            const ANSWER vote = Value(answer).answer;
             if (vote == ANSWER::CTFO) {
               card_entry.vote = "CTFO";
             } else if (vote == ANSWER::TFU) {
@@ -1074,9 +1128,9 @@ class CTFOServer final {
           }
 
           card_entry.favorited = false;
-          const EntryWrapper<Favorite> fav = favorites.Get(uid, card.cid);
-          if (fav) {
-            card_entry.favorited = static_cast<Favorite>(fav).favorited;
+          const auto fav = favorites.Get(uid, card.cid);
+          if (Exists(fav)) {
+            card_entry.favorited = Value(fav).favorited;
           }
           return card_entry;
         };
@@ -1092,16 +1146,20 @@ class CTFOServer final {
 
     for (size_t i = 0; i < 2; ++i) {
       for (auto cit = prepared_cards[i].get().rbegin(); cit != prepared_cards[i].get().rend(); ++cit) {
-        feeds[i].get().push_back(GenerateCardForFeed(data.Get(cit->second)));
-        feeds[i].get().back().relevance = cit->first;
+        const auto card = data.cards[cit->second];
+        if (Exists(card)) {
+          feeds[i].get().push_back(GenerateCardForFeed(Value(card)));
+          feeds[i].get().back().relevance = cit->first;
+        }
       }
     }
 
     if (notifications_since != static_cast<uint64_t>(-1)) {
       // TODO(dkorolev): `upper_bound`, not go through all notifications for this user.
-      try {
+      const auto notifications_for_user = data.notifications.Rows()[uid];
+      if (Exists(notifications_for_user)) {
         size_t appended_so_far = 0u;
-        for (const Notification& notification : Matrix<Notification>::Accessor(data)[uid]) {
+        for (const Notification& notification : Value(notifications_for_user)) {
           if (notification.timestamp.ms > notifications_since) {
             response.notifications.push_back(notification.BuildResponseNotification());
             ++appended_so_far;
@@ -1112,8 +1170,6 @@ class CTFOServer final {
           }
         }
         std::reverse(response.notifications.begin(), response.notifications.end());
-      } catch (const yoda::SubscriptException<Notification>&) {
-        // No notifications for this user.
       }
     }
 
@@ -1164,18 +1220,18 @@ class CTFOServer final {
         if (uid != UID::INVALID_USER) {
           storage_.Transaction([this, uid, cid, oid, uid_str, cid_str, oid_str, token, response](
               StorageAPI::T_DATA data) {
-            const auto auth_token_accessor = Matrix<AuthKeyTokenPair>::Accessor(data);
+            const auto& auth_token_accessor = data.auth_token;
             bool token_is_valid = false;
             if (auth_token_accessor.Cols().Has(token)) {
               // Something went terribly wrong
               // if we have more than one authentication key for token.
-              assert(auth_token_accessor[token].size() == 1);
-              if (auth_token_accessor[token].begin()->valid) {
+              assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
+              if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
                 token_is_valid = true;
               }
             }
             if (token_is_valid) {
-              if (!data.Has(uid)) {
+              if (!Exists(data.users[uid])) {
                 DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s'.", uid_str.c_str()));
                 return;
               }
@@ -1184,69 +1240,71 @@ class CTFOServer final {
                   DebugPrint("[UpdateStateOnEvent] No CID.");
                   return;
                 }
-                if (!data.Has(cid)) {
+                if (!Exists(data.cards[cid])) {
                   DebugPrint(
                       Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in SKIP/CTFO/TFU.", cid_str.c_str()));
                   return;
                 }
-                auto answers_mutator = Matrix<Answer>::Mutator(data);
+                auto& answers_mutator = data.answers;
                 if (!answers_mutator.Has(uid, cid)) {  // Do not overwrite existing answers.
-                  data.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
+                  data.answers.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
                   DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
                                     UIDToString(uid).c_str(),
                                     CIDToString(cid).c_str(),
                                     static_cast<int>(response)));
-                  Card card = data.Get(cid);
-                  auto user_mutator = Dictionary<User>::Mutator(data);
-                  User user = user_mutator.Get(uid);
-                  if (response != RESPONSE::SKIP) {
-                    if (response == RESPONSE::CTFO) {
-                      ++card.ctfo_count;
-                      DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
-                                        CIDToString(cid).c_str(),
-                                        card.ctfo_count));
-                      user.score += 50u;
-                      DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
-                                        UIDToString(uid).c_str(),
-                                        50u));
+                  const auto optional_card = data.cards[cid];
+                  const auto optional_user = data.users[uid];
+                  if (Exists(optional_card) && Exists(optional_user)) {
+                    Card card = Value(optional_card);
+                    User user = Value(optional_user);
+                    if (response != RESPONSE::SKIP) {
+                      if (response == RESPONSE::CTFO) {
+                        ++card.ctfo_count;
+                        DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
+                                          CIDToString(cid).c_str(),
+                                          card.ctfo_count));
+                        user.score += 50u;
+                        DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
+                                          UIDToString(uid).c_str(),
+                                          50u));
+                      }
+                      if (response == RESPONSE::TFU) {
+                        ++card.tfu_count;
+                        DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
+                                          CIDToString(cid).c_str(),
+                                          card.tfu_count));
+                        user.score += 50u;
+                        DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
+                                          UIDToString(uid).c_str(),
+                                          50u));
+                      }
+                      if (user.level < LEVEL_SCORES.size() - 1 && user.score > LEVEL_SCORES[user.level + 1]) {
+                        user.score -= LEVEL_SCORES[user.level + 1];
+                        ++user.level;
+                        DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got promoted to a new level = %u",
+                                          UIDToString(uid).c_str(),
+                                          user.level));
+                      }
+                      data.cards.Insert(card);
+                      data.users.Insert(user);
                     }
-                    if (response == RESPONSE::TFU) {
-                      ++card.tfu_count;
-                      DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
-                                        CIDToString(cid).c_str(),
-                                        card.tfu_count));
-                      user.score += 50u;
-                      DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
-                                        UIDToString(uid).c_str(),
-                                        50u));
-                    }
-                    if (user.level < LEVEL_SCORES.size() - 1 && user.score > LEVEL_SCORES[user.level + 1]) {
-                      user.score -= LEVEL_SCORES[user.level + 1];
-                      ++user.level;
-                      DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got promoted to a new level = %u",
-                                        UIDToString(uid).c_str(),
-                                        user.level));
-                    }
-                    data.Add(card);
-                    data.Add(user);
                   }
                 } else {
-                  DebugPrint(
-                      Printf("[UpdateStateOnEvent] Answer already exists: [%s, %s, %d]",
-                             UIDToString(uid).c_str(),
-                             CIDToString(cid).c_str(),
-                             static_cast<int>(static_cast<Answer>(answers_mutator.Get(uid, cid)).answer)));
+                  DebugPrint(Printf("[UpdateStateOnEvent] Answer already exists: [%s, %s, %d]",
+                                    UIDToString(uid).c_str(),
+                                    CIDToString(cid).c_str(),
+                                    static_cast<int>(Value(answers_mutator.Get(uid, cid)).answer)));
                 }
               } else if (response == RESPONSE::FAV_CARD || response == RESPONSE::UNFAV_CARD) {
                 if (cid == CID::INVALID_CARD) {
                   DebugPrint("[UpdateStateOnEvent] No CID.");
                   return;
                 }
-                if (!data.Has(cid)) {
+                if (!Exists(data.cards[cid])) {
                   DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' FAV/UNFAV.", cid_str.c_str()));
                   return;
                 }
-                auto favorites_mutator = Matrix<Favorite>::Mutator(data);
+                auto& favorites_mutator = data.favorites;
                 favorites_mutator.Add(Favorite(uid, cid, (response == RESPONSE::FAV_CARD)));
                 DebugPrint(Printf("[UpdateStateOnEvent] Added favorite: [%s, %s, %s]",
                                   UIDToString(uid).c_str(),
@@ -1258,7 +1316,7 @@ class CTFOServer final {
                   DebugPrint("[UpdateStateOnEvent] No OID.");
                   return;
                 }
-                if (!Matrix<Comment>::Accessor(data).Cols().Has(oid)) {
+                if (!data.comments.Cols().Has(oid)) {
                   DebugPrint(
                       Printf("[UpdateStateOnEvent] Nonexistent OID '%s' LIKE/UNLIKE/FLAG.", oid_str.c_str()));
                   return;
@@ -1269,18 +1327,18 @@ class CTFOServer final {
                   CommentLike like;
                   like.oid = oid;
                   like.uid = uid;
-                  data.Add(like);
+                  data.comment_likes.Add(like);
                 } else if (response == RESPONSE::UNLIKE_COMMENT) {
                   DebugPrint(Printf(
                       "[UpdateStateOnEvent] Unlike comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
-                  Matrix<CommentLike>::Mutator(data).Delete(oid, uid);
+                  data.comment_likes.Delete(oid, uid);
                 } else if (response == RESPONSE::FLAG_COMMENT) {
                   DebugPrint(
                       Printf("[UpdateStateOnEvent] Flag comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
                   CommentFlagAsInappropriate flag;
                   flag.oid = oid;
                   flag.uid = uid;
-                  data.Add(flag);
+                  data.flagged_comments.Add(flag);
                 } else {
                   DebugPrint(
                       Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
@@ -1294,7 +1352,7 @@ class CTFOServer final {
                   DebugPrint("[UpdateStateOnEvent] No CID.");
                   return;
                 }
-                if (!Dictionary<Card>::Accessor(data).Has(cid)) {
+                if (!Exists(data.cards[cid])) {
                   DebugPrint(
                       Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in FLAG_CARD.", cid_str.c_str()));
                   return;
@@ -1304,7 +1362,7 @@ class CTFOServer final {
                 CardFlagAsInappropriate flag;
                 flag.cid = cid;
                 flag.uid = uid;
-                data.Add(flag);
+                data.flagged_cards.Add(flag);
               } else {
                 DebugPrint(Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
                                   static_cast<int>(response),
