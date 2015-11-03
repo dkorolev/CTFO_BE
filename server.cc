@@ -31,6 +31,7 @@ using namespace CTFO;
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(port, 8383, "Port to spawn CTFO RESTful server on.");
+DEFINE_int32(healthz_port, 8393, "Port to spawn /healthz to return OK.");
 DEFINE_string(storage_file, "./db.json", "The file to store the snapshot of the database in.");
 DEFINE_int32(event_log_port, 0, "Port to spawn event collector on.");  // 0 = the same as `port`.
 DEFINE_string(event_log_file,
@@ -45,6 +46,7 @@ int main(int argc, char **argv) {
   bricks::random::SetSeed(FLAGS_rand_seed);
   CTFOServer(FLAGS_cards_file,
              FLAGS_port,
+             FLAGS_healthz_port,
              FLAGS_storage_file,
              FLAGS_event_log_port,
              FLAGS_event_log_file,

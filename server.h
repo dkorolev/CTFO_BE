@@ -109,12 +109,14 @@ class CTFOServer final {
  public:
   explicit CTFOServer(const std::string& cards_file,
                       int port,
+                      int healthz_port,
                       const std::string& storage_file,
                       int event_log_port,
                       const std::string& event_log_file,
                       const bricks::time::MILLISECONDS_INTERVAL tick_interval_ms,
                       const bool debug_print_to_stderr = false)
       : port_(port),
+        healthz_port_(healthz_port),
         event_log_file_(event_log_file),
         event_collector_(event_log_port ? event_log_port : port,
                          event_log_stream_,
@@ -133,7 +135,7 @@ class CTFOServer final {
       }
     }).Go();
 
-    HTTP(port_).Register("/healthz", [](Request r) { r("OK\n"); });
+    HTTP(healthz_port_).Register("/healthz", [](Request r) { r("OK\n"); });
     HTTP(port_).Register("/ctfo/auth/ios", BindToThis(&CTFOServer::RouteAuthiOS));
     HTTP(port_).Register("/ctfo/feed", BindToThis(&CTFOServer::RouteFeed));
     HTTP(port_).Register("/ctfo/favs", BindToThis(&CTFOServer::RouteFavorites));
@@ -145,7 +147,7 @@ class CTFOServer final {
 
   ~CTFOServer() {
     // TODO(dkorolev): Scoped registerers FTW.
-    HTTP(port_).UnRegister("/healthz");
+    HTTP(healthz_port_).UnRegister("/healthz");
     HTTP(port_).UnRegister("/ctfo/auth/ios");
     HTTP(port_).UnRegister("/ctfo/feed");
     HTTP(port_).UnRegister("/ctfo/favs");
@@ -1013,6 +1015,7 @@ class CTFOServer final {
 
  private:
   const int port_;
+  const int healthz_port_;
   const std::string event_log_file_;
   std::ofstream event_log_stream_;
   EventCollectorHTTPServer event_collector_;
