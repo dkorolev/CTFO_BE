@@ -382,7 +382,7 @@ class CTFOServer final {
                     card_entry.tfu_count = card.tfu_count;
                     card_entry.skip_count = card.skip_count;
 
-                    const ImmutableOptional<Answer> answer = answers.Get(uid, card.cid);
+                    const auto answer = answers.Get(uid, card.cid);
                     if (Exists(answer)) {
                       const ANSWER vote = Value(answer).answer;
                       if (vote == ANSWER::CTFO) {
@@ -499,7 +499,7 @@ class CTFOServer final {
                     card_entry.tfu_count = card.tfu_count;
                     card_entry.skip_count = card.skip_count;
 
-                    const ImmutableOptional<Answer> answer = answers.Get(uid, card.cid);
+                    const auto answer = answers.Get(uid, card.cid);
                     if (Exists(answer)) {
                       const ANSWER vote = Value(answer).answer;
                       if (vote == ANSWER::CTFO) {
@@ -510,7 +510,7 @@ class CTFOServer final {
                     }
 
                     card_entry.favorited = false;
-                    const ImmutableOptional<Favorite> fav = favorites.Get(uid, card.cid);
+                    const auto fav = favorites.Get(uid, card.cid);
                     if (Exists(fav)) {
                       card_entry.favorited = Value(fav).favorited;
                     }
@@ -587,7 +587,7 @@ class CTFOServer final {
             card_entry.vote = "";
             card_entry.favorited = false;
             if (uid != UID::INVALID_USER) {
-              const ImmutableOptional<Answer> answer = answers.Get(uid, card.cid);
+              const auto answer = answers.Get(uid, card.cid);
               if (Exists(answer)) {
                 const ANSWER vote = Value(answer).answer;
                 if (vote == ANSWER::CTFO) {
@@ -596,7 +596,7 @@ class CTFOServer final {
                   card_entry.vote = "TFU";
                 }
               }
-              const ImmutableOptional<Favorite> fav = favorites.Get(uid, card.cid);
+              const auto fav = favorites.Get(uid, card.cid);
               if (Exists(fav)) {
                 card_entry.favorited = Value(fav).favorited;
               }
@@ -1117,7 +1117,7 @@ class CTFOServer final {
           card_entry.skip_count = card.skip_count;
 
           card_entry.vote = "";
-          const ImmutableOptional<Answer> answer = answers.Get(uid, card.cid);
+          const auto answer = answers.Get(uid, card.cid);
           if (Exists(answer)) {
             const ANSWER vote = Value(answer).answer;
             if (vote == ANSWER::CTFO) {
@@ -1128,7 +1128,7 @@ class CTFOServer final {
           }
 
           card_entry.favorited = false;
-          const ImmutableOptional<Favorite> fav = favorites.Get(uid, card.cid);
+          const auto fav = favorites.Get(uid, card.cid);
           if (Exists(fav)) {
             card_entry.favorited = Value(fav).favorited;
           }
