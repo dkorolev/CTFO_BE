@@ -133,6 +133,7 @@ class CTFOServer final {
       }
     }).Go();
 
+    HTTP(port_).Register("/healthz", [](Request r) { r("OK\n"); });
     HTTP(port_).Register("/ctfo/auth/ios", BindToThis(&CTFOServer::RouteAuthiOS));
     HTTP(port_).Register("/ctfo/feed", BindToThis(&CTFOServer::RouteFeed));
     HTTP(port_).Register("/ctfo/favs", BindToThis(&CTFOServer::RouteFavorites));
@@ -144,6 +145,7 @@ class CTFOServer final {
 
   ~CTFOServer() {
     // TODO(dkorolev): Scoped registerers FTW.
+    HTTP(port_).UnRegister("/healthz");
     HTTP(port_).UnRegister("/ctfo/auth/ios");
     HTTP(port_).UnRegister("/ctfo/feed");
     HTTP(port_).UnRegister("/ctfo/favs");
