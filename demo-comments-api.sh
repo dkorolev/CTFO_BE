@@ -4,7 +4,8 @@ set -e
 
 echo "CTFO comments API demo."
 
-TEST_HOST=https://secure.c5t.io
+TEST_HOST=https://ctfo.current.ai
+# TEST_HOST=https://secure.c5t.io
 # TEST_HOST=localhost:8383
 
 TEST_DID=fake_did
