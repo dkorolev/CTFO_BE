@@ -1395,7 +1395,7 @@ class CTFOServer final {
       }
     } catch (const std::bad_cast&) {
       // `event` is not an `iOSGenericEvent`.
-      DebugPrint("[UpdateStateOnEvent] Not an `iOSGenericEvent`.");
+      DebugPrint("[UpdateStateOnEvent] Not an `iOSGenericEvent`: " + JSON(event));
     }
   }
 };
