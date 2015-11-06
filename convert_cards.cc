@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
       } while (cids.find(cid) != cids.end());
       cids.insert(cid);
 
-      Card c(cid, text, CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()]);
+      Card c(cid, text, CARD_COLORS[(static_cast<uint64_t>(cid) * 17) % CARD_COLORS.size()]);
       if (std::isdigit(text[0]) && text[1] == '\t') {
         const int index = static_cast<double>(text[0] - '0');
         c.text = text.substr(2);
