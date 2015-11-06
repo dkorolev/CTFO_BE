@@ -421,7 +421,7 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ("Foo.", feed_recent[0].text);
       EXPECT_TRUE(feed_recent[0].is_my_card);
       EXPECT_EQ(0u, feed_recent[0].number_of_comments);
-      EXPECT_EQ(1.0, feed_recent[0].relevance);
+      EXPECT_DOUBLE_EQ(0.9, feed_recent[0].relevance);
     }
 
     {
@@ -438,7 +438,7 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ("Foo.", feed_recent[0].text);
       EXPECT_TRUE(feed_recent[0].is_my_card);
       EXPECT_EQ(0u, feed_recent[0].number_of_comments);
-      EXPECT_DOUBLE_EQ(0.99, feed_recent[0].relevance);
+      EXPECT_DOUBLE_EQ(0.9 * 0.99, feed_recent[0].relevance);
     }
 
     {
@@ -455,7 +455,7 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ("Foo.", feed_recent[0].text);
       EXPECT_TRUE(feed_recent[0].is_my_card);
       EXPECT_EQ(0u, feed_recent[0].number_of_comments);
-      EXPECT_DOUBLE_EQ(0.99 * 0.99, feed_recent[0].relevance);
+      EXPECT_DOUBLE_EQ(0.9 * 0.99 * 0.99, feed_recent[0].relevance);
     }
 
     // Restore the time back.

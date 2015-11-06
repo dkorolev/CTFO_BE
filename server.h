@@ -109,14 +109,12 @@ class CTFOServer final {
  public:
   explicit CTFOServer(const std::string& cards_file,
                       int port,
-                      int healthz_port,
                       const std::string& storage_file,
                       int event_log_port,
                       const std::string& event_log_file,
                       const bricks::time::MILLISECONDS_INTERVAL tick_interval_ms,
                       const bool debug_print_to_stderr = false)
       : port_(port),
-        healthz_port_(healthz_port),
         event_log_file_(event_log_file),
         event_collector_(event_log_port ? event_log_port : port,
                          event_log_stream_,
@@ -129,13 +127,22 @@ class CTFOServer final {
     event_log_stream_.open(event_log_file_, std::ofstream::out | std::ofstream::app);
 
     bricks::cerealize::CerealFileParser<Card, bricks::cerealize::CerealFormat::JSON> cf(cards_file);
+    const UID admin_uid = static_cast<UID>(1000000000000000001ull);
     storage_.Transaction([&cf](StorageAPI::T_DATA data) {
-      while (cf.Next([&data](const Card& card) { data.cards.Insert(card); })) {
+      User admin_user;
+      admin_user.uid = admin_uid;
+      admin_user.level = 80;         // Superuser 80lvl.
+      admin_user.score = 999999999;  // With one short to one billion points.
+      data.users.Insert(admin_user);
+      while (cf.Next([&data](const Card& card) {
+          data.cards.Insert(card);
+          data.card_authors.Add(CardAuthor{card.cid, admin_uid});
+        })) {
         ;
       }
     }).Go();
 
-    HTTP(healthz_port_).Register("/healthz", [](Request r) { r("OK\n"); });
+    HTTP(port_).Register("/healthz", [](Request r) { r("OK\n"); });
     HTTP(port_).Register("/ctfo/auth/ios", BindToThis(&CTFOServer::RouteAuthiOS));
     HTTP(port_).Register("/ctfo/feed", BindToThis(&CTFOServer::RouteFeed));
     HTTP(port_).Register("/ctfo/favs", BindToThis(&CTFOServer::RouteFavorites));
@@ -147,7 +154,7 @@ class CTFOServer final {
 
   ~CTFOServer() {
     // TODO(dkorolev): Scoped registerers FTW.
-    HTTP(healthz_port_).UnRegister("/healthz");
+    HTTP(port_).UnRegister("/healthz");
     HTTP(port_).UnRegister("/ctfo/auth/ios");
     HTTP(port_).UnRegister("/ctfo/feed");
     HTTP(port_).UnRegister("/ctfo/favs");
@@ -376,10 +383,11 @@ class CTFOServer final {
                     if (Exists(comments_per_card)) {
                       card_entry.number_of_comments = Value(comments_per_card).Size();
                     }
+                    const auto now = static_cast<uint64_t>(bricks::time::Now());
                     card_entry.text = card.text;
                     card_entry.ms = card.ms;
                     card_entry.color = card.color;
-                    card_entry.relevance = RandomDouble(0, 1);
+                    card_entry.relevance = 0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
                     card_entry.ctfo_score = 50u;
                     card_entry.tfu_score = 50u;
                     card_entry.ctfo_count = card.ctfo_count;
@@ -493,10 +501,11 @@ class CTFOServer final {
                     if (Exists(comments_iterator)) {
                       card_entry.number_of_comments = Value(comments_iterator).Size();
                     }
+                    const auto now = static_cast<uint64_t>(bricks::time::Now());
                     card_entry.text = card.text;
                     card_entry.ms = card.ms;
                     card_entry.color = card.color;
-                    card_entry.relevance = RandomDouble(0, 1);
+                    card_entry.relevance = 0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
                     card_entry.ctfo_score = 50u;
                     card_entry.tfu_score = 50u;
                     card_entry.ctfo_count = card.ctfo_count;
@@ -581,7 +590,7 @@ class CTFOServer final {
             card_entry.text = card.text;
             card_entry.ms = card.ms;
             card_entry.color = card.color;
-            card_entry.relevance = RandomDouble(0, 1);
+            card_entry.relevance = 1.0;  // When `GET`-ting a card, make it 1.0.
             card_entry.ctfo_score = 50u;
             card_entry.tfu_score = 50u;
             card_entry.ctfo_count = card.ctfo_count;
@@ -1015,7 +1024,6 @@ class CTFOServer final {
 
  private:
   const int port_;
-  const int healthz_port_;
   const std::string event_log_file_;
   std::ofstream event_log_stream_;
   EventCollectorHTTPServer event_collector_;
@@ -1114,7 +1122,7 @@ class CTFOServer final {
           card_entry.text = card.text;
           card_entry.ms = card.ms;
           card_entry.color = card.color;
-          card_entry.relevance = RandomDouble(0, 1);
+          card_entry.relevance = 0.0;  // Will be overridden later.
           card_entry.ctfo_score = 50u;
           card_entry.tfu_score = 50u;
           card_entry.ctfo_count = card.ctfo_count;
@@ -1387,7 +1395,7 @@ class CTFOServer final {
       }
     } catch (const std::bad_cast&) {
       // `event` is not an `iOSGenericEvent`.
-      DebugPrint("[UpdateStateOnEvent] Not an `iOSGenericEvent`.");
+      DebugPrint("[UpdateStateOnEvent] Not an `iOSGenericEvent`: " + JSON(event));
     }
   }
 };

@@ -1,5 +1,4 @@
 .current
-*.txt
 *.json
 *.swp
 *.log
