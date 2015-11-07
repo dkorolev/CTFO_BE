@@ -127,7 +127,6 @@ class CTFOServer final {
     event_log_stream_.open(event_log_file_, std::ofstream::out | std::ofstream::app);
 
     bricks::cerealize::CerealFileParser<Card, bricks::cerealize::CerealFormat::JSON> cf(cards_file);
-    const UID admin_uid = static_cast<UID>(1000000000000000001ull);
     storage_.Transaction([&cf](StorageAPI::T_DATA data) {
       User admin_user;
       admin_user.uid = admin_uid;
