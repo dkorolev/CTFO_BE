@@ -134,9 +134,9 @@ class CTFOServer final {
       admin_user.score = 999999999;  // With one short to one billion points.
       data.users.Insert(admin_user);
       while (cf.Next([&data](const Card& card) {
-          data.cards.Insert(card);
-          data.card_authors.Add(CardAuthor{card.cid, admin_uid});
-        })) {
+        data.cards.Insert(card);
+        data.card_authors.Add(CardAuthor{card.cid, admin_uid});
+      })) {
         ;
       }
     }).Go();
@@ -386,7 +386,8 @@ class CTFOServer final {
                     card_entry.text = card.text;
                     card_entry.ms = card.ms;
                     card_entry.color = card.color;
-                    card_entry.relevance = 0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+                    card_entry.relevance =
+                        0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
                     card_entry.ctfo_score = 50u;
                     card_entry.tfu_score = 50u;
                     card_entry.ctfo_count = card.ctfo_count;
@@ -504,7 +505,8 @@ class CTFOServer final {
                     card_entry.text = card.text;
                     card_entry.ms = card.ms;
                     card_entry.color = card.color;
-                    card_entry.relevance = 0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+                    card_entry.relevance =
+                        0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
                     card_entry.ctfo_score = 50u;
                     card_entry.tfu_score = 50u;
                     card_entry.ctfo_count = card.ctfo_count;
@@ -1341,17 +1343,23 @@ class CTFOServer final {
                   data.comment_likes.Add(like);
 
                   // Emit the "my comment liked" notification.
-                  const auto comment = data.comments[oid];
-                  if (Exists(comment)) {
-                    const auto& card_authors = data.card_authors;
-                    const auto iterable = card_authors.Rows()[cid];
-                    if (Exists(iterable)) {
-                      const auto v = Value(iterable);
-                      if (v.Size() == 1u) {
-                        card_author_uid = (*v.begin()).uid;
-                        if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
-                          data.notifications.Add(Notification(
-                                card_author_uid, now, std::make_shared<NotificationMyCommentLiked>(like.uid, Value(comment))));
+                  const auto comments_iterator = data.comments.Cols()[oid];
+                  if (Exists(comments_iterator)) {
+                    const auto comments = Value(comments_iterator);
+                    if (comments.Size() == 1u) {
+                      const Comment& comment = *comments.begin();
+                      const auto& card_authors = data.card_authors;
+                      const auto card_authors_iterator = card_authors.Rows()[cid];
+                      if (Exists(card_authors_iterator)) {
+                        const auto card_authors = Value(card_authors_iterator);
+                        if (card_authors.Size() == 1u) {
+                          UID card_author_uid = (*card_authors.begin()).uid;
+                          if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
+                            data.notifications.Add(
+                                Notification(card_author_uid,
+                                             static_cast<uint64_t>(bricks::time::Now()),
+                                             std::make_shared<NotificationMyCommentLiked>(like.uid, comment)));
+                          }
                         }
                       }
                     }

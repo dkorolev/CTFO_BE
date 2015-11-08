@@ -717,11 +717,13 @@ struct Notification : Super {
 };
 
 struct NotificationMyCardNewComment : AbstractNotification {
-  UID uid;            // Who left that comment.
-  CID cid;            // To what card.
-  OID oid;            // Which comment.
-  std::string text;   // Text of the newly added comment.
+  UID uid;           // Who left that comment.
+  CID cid;           // To what card.
+  OID oid;           // Which comment.
+  std::string text;  // Text of the newly added comment.
   NotificationMyCardNewComment() = default;
+  NotificationMyCardNewComment(UID uid, CID cid, OID oid, std::string text)
+      : uid(uid), cid(cid), oid(oid), text(text) {}
   NotificationMyCardNewComment(const Comment& comment)
       : uid(comment.author_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
   template <typename A>
@@ -744,7 +746,7 @@ struct NotificationMyCommentLiked : AbstractNotification {
   std::string text;  // Text of that comment of mine.
   NotificationMyCommentLiked() = default;
   NotificationMyCommentLiked(UID liker_uid, const Comment& comment)
-      : uid(liker), cid(comment.cid), oid(comment.oid), text(comment.text) {}
+      : uid(liker_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
   template <typename A>
   void serialize(A& ar) {
     ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(text));
