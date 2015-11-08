@@ -921,7 +921,6 @@ class CTFOServer final {
               }
 
               auto& comments_mutator = data.comments;
-              auto& notifications_mutator = data.notifications;
 
               Comment comment;
               comment.cid = cid;
@@ -947,9 +946,9 @@ class CTFOServer final {
 
               comments_mutator.Add(comment);
 
-              // TODO(dkorolev)+TODO(mzhurovich): `Emplace` in the new Yoda?
+              // Emit the "new comment" notification.
               if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
-                notifications_mutator.Add(Notification(
+                data.notifications.Add(Notification(
                     card_author_uid, now, std::make_shared<NotificationMyCardNewComment>(comment)));
               }
 
@@ -1340,6 +1339,24 @@ class CTFOServer final {
                   like.oid = oid;
                   like.uid = uid;
                   data.comment_likes.Add(like);
+
+                  // Emit the "my comment liked" notification.
+                  const auto comment = data.comments[oid];
+                  if (Exists(comment)) {
+                    const auto& card_authors = data.card_authors;
+                    const auto iterable = card_authors.Rows()[cid];
+                    if (Exists(iterable)) {
+                      const auto v = Value(iterable);
+                      if (v.Size() == 1u) {
+                        card_author_uid = (*v.begin()).uid;
+                        if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
+                          data.notifications.Add(Notification(
+                                card_author_uid, now, std::make_shared<NotificationMyCommentLiked>(like.uid, Value(comment))));
+                        }
+                      }
+                    }
+                  }
+
                 } else if (response == RESPONSE::UNLIKE_COMMENT) {
                   DebugPrint(Printf(
                       "[UpdateStateOnEvent] Unlike comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
