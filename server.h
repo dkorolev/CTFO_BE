@@ -1225,8 +1225,7 @@ class CTFOServer final {
         CerealizeParseJSON(entry.b, event);
         UpdateStateOnEvent(event);
       } catch (const bricks::ParseJSONException&) {
-        DebugPrint(
-            Printf("[OnMidichloriansEvent] CerealizeParseJSON failed. entry.b = '%s')", entry.b.c_str()));
+        DebugPrint(Printf("[OnMidichloriansEvent] ParseJSON failed. entry.b = '%s')", entry.b.c_str()));
       }
     } else {
       if (entry.m != "TICK") {
