@@ -1372,19 +1372,12 @@ class CTFOServer final {
                     const auto comments = Value(comments_iterator);
                     if (comments.Size() == 1u) {
                       const Comment& comment = *comments.begin();
-                      const auto& card_authors = data.card_authors;
-                      const auto card_authors_iterator = card_authors.Rows()[cid];
-                      if (Exists(card_authors_iterator)) {
-                        const auto card_authors = Value(card_authors_iterator);
-                        if (card_authors.Size() == 1u) {
-                          UID card_author_uid = (*card_authors.begin()).uid;
-                          if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
-                            data.notifications.Add(
-                                Notification(card_author_uid,
-                                             static_cast<uint64_t>(bricks::time::Now()),
-                                             std::make_shared<NotificationMyCommentLiked>(like.uid, comment)));
-                          }
-                        }
+                      UID comment_author_uid = comment.author_uid;
+                      if (comment_author_uid != UID::INVALID_USER && comment_author_uid != like.uid) {
+                        data.notifications.Add(
+                            Notification(comment_author_uid,
+                                         static_cast<uint64_t>(bricks::time::Now()),
+                                         std::make_shared<NotificationMyCommentLiked>(like.uid, comment)));
                       }
                     }
                   }
