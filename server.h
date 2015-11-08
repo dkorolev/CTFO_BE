@@ -954,6 +954,15 @@ class CTFOServer final {
                     card_author_uid, now, std::make_shared<NotificationMyCardNewComment>(comment)));
               }
 
+              // Emit the " new comment on a card you starred" notification.
+              const auto card_favoriters = data.favorites.Cols()[cid];
+              if (Exists(card_favoriters)) {
+                for (const Favorite& fav : Value(card_favoriters)) {
+                  data.notifications.Add(Notification(
+                      fav.uid, now, std::make_shared<NotificationNewCommentOnCardIStarred>(uid, comment)));
+                }
+              }
+
               AddCommentResponse response;
               response.ms = now;
               response.oid = OIDToString(oid);
