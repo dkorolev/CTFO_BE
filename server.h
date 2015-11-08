@@ -632,9 +632,9 @@ class CTFOServer final {
         try {
           AddCardRequest request;
           try {
-            ParseJSON(r.body, request);
+            CerealizeParseJSON(r.body, request);
           } catch (const bricks::ParseJSONException&) {
-            const auto short_request = ParseJSON<AddCardShortRequest>(r.body);
+            const auto short_request = CerealizeParseJSON<AddCardShortRequest>(r.body);
             request.text = short_request.text;
             request.color = CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()];
           }
@@ -885,9 +885,9 @@ class CTFOServer final {
         try {
           AddCommentRequest request;
           try {
-            ParseJSON(r.body, request);
+            CerealizeParseJSON(r.body, request);
           } catch (const bricks::ParseJSONException&) {
-            const auto short_request = ParseJSON<AddCommentShortRequest>(r.body);
+            const auto short_request = CerealizeParseJSON<AddCommentShortRequest>(r.body);
             request.text = short_request.text;
           }
           storage_.Transaction([this, cid, uid, oid, token, request, requested_url](StorageAPI::T_DATA data) {
@@ -1222,10 +1222,11 @@ class CTFOServer final {
     std::unique_ptr<MidichloriansEvent> event;
     if (entry.m == "POST") {
       try {
-        ParseJSON(entry.b, event);
+        CerealizeParseJSON(entry.b, event);
         UpdateStateOnEvent(event);
       } catch (const bricks::ParseJSONException&) {
-        DebugPrint(Printf("[OnMidichloriansEvent] ParseJSON failed. entry.b = '%s')", entry.b.c_str()));
+        DebugPrint(
+            Printf("[OnMidichloriansEvent] CerealizeParseJSON failed. entry.b = '%s')", entry.b.c_str()));
       }
     } else {
       if (entry.m != "TICK") {
@@ -1436,7 +1437,7 @@ class CTFOServer final {
       }
     } catch (const std::bad_cast&) {
       // `event` is not an `iOSGenericEvent`.
-      DebugPrint("[UpdateStateOnEvent] Not an `iOSGenericEvent`: " + JSON(event));
+      DebugPrint("[UpdateStateOnEvent] Not an `iOSGenericEvent`: " + CerealizeJSON(event));
     }
   }
 };
