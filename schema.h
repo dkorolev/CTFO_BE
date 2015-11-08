@@ -745,8 +745,6 @@ struct NotificationNewReplyToMyComment : AbstractNotification {
   OID oid;           // Which comment.
   std::string text;  // Text of the newly added comment.
   NotificationNewReplyToMyComment() = default;
-  //  NotificationNewReplyToMyComment(UID uid, CID cid, OID oid, std::string text)
-  //      : uid(uid), cid(cid), oid(oid), text(text) {}
   NotificationNewReplyToMyComment(const Comment& comment)
       : uid(comment.author_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
   template <typename A>
