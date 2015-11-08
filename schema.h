@@ -739,6 +739,29 @@ struct NotificationMyCardNewComment : AbstractNotification {
   }
 };
 
+struct NotificationNewReplyToMyComment : AbstractNotification {
+  UID uid;           // Who left that comment.
+  CID cid;           // To what card.
+  OID oid;           // Which comment.
+  std::string text;  // Text of the newly added comment.
+  NotificationNewReplyToMyComment() = default;
+  //  NotificationNewReplyToMyComment(UID uid, CID cid, OID oid, std::string text)
+  //      : uid(uid), cid(cid), oid(oid), text(text) {}
+  NotificationNewReplyToMyComment(const Comment& comment)
+      : uid(comment.author_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(text));
+  }
+  void PopulateResponseNotification(ResponseNotification& output) const override {
+    output.type = "NewReplyToMyComment";
+    output.uid = UIDToString(uid);
+    output.cid = CIDToString(cid);
+    output.oid = OIDToString(oid);
+    output.text = text;
+  }
+};
+
 struct NotificationMyCommentLiked : AbstractNotification {
   UID uid;           // Who liked my comment.
   CID cid;           // On what card.
@@ -785,6 +808,7 @@ struct NotificationNewCommentOnCardIStarred : AbstractNotification {
 
 // Inner polymorphic types have to be registered. -- D.K.
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCardNewComment, "NotificationMyCardNewComment");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationNewReplyToMyComment, "NotificationNewReplyToMyComment");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCommentLiked, "NotificationMyCommentLiked");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationNewCommentOnCardIStarred,
                                "NotificationNewCommentOnCardIStarred");

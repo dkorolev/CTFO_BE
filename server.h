@@ -913,6 +913,9 @@ class CTFOServer final {
               const auto now = static_cast<uint64_t>(bricks::time::Now());
 
               UID card_author_uid = UID::INVALID_USER;
+              OID parent_oid =
+                  (!request.parent_oid.empty()) ? StringToOID(request.parent_oid) : OID::INVALID_COMMENT;
+              UID parent_comment_author_uid = UID::INVALID_USER;
               const auto& card_authors = data.card_authors;  // Matrix<CardAuthor>::Accessor(data);
               const auto iterable = card_authors.Rows()[cid];
               if (Exists(iterable)) {
@@ -930,16 +933,20 @@ class CTFOServer final {
               comment.author_uid = uid;
               comment.text = request.text;
 
-              if (!request.parent_oid.empty()) {
-                comment.parent_oid = StringToOID(request.parent_oid);
-                const auto iterable = comments_mutator.Cols()[comment.parent_oid];
+              if (parent_oid != OID::INVALID_COMMENT) {
+                comment.parent_oid = parent_oid;
+                const auto iterable = comments_mutator.Cols()[parent_oid];
                 if (Exists(iterable)) {
                   const auto v = Value(iterable);
                   if (v.Size() != 1u) {
                     // TODO(dkorolev): This error is oh so wrong. Fix it.
                     return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
-                  } else if ((*v.begin()).parent_oid != OID::INVALID_COMMENT) {
-                    return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n", HTTPResponseCode.BadRequest);
+                  } else {
+                    const Comment& parent_comment = *v.begin();
+                    if (parent_comment.parent_oid != OID::INVALID_COMMENT) {
+                      return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n", HTTPResponseCode.BadRequest);
+                    }
+                    parent_comment_author_uid = parent_comment.author_uid;
                   }
                 } else {
                   return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
@@ -954,13 +961,21 @@ class CTFOServer final {
                     card_author_uid, now, std::make_shared<NotificationMyCardNewComment>(comment)));
               }
 
-              // Emit the " new comment on a card you starred" notification.
+              // Emit the "new comment on a card you starred" notification.
               const auto card_favoriters = data.favorites.Cols()[cid];
               if (Exists(card_favoriters)) {
                 for (const Favorite& fav : Value(card_favoriters)) {
                   data.notifications.Add(Notification(
                       fav.uid, now, std::make_shared<NotificationNewCommentOnCardIStarred>(uid, comment)));
                 }
+              }
+
+              if (parent_comment_author_uid != UID::INVALID_USER && parent_comment_author_uid != uid) {
+                // Emit the "new reply to your comment" notification.
+                data.notifications.Add(
+                    Notification(parent_comment_author_uid,
+                                 now,
+                                 std::make_shared<NotificationNewReplyToMyComment>(comment)));
               }
 
               AddCommentResponse response;
