@@ -134,9 +134,9 @@ class CTFOServer final {
       admin_user.score = 999999999;  // With one short to one billion points.
       data.users.Insert(admin_user);
       while (cf.Next([&data](const Card& card) {
-          data.cards.Insert(card);
-          data.card_authors.Add(CardAuthor{card.cid, admin_uid});
-        })) {
+        data.cards.Insert(card);
+        data.card_authors.Add(CardAuthor{card.cid, admin_uid});
+      })) {
         ;
       }
     }).Go();
@@ -386,7 +386,8 @@ class CTFOServer final {
                     card_entry.text = card.text;
                     card_entry.ms = card.ms;
                     card_entry.color = card.color;
-                    card_entry.relevance = 0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+                    card_entry.relevance =
+                        0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
                     card_entry.ctfo_score = 50u;
                     card_entry.tfu_score = 50u;
                     card_entry.ctfo_count = card.ctfo_count;
@@ -504,7 +505,8 @@ class CTFOServer final {
                     card_entry.text = card.text;
                     card_entry.ms = card.ms;
                     card_entry.color = card.color;
-                    card_entry.relevance = 0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+                    card_entry.relevance =
+                        0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
                     card_entry.ctfo_score = 50u;
                     card_entry.tfu_score = 50u;
                     card_entry.ctfo_count = card.ctfo_count;
@@ -911,6 +913,9 @@ class CTFOServer final {
               const auto now = static_cast<uint64_t>(bricks::time::Now());
 
               UID card_author_uid = UID::INVALID_USER;
+              OID parent_oid =
+                  (!request.parent_oid.empty()) ? StringToOID(request.parent_oid) : OID::INVALID_COMMENT;
+              UID parent_comment_author_uid = UID::INVALID_USER;
               const auto& card_authors = data.card_authors;  // Matrix<CardAuthor>::Accessor(data);
               const auto iterable = card_authors.Rows()[cid];
               if (Exists(iterable)) {
@@ -921,7 +926,6 @@ class CTFOServer final {
               }
 
               auto& comments_mutator = data.comments;
-              auto& notifications_mutator = data.notifications;
 
               Comment comment;
               comment.cid = cid;
@@ -929,16 +933,20 @@ class CTFOServer final {
               comment.author_uid = uid;
               comment.text = request.text;
 
-              if (!request.parent_oid.empty()) {
-                comment.parent_oid = StringToOID(request.parent_oid);
-                const auto iterable = comments_mutator.Cols()[comment.parent_oid];
+              if (parent_oid != OID::INVALID_COMMENT) {
+                comment.parent_oid = parent_oid;
+                const auto iterable = comments_mutator.Cols()[parent_oid];
                 if (Exists(iterable)) {
                   const auto v = Value(iterable);
                   if (v.Size() != 1u) {
                     // TODO(dkorolev): This error is oh so wrong. Fix it.
                     return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
-                  } else if ((*v.begin()).parent_oid != OID::INVALID_COMMENT) {
-                    return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n", HTTPResponseCode.BadRequest);
+                  } else {
+                    const Comment& parent_comment = *v.begin();
+                    if (parent_comment.parent_oid != OID::INVALID_COMMENT) {
+                      return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n", HTTPResponseCode.BadRequest);
+                    }
+                    parent_comment_author_uid = parent_comment.author_uid;
                   }
                 } else {
                   return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
@@ -947,10 +955,27 @@ class CTFOServer final {
 
               comments_mutator.Add(comment);
 
-              // TODO(dkorolev)+TODO(mzhurovich): `Emplace` in the new Yoda?
+              // Emit the "new comment" notification.
               if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
-                notifications_mutator.Add(Notification(
+                data.notifications.Add(Notification(
                     card_author_uid, now, std::make_shared<NotificationMyCardNewComment>(comment)));
+              }
+
+              // Emit the "new comment on a card you starred" notification.
+              const auto card_favoriters = data.favorites.Cols()[cid];
+              if (Exists(card_favoriters)) {
+                for (const Favorite& fav : Value(card_favoriters)) {
+                  data.notifications.Add(Notification(
+                      fav.uid, now, std::make_shared<NotificationNewCommentOnCardIStarred>(uid, comment)));
+                }
+              }
+
+              if (parent_comment_author_uid != UID::INVALID_USER && parent_comment_author_uid != uid) {
+                // Emit the "new reply to your comment" notification.
+                data.notifications.Add(
+                    Notification(parent_comment_author_uid,
+                                 now,
+                                 std::make_shared<NotificationNewReplyToMyComment>(comment)));
               }
 
               AddCommentResponse response;
@@ -1340,6 +1365,23 @@ class CTFOServer final {
                   like.oid = oid;
                   like.uid = uid;
                   data.comment_likes.Add(like);
+
+                  // Emit the "my comment liked" notification.
+                  const auto comments_iterator = data.comments.Cols()[oid];
+                  if (Exists(comments_iterator)) {
+                    const auto comments = Value(comments_iterator);
+                    if (comments.Size() == 1u) {
+                      const Comment& comment = *comments.begin();
+                      UID comment_author_uid = comment.author_uid;
+                      if (comment_author_uid != UID::INVALID_USER && comment_author_uid != like.uid) {
+                        data.notifications.Add(
+                            Notification(comment_author_uid,
+                                         static_cast<uint64_t>(bricks::time::Now()),
+                                         std::make_shared<NotificationMyCommentLiked>(like.uid, comment)));
+                      }
+                    }
+                  }
+
                 } else if (response == RESPONSE::UNLIKE_COMMENT) {
                   DebugPrint(Printf(
                       "[UpdateStateOnEvent] Unlike comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
