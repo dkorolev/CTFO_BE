@@ -965,8 +965,10 @@ class CTFOServer final {
               const auto card_favoriters = data.favorites.Cols()[cid];
               if (Exists(card_favoriters)) {
                 for (const Favorite& fav : Value(card_favoriters)) {
-                  data.notifications.Add(Notification(
-                      fav.uid, now, std::make_shared<NotificationNewCommentOnCardIStarred>(uid, comment)));
+                  if (fav.uid != uid) {
+                    data.notifications.Add(Notification(
+                        fav.uid, now, std::make_shared<NotificationNewCommentOnCardIStarred>(uid, comment)));
+                  }
                 }
               }
 
