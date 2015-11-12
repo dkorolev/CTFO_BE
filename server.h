@@ -1384,6 +1384,20 @@ class CTFOServer final {
                       }
                       data.cards.Insert(card);
                       data.users.Insert(user);
+                      // Emit the "new votes on my card" notification.
+                      const auto iterable = data.card_authors.Rows()[cid];
+                      if (Exists(iterable)) {
+                        // Of course, there can only be one author, but meh. -- D.K.
+                        for (const auto& authors : Value(iterable)) {
+                          const UID author_uid = authors.uid;
+                          if (author_uid != UID::INVALID_USER && author_uid != uid) {
+                            data.notifications.Add(
+                                Notification(author_uid,
+                                             static_cast<uint64_t>(bricks::time::Now()),
+                                             std::make_shared<NotificationNewVotesOnMyCard>(uid, cid)));
+                          }
+                        }
+                      }
                     }
                   }
                 } else {

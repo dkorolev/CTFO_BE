@@ -831,6 +831,25 @@ struct NotificationMyCardStarred : AbstractNotification {
   CID GetCID() const override { return cid; }
 };
 
+struct NotificationNewVotesOnMyCard : AbstractNotification {
+  UID uid;  // Who (grouped later at transmission phase).
+  CID cid;  // On which card.
+  NotificationNewVotesOnMyCard() = default;
+  NotificationNewVotesOnMyCard(UID uid, CID cid) : uid(uid), cid(cid) {}
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(uid), CEREAL_NVP(cid));
+  }
+  void PopulateResponseNotification(ResponseNotification& output) const override {
+    output.type = "NewVotesOnMyCard";
+    output.cid = CIDToString(cid);
+    output.uid = UIDToString(uid);
+    output.oid = "";
+    output.text = "";
+  }
+  CID GetCID() const override { return cid; }
+};
+
 }  // namespace CTFO
 
 // Inner polymorphic types have to be registered. -- D.K.
@@ -840,5 +859,6 @@ CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCommentLiked, "NotificationMy
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationNewCommentOnCardIStarred,
                                "NotificationNewCommentOnCardIStarred");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCardStarred, "NotificationMyCardStarred");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationNewVotesOnMyCard, "NotificationNewVotesOnMyCard");
 
 #endif  // CTFO_SCHEMA_H
