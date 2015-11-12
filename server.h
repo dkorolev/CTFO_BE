@@ -77,7 +77,7 @@ struct StorageAPIImpl {
 };
 
 struct StorageAPI {
-  using T_DATA_IMPL = StorageAPIImpl<ReplayFromAndAppendToFile>;
+  using T_DATA_IMPL = StorageAPIImpl<ReplayFromAndAppendToFileUsingCereal>;
   typedef T_DATA_IMPL& T_DATA;
 
   T_DATA_IMPL actual_data;
