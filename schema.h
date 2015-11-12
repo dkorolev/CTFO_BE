@@ -455,7 +455,7 @@ struct ResponseCardEntry {
   std::string cid = "cINVALID";         // Card id, format 'c02XXX...'.
   std::string author_uid = "uINVALID";  // The author of this comment.
   std::string text = "";                // Card text.
-  uint64_t ms;                          // Card timestamp, milliseconds from epoch.
+  uint64_t ms = 0ull;                   // Card timestamp, milliseconds from epoch.
   Color color;                          // Card color.
   double relevance = 0.0;               // Card relevance for particular user, [0.0, 1.0].
   uint64_t ctfo_score = 0u;             // Number of points, which user gets for "CTFO" answer.
@@ -812,6 +812,25 @@ struct NotificationNewCommentOnCardIStarred : AbstractNotification {
   CID GetCID() const override { return cid; }
 };
 
+struct NotificationMyCardStarred : AbstractNotification {
+  UID uid;  // Who starred my card.
+  CID cid;  // Which card.
+  NotificationMyCardStarred() = default;
+  NotificationMyCardStarred(UID starrer_uid, CID cid) : uid(starrer_uid), cid(cid) {}
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(uid), CEREAL_NVP(cid));
+  }
+  void PopulateResponseNotification(ResponseNotification& output) const override {
+    output.type = "MyCardStarred";
+    output.uid = UIDToString(uid);
+    output.cid = CIDToString(cid);
+    output.oid = "";
+    output.text = "";
+  }
+  CID GetCID() const override { return cid; }
+};
+
 }  // namespace CTFO
 
 // Inner polymorphic types have to be registered. -- D.K.
@@ -820,5 +839,6 @@ CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationNewReplyToMyComment, "Notificat
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCommentLiked, "NotificationMyCommentLiked");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationNewCommentOnCardIStarred,
                                "NotificationNewCommentOnCardIStarred");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCardStarred, "NotificationMyCardStarred");
 
 #endif  // CTFO_SCHEMA_H

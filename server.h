@@ -1407,6 +1407,21 @@ class CTFOServer final {
                                   UIDToString(uid).c_str(),
                                   CIDToString(cid).c_str(),
                                   (response == RESPONSE::FAV_CARD) ? "Favorite" : "Unfavorite"));
+
+                // Emit the "my card starred" notification.
+                const auto iterable = data.card_authors.Rows()[cid];
+                if (Exists(iterable)) {
+                  // Of course, there can only be one author, but meh. -- D.K.
+                  for (const auto& authors : Value(iterable)) {
+                    const UID author_uid = authors.uid;
+                    if (author_uid != UID::INVALID_USER && author_uid != uid) {
+                      data.notifications.Add(
+                          Notification(author_uid,
+                                       static_cast<uint64_t>(bricks::time::Now()),
+                                       std::make_shared<NotificationMyCardStarred>(uid, cid)));
+                    }
+                  }
+                }
               } else if (response == RESPONSE::LIKE_COMMENT || response == RESPONSE::UNLIKE_COMMENT ||
                          response == RESPONSE::FLAG_COMMENT) {
                 if (oid == OID::INVALID_COMMENT) {

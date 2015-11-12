@@ -1375,7 +1375,7 @@ TEST(CTFO, NotificationsSerializeWellInYoda) {
   EXPECT_EQ(
       "{\"data\":{\"nid\":\"n05000000000012345000\",\"type\":\"MyCardNewComment\",\"ms\":12345,\"uid\":"
       "\"u00000000000000000001\",\"cid\":\"c00000000000000000002\",\"oid\":\"o00000000000000000003\",\"text\":"
-      "\"foo\",\"card\":{\"cid\":\"cINVALID\",\"author_uid\":\"uINVALID\",\"text\":\"\",\"ms\":4235836,"
+      "\"foo\",\"card\":{\"cid\":\"cINVALID\",\"author_uid\":\"uINVALID\",\"text\":\"\",\"ms\":0,"
       "\"color\":{\"red\":0,\"green\":0,\"blue\":0},\"relevance\":0,\"ctfo_score\":0,\"tfu_score\":0,\"ctfo_"
       "count\":0,\"tfu_count\":0,\"skip_count\":0,\"vote\":\"\",\"favorited\":false,\"is_my_card\":false,"
       "\"number_of_comments\":0},\"n\":1}}",
