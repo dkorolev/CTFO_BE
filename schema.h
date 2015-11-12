@@ -636,6 +636,7 @@ struct ResponseNotification {
   std::string cid;
   std::string oid;
   std::string text;
+  ResponseCardEntry card;
   size_t n = 1u;
 
   template <typename A>
@@ -647,6 +648,7 @@ struct ResponseNotification {
        CEREAL_NVP(cid),
        CEREAL_NVP(oid),
        CEREAL_NVP(text),
+       CEREAL_NVP(card),
        CEREAL_NVP(n));
   }
 };
@@ -683,6 +685,8 @@ struct ComparableNonHashableTimestamp {
 struct AbstractNotification : Super {
   virtual ~AbstractNotification() {}
   virtual void PopulateResponseNotification(ResponseNotification& output) const = 0;
+
+  virtual CID GetCID() const = 0;  // To return full card bodies in the payload; can be CID::INVALID_CARD.
 };
 
 struct Notification : Super {
@@ -710,6 +714,8 @@ struct Notification : Super {
     notification->PopulateResponseNotification(result);
     return result;
   }
+  CID GetCID() const { return notification->GetCID(); }
+
   template <typename A>
   void serialize(A& ar) {
     ar(CEREAL_NVP(uid), CEREAL_NVP(timestamp), CEREAL_NVP(notification));
@@ -737,6 +743,7 @@ struct NotificationMyCardNewComment : AbstractNotification {
     output.oid = OIDToString(oid);
     output.text = text;
   }
+  CID GetCID() const override { return cid; }
 };
 
 struct NotificationNewReplyToMyComment : AbstractNotification {
@@ -758,6 +765,7 @@ struct NotificationNewReplyToMyComment : AbstractNotification {
     output.oid = OIDToString(oid);
     output.text = text;
   }
+  CID GetCID() const override { return cid; }
 };
 
 struct NotificationMyCommentLiked : AbstractNotification {
@@ -779,6 +787,7 @@ struct NotificationMyCommentLiked : AbstractNotification {
     output.oid = OIDToString(oid);
     output.text = text;
   }
+  CID GetCID() const override { return cid; }
 };
 
 struct NotificationNewCommentOnCardIStarred : AbstractNotification {
@@ -800,6 +809,7 @@ struct NotificationNewCommentOnCardIStarred : AbstractNotification {
     output.oid = OIDToString(oid);
     output.text = text;
   }
+  CID GetCID() const override { return cid; }
 };
 
 }  // namespace CTFO

@@ -551,7 +551,7 @@ TEST(CTFO, SmokeTest) {
     added_card3_cid = add_card_response.cid;
   }
 
-  // Attempt to add a card but send it a malformed BODY.
+// Attempt to add a card but send it a malformed BODY.
 #if 0
   {
     // TODO(dkorolev): Revisit as we migrate to the new type system.
@@ -1193,6 +1193,7 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ("MyCardNewComment", feed_response.notifications[0].type);
       EXPECT_EQ(another_actual_uid, feed_response.notifications[0].uid);
       EXPECT_EQ(added_card_cid, feed_response.notifications[0].cid);
+      EXPECT_EQ("Foo.", feed_response.notifications[0].card.text);
       EXPECT_EQ(comment_to_be_notified_about_oid, feed_response.notifications[0].oid);
       EXPECT_EQ("Ding!", feed_response.notifications[0].text);
       EXPECT_EQ(1u, feed_response.notifications[0].n);
@@ -1374,7 +1375,10 @@ TEST(CTFO, NotificationsSerializeWellInYoda) {
   EXPECT_EQ(
       "{\"data\":{\"nid\":\"n05000000000012345000\",\"type\":\"MyCardNewComment\",\"ms\":12345,\"uid\":"
       "\"u00000000000000000001\",\"cid\":\"c00000000000000000002\",\"oid\":\"o00000000000000000003\",\"text\":"
-      "\"foo\",\"n\":1}}",
+      "\"foo\",\"card\":{\"cid\":\"cINVALID\",\"author_uid\":\"uINVALID\",\"text\":\"\",\"ms\":4235836,"
+      "\"color\":{\"red\":0,\"green\":0,\"blue\":0},\"relevance\":0,\"ctfo_score\":0,\"tfu_score\":0,\"ctfo_"
+      "count\":0,\"tfu_count\":0,\"skip_count\":0,\"vote\":\"\",\"favorited\":false,\"is_my_card\":false,"
+      "\"number_of_comments\":0},\"n\":1}}",
       user_facing_json);
   const std::string stream_stored_json = CerealizeJSON(notification);
   EXPECT_EQ(

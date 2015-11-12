@@ -1194,17 +1194,75 @@ class CTFOServer final {
     }
 
     if (notifications_since != static_cast<uint64_t>(-1)) {
+      // Shamelessly copy-pasted from GenerateCardForFeed. -- D.K.
+      const auto GenerateCardForNotification =
+          [this, uid, &answers, &favorites, &comments, &card_authors](const Card& card) {
+            ResponseCardEntry card_entry;
+            card_entry.cid = CIDToString(card.cid);
+            const auto iterable = card_authors.Rows()[card.cid];
+            if (Exists(iterable)) {
+              const auto v = Value(iterable);
+              if (v.Size() == 1u) {
+                const UID author_uid = (*v.begin()).uid;
+                card_entry.author_uid = UIDToString(author_uid);
+                card_entry.is_my_card = (uid == author_uid);
+              }
+            }
+            const auto comments_for_card = comments.Rows()[card.cid];
+            if (Exists(comments_for_card)) {
+              card_entry.number_of_comments = Value(comments_for_card).Size();
+            }
+            card_entry.text = card.text;
+            card_entry.ms = card.ms;
+            card_entry.color = card.color;
+            card_entry.relevance = 0.0;  // Will be overridden later.
+            card_entry.ctfo_score = 50u;
+            card_entry.tfu_score = 50u;
+            card_entry.ctfo_count = card.ctfo_count;
+            card_entry.tfu_count = card.tfu_count;
+            card_entry.skip_count = card.skip_count;
+
+            card_entry.vote = "";
+            const auto answer = answers.Get(uid, card.cid);
+            if (Exists(answer)) {
+              const ANSWER vote = Value(answer).answer;
+              if (vote == ANSWER::CTFO) {
+                card_entry.vote = "CTFO";
+              } else if (vote == ANSWER::TFU) {
+                card_entry.vote = "TFU";
+              }
+            }
+
+            card_entry.favorited = false;
+            const auto fav = favorites.Get(uid, card.cid);
+            if (Exists(fav)) {
+              card_entry.favorited = Value(fav).favorited;
+            }
+            return card_entry;
+          };
       // TODO(dkorolev): `upper_bound`, not go through all notifications for this user.
+      std::map<CID, ResponseCardEntry> cards_used;
       const auto notifications_for_user = data.notifications.Rows()[uid];
       if (Exists(notifications_for_user)) {
-        size_t appended_so_far = 0u;
         for (const Notification& notification : Value(notifications_for_user)) {
           if (notification.timestamp.ms > notifications_since) {
-            response.notifications.push_back(notification.BuildResponseNotification());
-            ++appended_so_far;
-            // TODO(dkorolev): Command line flag or parameter instead of bare `50`.
-            if (appended_so_far >= 50u) {
-              break;
+            const CID cid = notification.GetCID();
+            if (cid != CID::INVALID_CARD && !cards_used.count(cid)) {
+              const auto card = data.cards[cid];
+              if (Exists(card)) {
+                cards_used[cid] = GenerateCardForNotification(Value(card));
+              }
+            }
+            // Explicitly hold off on sending notifications for already non-existent cards.
+            if (cid == CID::INVALID_CARD || cards_used.count(cid)) {
+              response.notifications.push_back(notification.BuildResponseNotification());
+              if (cid != CID::INVALID_CARD) {
+                response.notifications.back().card = cards_used[cid];
+              }
+              // TODO(dkorolev): Command line flag or parameter instead of bare `50`.
+              if (response.notifications.size() >= 50u) {
+                break;
+              }
             }
           }
         }
