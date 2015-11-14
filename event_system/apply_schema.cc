@@ -9,7 +9,8 @@ CEREAL_REGISTER_TYPE(CardActionEvent);
 struct SimpleDumpJSONToStandardOutput {
   template <typename T>
   void operator()(const T& entry) {
-    std::cout << JSON(entry) << std::endl;
+    // TODO(dkorolev): Deprecate.
+    std::cout << CerealizeJSON(entry) << std::endl;
   }
 };
 

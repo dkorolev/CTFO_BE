@@ -37,7 +37,8 @@ struct JSONByLineParser {
   static void ParseJSONAndCallF(const std::string& line, F&& f) {
     T object;
     try {
-      ParseJSON(line, object);
+      // TODO(dkorolev): Deprecate.
+      CerealizeParseJSON(line, object);
       f(object);
     } catch (const bricks::ParseJSONException&) {
       std::cerr << "Unable to parse JSON." << std::endl;
@@ -133,7 +134,8 @@ struct EventPreprocessor {
     if (log_entry.m != "TICK") {
       try {
         std::unique_ptr<MidichloriansEvent> midichlorians_event;
-        ParseJSON(log_entry.b, midichlorians_event);
+        // TODO(dkorolev): Deprecate.
+        CerealizeParseJSON(log_entry.b, midichlorians_event);
         bricks::metaprogramming::RTTIDynamicCall<
             typename MidichloriansEventPreprocessor<BASE_EVENT>::T_SUPPORTED_TYPES>(
             midichlorians_event, midichlorians_preprocessor, log_entry.t, std::forward<F>(f));

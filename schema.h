@@ -455,7 +455,7 @@ struct ResponseCardEntry {
   std::string cid = "cINVALID";         // Card id, format 'c02XXX...'.
   std::string author_uid = "uINVALID";  // The author of this comment.
   std::string text = "";                // Card text.
-  uint64_t ms;                          // Card timestamp, milliseconds from epoch.
+  uint64_t ms = 0ull;                   // Card timestamp, milliseconds from epoch.
   Color color;                          // Card color.
   double relevance = 0.0;               // Card relevance for particular user, [0.0, 1.0].
   uint64_t ctfo_score = 0u;             // Number of points, which user gets for "CTFO" answer.
@@ -636,6 +636,7 @@ struct ResponseNotification {
   std::string cid;
   std::string oid;
   std::string text;
+  ResponseCardEntry card;
   size_t n = 1u;
 
   template <typename A>
@@ -647,6 +648,7 @@ struct ResponseNotification {
        CEREAL_NVP(cid),
        CEREAL_NVP(oid),
        CEREAL_NVP(text),
+       CEREAL_NVP(card),
        CEREAL_NVP(n));
   }
 };
@@ -683,6 +685,8 @@ struct ComparableNonHashableTimestamp {
 struct AbstractNotification : Super {
   virtual ~AbstractNotification() {}
   virtual void PopulateResponseNotification(ResponseNotification& output) const = 0;
+
+  virtual CID GetCID() const = 0;  // To return full card bodies in the payload; can be CID::INVALID_CARD.
 };
 
 struct Notification : Super {
@@ -710,6 +714,8 @@ struct Notification : Super {
     notification->PopulateResponseNotification(result);
     return result;
   }
+  CID GetCID() const { return notification->GetCID(); }
+
   template <typename A>
   void serialize(A& ar) {
     ar(CEREAL_NVP(uid), CEREAL_NVP(timestamp), CEREAL_NVP(notification));
@@ -737,6 +743,7 @@ struct NotificationMyCardNewComment : AbstractNotification {
     output.oid = OIDToString(oid);
     output.text = text;
   }
+  CID GetCID() const override { return cid; }
 };
 
 struct NotificationNewReplyToMyComment : AbstractNotification {
@@ -758,6 +765,7 @@ struct NotificationNewReplyToMyComment : AbstractNotification {
     output.oid = OIDToString(oid);
     output.text = text;
   }
+  CID GetCID() const override { return cid; }
 };
 
 struct NotificationMyCommentLiked : AbstractNotification {
@@ -779,6 +787,7 @@ struct NotificationMyCommentLiked : AbstractNotification {
     output.oid = OIDToString(oid);
     output.text = text;
   }
+  CID GetCID() const override { return cid; }
 };
 
 struct NotificationNewCommentOnCardIStarred : AbstractNotification {
@@ -800,6 +809,45 @@ struct NotificationNewCommentOnCardIStarred : AbstractNotification {
     output.oid = OIDToString(oid);
     output.text = text;
   }
+  CID GetCID() const override { return cid; }
+};
+
+struct NotificationMyCardStarred : AbstractNotification {
+  UID uid;  // Who starred my card.
+  CID cid;  // Which card.
+  NotificationMyCardStarred() = default;
+  NotificationMyCardStarred(UID starrer_uid, CID cid) : uid(starrer_uid), cid(cid) {}
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(uid), CEREAL_NVP(cid));
+  }
+  void PopulateResponseNotification(ResponseNotification& output) const override {
+    output.type = "MyCardStarred";
+    output.uid = UIDToString(uid);
+    output.cid = CIDToString(cid);
+    output.oid = "";
+    output.text = "";
+  }
+  CID GetCID() const override { return cid; }
+};
+
+struct NotificationNewVotesOnMyCard : AbstractNotification {
+  UID uid;  // Who (grouped later at transmission phase).
+  CID cid;  // On which card.
+  NotificationNewVotesOnMyCard() = default;
+  NotificationNewVotesOnMyCard(UID uid, CID cid) : uid(uid), cid(cid) {}
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(uid), CEREAL_NVP(cid));
+  }
+  void PopulateResponseNotification(ResponseNotification& output) const override {
+    output.type = "NewVotesOnMyCard";
+    output.cid = CIDToString(cid);
+    output.uid = UIDToString(uid);
+    output.oid = "";
+    output.text = "";
+  }
+  CID GetCID() const override { return cid; }
 };
 
 }  // namespace CTFO
@@ -810,5 +858,7 @@ CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationNewReplyToMyComment, "Notificat
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCommentLiked, "NotificationMyCommentLiked");
 CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationNewCommentOnCardIStarred,
                                "NotificationNewCommentOnCardIStarred");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCardStarred, "NotificationMyCardStarred");
+CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationNewVotesOnMyCard, "NotificationNewVotesOnMyCard");
 
 #endif  // CTFO_SCHEMA_H

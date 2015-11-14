@@ -42,7 +42,7 @@ DEFINE_bool(debug_print, true, "Print debug info to stderr.");
 
 int main(int argc, char **argv) {
   ParseDFlags(&argc, &argv);
-  bricks::random::SetSeed(FLAGS_rand_seed);
+  bricks::random::SetRandomSeed(FLAGS_rand_seed);
   CTFOServer(FLAGS_cards_file,
              FLAGS_port,
              FLAGS_storage_file,
