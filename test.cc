@@ -1364,7 +1364,7 @@ TEST(CTFO, UseRightHTTPVerbs) {
   EXPECT_EQ("METHOD NOT ALLOWED\n", post_feed.body);
 }
 
-TEST(CTFO, NotificationsSerializeWellInYoda) {
+TEST(CTFO, NotificationsSerializeWell) {
   const UID me = static_cast<UID>(42);
   const UID uid = static_cast<UID>(1);
   const CID cid = static_cast<CID>(2);
@@ -1388,3 +1388,5 @@ TEST(CTFO, NotificationsSerializeWellInYoda) {
       stream_stored_json);
   EXPECT_EQ(stream_stored_json, CerealizeJSON(CerealizeParseJSON<Notification>(stream_stored_json)));
 }
+
+// TODO(dkorolev): Test the remaining notification types.
