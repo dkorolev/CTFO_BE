@@ -463,6 +463,60 @@ struct StarNotificationAlreadySent : Super {
   }
 };
 
+// To enable reporting users.
+struct UserReportedUser : Super {
+  UID who;
+  UID whom;
+
+  UID row() const { return who; }
+  void set_row(const UID value) { who = value; }
+  UID col() const { return whom; }
+  void set_col(const UID value) { whom = value; }
+
+  UserReportedUser(UID who = UID::INVALID_USER, UID whom = UID::INVALID_USER) : who(who), whom(whom) {}
+
+  template <typename A>
+  void serialize(A& ar) {
+    Super::serialize(ar);
+    ar(CEREAL_NVP(who), CEREAL_NVP(whom));
+  }
+};
+
+// To enable blocking users.
+struct UserBlockedUser : Super {
+  UID who;
+  UID whom;
+
+  UID row() const { return who; }
+  void set_row(const UID value) { who = value; }
+  UID col() const { return whom; }
+  void set_col(const UID value) { whom = value; }
+
+  UserBlockedUser(UID who = UID::INVALID_USER, UID whom = UID::INVALID_USER) : who(who), whom(whom) {}
+
+  template <typename A>
+  void serialize(A& ar) {
+    Super::serialize(ar);
+    ar(CEREAL_NVP(who), CEREAL_NVP(whom));
+  }
+};
+
+// To enable banned users support.
+struct BannedUser : Super {
+  UID banned_uid;
+
+  BannedUser(const UID uid = UID::INVALID_USER) : banned_uid(uid) {}
+
+  UID key() const { return banned_uid; }
+  void set_key(const UID value) { banned_uid = value; }
+
+  template <typename A>
+  void serialize(A& ar) {
+    Super::serialize(ar);
+    ar(CEREAL_NVP(banned_uid));
+  }
+};
+
 // Data structures for generating RESTful responses.
 struct ResponseUserEntry {
   std::string uid = "uINVALID";    // User id, format 'u01XXX...'.
@@ -683,6 +737,7 @@ struct ResponseNotification {
 struct ResponseFeed {
   uint64_t ms;                                      // Server timestamp, milliseconds from epoch.
   ResponseUserEntry user;                           // User information.
+  bool banned = false;                              // Whether the user is banned.
   std::vector<ResponseCardEntry> feed_hot;          // "Hot" cards feeds.
   std::vector<ResponseCardEntry> feed_recent;       // "Recent" cards feeds.
   std::vector<ResponseNotification> notifications;  // Notifications.
@@ -691,6 +746,7 @@ struct ResponseFeed {
   void serialize(A& ar) {
     ar(CEREAL_NVP(ms),
        CEREAL_NVP(user),
+       CEREAL_NVP(banned),
        CEREAL_NVP(feed_hot),
        CEREAL_NVP(feed_recent),
        CEREAL_NVP(notifications));

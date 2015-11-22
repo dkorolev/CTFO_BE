@@ -37,7 +37,7 @@ enum class ANSWER : int { UNSEEN = 0, CTFO = 1, TFU = 2, SKIP = -1 };
 enum class AUTH_TYPE : int { UNDEFINED = 0, IOS };
 
 // To parse incoming Midichlorians logs.
-enum class RESPONSE : int {
+enum class LOG_EVENT : int {
   SKIP = static_cast<int>(ANSWER::SKIP),
   CTFO = static_cast<int>(ANSWER::CTFO),
   TFU = static_cast<int>(ANSWER::TFU),
@@ -46,7 +46,9 @@ enum class RESPONSE : int {
   LIKE_COMMENT = 201,
   UNLIKE_COMMENT = 202,
   FLAG_COMMENT = 203,
-  FLAG_CARD = 301
+  FLAG_CARD = 301,
+  REPORT_USER = 401,
+  BLOCK_USER = 402
 };
 
 }  // namespace CTFO

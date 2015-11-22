@@ -53,6 +53,10 @@ SOFTWARE.
 using namespace bricks::random;
 using namespace bricks::strings;
 
+// TODO(dkorolev): Make these constructor parameters of `CTFOServer`.
+static const size_t FLAGS_blocks_to_ban = 5u;
+static const size_t FLAGS_reports_to_ban = 10u;
+
 namespace CTFO {
 
 template <typename POLICY>
@@ -73,6 +77,9 @@ struct StorageAPIImpl {
   LightweightMatrix<Notification, POLICY> notifications{"notifications", instance};
   OrderedDictionary<StarNotificationAlreadySent, POLICY> starred_notification_already_sent{
       "starred_notification_already_sent", instance};
+  LightweightMatrix<UserReportedUser, POLICY> user_reported_user{"user_reported_user", instance};
+  LightweightMatrix<UserBlockedUser, POLICY> user_blocked_user{"user_blocked_user", instance};
+  OrderedDictionary<BannedUser, POLICY> banned_users{"banned_users", instance};
 
   // TODO(dkorolev): A templated version of the constructor.
   StorageAPIImpl(const std::string& filename) : instance(filename) { instance.Run(); }
@@ -248,7 +255,7 @@ class CTFOServer final {
               CopyUserInfoToResponseEntry(user, user_entry);
               user_entry.token = token;
 
-              ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
+              ResponseFeed rfeed = GenerateResponseFeed(data, uid, user_entry, feed_count, notifications_since);
               return Response(rfeed, "feed");
             },
             std::move(r));
@@ -298,7 +305,8 @@ class CTFOServer final {
                 ResponseUserEntry user_entry;
                 CopyUserInfoToResponseEntry(user, user_entry);
                 user_entry.token = token;
-                ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
+                ResponseFeed rfeed =
+                    GenerateResponseFeed(data, uid, user_entry, feed_count, notifications_since);
                 return Response(rfeed, "feed");
               }
             },
@@ -413,7 +421,6 @@ class CTFOServer final {
 
               for (const auto& c : favs) {
                 const auto card = data.cards[c.second];
-                // This might have been the bug Kolya mentioned! -- D.K.
                 if (Exists(card)) {
                   rfavs.cards.push_back(GenerateCardForFavs(Value(card)));
                 }
@@ -663,7 +670,6 @@ class CTFOServer final {
 
               auto& cards_mutator = data.cards;
               auto& authors_mutator = data.card_authors;
-              auto& favorites_mutator = data.favorites;
 
               Card card;
               card.cid = cid;
@@ -675,15 +681,6 @@ class CTFOServer final {
               author.uid = uid;
               author.cid = cid;
               authors_mutator.Add(author);
-
-              if (false) {
-                // Master Gene taught us own cards should not be favorited by default.
-                Favorite favorite;
-                favorite.uid = uid;
-                favorite.cid = cid;
-                favorite.favorited = true;
-                favorites_mutator.Add(favorite);
-              }
 
               AddCardResponse response;
               response.ms = now;
@@ -815,14 +812,38 @@ class CTFOServer final {
               const auto& comment_flagged_accessor = data.flagged_comments;
               std::vector<Comment> proto_comments;
               std::set<OID> flagged_comments;
-              const auto& comments = data.comments;  // Matrix<Comment>::Accessor(data);
+              const auto& comments = data.comments;
               const auto comments_per_card = comments.Rows()[cid];
               if (Exists(comments_per_card)) {
                 for (const auto& comment : Value(comments_per_card)) {
                   if (comment_flagged_accessor.Has(comment.oid, uid)) {
                     flagged_comments.insert(comment.oid);
                   }
-                  proto_comments.push_back(comment);
+                  // Make sure to not return comments left by the users the current user has blocked,
+                  // comments left by banned users, or comments that are 2nd level with the 1st level comment
+                  // being a comment from the user whom the current user has blocked, or who are banned.
+                  bool comment_hidden_due_to_block_or_ban = false;
+                  if (data.user_blocked_user.Has(uid, comment.author_uid)) {
+                    comment_hidden_due_to_block_or_ban = true;
+                  } else if (Exists(data.banned_users[comment.author_uid])) {
+                    comment_hidden_due_to_block_or_ban = true;
+                  } else if (comment.parent_oid != OID::INVALID_COMMENT) {
+                    const auto top_level_comments = comments_accessor.Cols()[comment.parent_oid];
+                    if (Exists(top_level_comments)) {
+                      const auto v = Value(top_level_comments);
+                      if (v.Size() == 1u) {
+                        const Comment& parent_comment = *v.begin();
+                        if (data.user_blocked_user.Has(uid, parent_comment.author_uid)) {
+                          comment_hidden_due_to_block_or_ban = true;
+                        } else if (Exists(data.banned_users[parent_comment.author_uid])) {
+                          comment_hidden_due_to_block_or_ban = true;
+                        }
+                      }
+                    }
+                  }
+                  if (!comment_hidden_due_to_block_or_ban) {
+                    proto_comments.push_back(comment);
+                  }
                 }
               }
               const auto sortkey = [&comments_accessor](const Comment& c) -> std::pair<uint64_t, uint64_t> {
@@ -918,7 +939,7 @@ class CTFOServer final {
               OID parent_oid =
                   (!request.parent_oid.empty()) ? StringToOID(request.parent_oid) : OID::INVALID_COMMENT;
               UID parent_comment_author_uid = UID::INVALID_USER;
-              const auto& card_authors = data.card_authors;  // Matrix<CardAuthor>::Accessor(data);
+              const auto& card_authors = data.card_authors;
               const auto iterable = card_authors.Rows()[cid];
               if (Exists(iterable)) {
                 const auto v = Value(iterable);
@@ -1065,17 +1086,19 @@ class CTFOServer final {
 
   StorageAPI storage_;
 
-  const std::map<std::string, RESPONSE> valid_responses_ = {{"CTFO", RESPONSE::CTFO},
-                                                            {"TFU", RESPONSE::TFU},
-                                                            {"SKIP", RESPONSE::SKIP},
-                                                            {"FAV", RESPONSE::FAV_CARD},
-                                                            {"FAV_CARD", RESPONSE::FAV_CARD},
-                                                            {"UNFAV", RESPONSE::UNFAV_CARD},
-                                                            {"UNFAV_CARD", RESPONSE::UNFAV_CARD},
-                                                            {"LIKE_COMMENT", RESPONSE::LIKE_COMMENT},
-                                                            {"UNLIKE_COMMENT", RESPONSE::UNLIKE_COMMENT},
-                                                            {"FLAG_COMMENT", RESPONSE::FLAG_COMMENT},
-                                                            {"FLAG_CARD", RESPONSE::FLAG_CARD}};
+  const std::map<std::string, LOG_EVENT> valid_responses_ = {{"CTFO", LOG_EVENT::CTFO},
+                                                             {"TFU", LOG_EVENT::TFU},
+                                                             {"SKIP", LOG_EVENT::SKIP},
+                                                             {"FAV", LOG_EVENT::FAV_CARD},
+                                                             {"FAV_CARD", LOG_EVENT::FAV_CARD},
+                                                             {"UNFAV", LOG_EVENT::UNFAV_CARD},
+                                                             {"UNFAV_CARD", LOG_EVENT::UNFAV_CARD},
+                                                             {"LIKE_COMMENT", LOG_EVENT::LIKE_COMMENT},
+                                                             {"UNLIKE_COMMENT", LOG_EVENT::UNLIKE_COMMENT},
+                                                             {"FLAG_COMMENT", LOG_EVENT::FLAG_COMMENT},
+                                                             {"FLAG_CARD", LOG_EVENT::FLAG_CARD},
+                                                             {"REPORT_USER", LOG_EVENT::REPORT_USER},
+                                                             {"BLOCK_USER", LOG_EVENT::BLOCK_USER}};
 
   void DebugPrint(const std::string& message) {
     if (debug_print_) {
@@ -1095,6 +1118,7 @@ class CTFOServer final {
   }
 
   ResponseFeed GenerateResponseFeed(StorageAPI::T_DATA data,
+                                    UID user_uid,
                                     ResponseUserEntry user_entry,
                                     size_t feed_size,
                                     uint64_t notifications_since) {
@@ -1102,6 +1126,10 @@ class CTFOServer final {
     constexpr size_t FEED_SIZE_LIMIT = 300ul;
     const size_t max_count = std::min(feed_size, FEED_SIZE_LIMIT);
     response.user = user_entry;
+    response.banned = Exists(data.banned_users[user_uid]);
+    if (response.banned) {
+      return response;
+    }
 
     const auto& cards = data.cards;
     const auto& answers = data.answers;
@@ -1115,21 +1143,36 @@ class CTFOServer final {
     const uint64_t now = static_cast<uint64_t>(bricks::time::Now());
     for (const auto& card : cards) {
       if (!answers.Has(uid, card.cid) && !flagged_cards.Has(card.cid, uid)) {
-        // For the recent feed, relevance is the function of the age of the card.
-        // Added just now => 1.00. Added 24 hour ago => 0.99. Added 48 hours ago => 0.99^2. Etc.
-        double time_order_key = 0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
-        double hot_order_key = RandomDouble(0.2, 0.4);
-        if (card.startup_index) {
-          time_order_key = 1.0 - 1e-6 * card.startup_index;
-          hot_order_key = 1.0 - 1e-6 * card.startup_index;
-        }
-        hot_cards.emplace(hot_order_key, card.cid);
-        recent_cards.emplace(time_order_key, card.cid);
-        if (hot_cards.size() > max_count) {
-          hot_cards.erase(hot_cards.begin());
-        }
-        if (recent_cards.size() > max_count) {
-          recent_cards.erase(recent_cards.begin());
+        const UID card_author_uid = [&data](CID cid) {
+          const auto& card_authors = data.card_authors;
+          const auto iterable = card_authors.Rows()[cid];
+          if (Exists(iterable)) {
+            const auto v = Value(iterable);
+            if (v.Size() == 1u) {
+              return (*v.begin()).uid;
+            }
+          }
+          return UID::INVALID_USER;
+        }(card.cid);
+
+        if (card_author_uid == UID::INVALID_USER || (!Exists(data.banned_users[card_author_uid]) &&
+                                                     !data.user_blocked_user.Has(uid, card_author_uid))) {
+          // For the recent feed, relevance is the function of the age of the card.
+          // Added just now => 1.00. Added 24 hour ago => 0.99. Added 48 hours ago => 0.99^2. Etc.
+          double time_order_key = 0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+          double hot_order_key = RandomDouble(0.2, 0.4);
+          if (card.startup_index) {
+            time_order_key = 1.0 - 1e-6 * card.startup_index;
+            hot_order_key = 1.0 - 1e-6 * card.startup_index;
+          }
+          hot_cards.emplace(hot_order_key, card.cid);
+          recent_cards.emplace(time_order_key, card.cid);
+          if (hot_cards.size() > max_count) {
+            hot_cards.erase(hot_cards.begin());
+          }
+          if (recent_cards.size() > max_count) {
+            recent_cards.erase(recent_cards.begin());
+          }
         }
       }
     }
@@ -1308,12 +1351,14 @@ class CTFOServer final {
     try {
       const iOSGenericEvent& ge = dynamic_cast<const iOSGenericEvent&>(*event.get());
       try {
-        const RESPONSE response = valid_responses_.at(ge.event);
+        const LOG_EVENT response = valid_responses_.at(ge.event);
         const std::string& uid_str = ge.fields.at("uid");
         const std::string token = ge.fields.at("token");
+        const std::string& whom_str = ge.fields.count("whom") ? ge.fields.at("whom") : "";
         const std::string cid_str = ge.fields.count("cid") ? ge.fields.at("cid") : "";
         const std::string oid_str = ge.fields.count("oid") ? ge.fields.at("oid") : "";
         const UID uid = StringToUID(uid_str);
+        const UID whom = StringToUID(whom_str);
         const CID cid = StringToCID(cid_str);
         const OID oid = StringToOID(oid_str);
         DebugPrint(Printf("[UpdateStateOnEvent] Event='%s', uid='%s', cid='%s', oid='%s', token='%s'",
@@ -1323,216 +1368,252 @@ class CTFOServer final {
                           oid_str.c_str(),
                           token.c_str()));
         if (uid != UID::INVALID_USER) {
-          storage_.Transaction([this, uid, cid, oid, uid_str, cid_str, oid_str, token, response](
-              StorageAPI::T_DATA data) {
-            const auto& auth_token_accessor = data.auth_token;
-            bool token_is_valid = false;
-            if (auth_token_accessor.Cols().Has(token)) {
-              // Something went terribly wrong
-              // if we have more than one authentication key for token.
-              assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-              if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
-                token_is_valid = true;
-              }
-            }
-            if (token_is_valid) {
-              if (!Exists(data.users[uid])) {
-                DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s'.", uid_str.c_str()));
-                return;
-              }
-              if (response == RESPONSE::SKIP || response == RESPONSE::CTFO || response == RESPONSE::TFU) {
-                if (cid == CID::INVALID_CARD) {
-                  DebugPrint("[UpdateStateOnEvent] No CID.");
-                  return;
+          storage_.Transaction(
+              [this, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, response](
+                  StorageAPI::T_DATA data) {
+                const auto& auth_token_accessor = data.auth_token;
+                bool token_is_valid = false;
+                if (auth_token_accessor.Cols().Has(token)) {
+                  // Something went terribly wrong
+                  // if we have more than one authentication key for token.
+                  assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
+                  if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
+                    token_is_valid = true;
+                  }
                 }
-                if (!Exists(data.cards[cid])) {
-                  DebugPrint(
-                      Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in SKIP/CTFO/TFU.", cid_str.c_str()));
-                  return;
-                }
-                auto& answers_mutator = data.answers;
-                if (!answers_mutator.Has(uid, cid)) {  // Do not overwrite existing answers.
-                  data.answers.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
-                  DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
-                                    UIDToString(uid).c_str(),
-                                    CIDToString(cid).c_str(),
-                                    static_cast<int>(response)));
-                  const auto optional_card = data.cards[cid];
-                  const auto optional_user = data.users[uid];
-                  if (Exists(optional_card) && Exists(optional_user)) {
-                    Card card = Value(optional_card);
-                    User user = Value(optional_user);
-                    if (response != RESPONSE::SKIP) {
-                      if (response == RESPONSE::CTFO) {
-                        ++card.ctfo_count;
-                        DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
-                                          CIDToString(cid).c_str(),
-                                          card.ctfo_count));
-                        user.score += 50u;
-                        DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
-                                          UIDToString(uid).c_str(),
-                                          50u));
+                if (token_is_valid) {
+                  if (!Exists(data.users[uid])) {
+                    DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s'.", uid_str.c_str()));
+                    return;
+                  }
+                  if (response == LOG_EVENT::SKIP || response == LOG_EVENT::CTFO ||
+                      response == LOG_EVENT::TFU) {
+                    if (cid == CID::INVALID_CARD) {
+                      DebugPrint("[UpdateStateOnEvent] No CID.");
+                      return;
+                    }
+                    if (!Exists(data.cards[cid])) {
+                      DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in SKIP/CTFO/TFU.",
+                                        cid_str.c_str()));
+                      return;
+                    }
+                    auto& answers_mutator = data.answers;
+                    if (!answers_mutator.Has(uid, cid)) {  // Do not overwrite existing answers.
+                      data.answers.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
+                      DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
+                                        UIDToString(uid).c_str(),
+                                        CIDToString(cid).c_str(),
+                                        static_cast<int>(response)));
+                      const auto optional_card = data.cards[cid];
+                      const auto optional_user = data.users[uid];
+                      if (Exists(optional_card) && Exists(optional_user)) {
+                        Card card = Value(optional_card);
+                        User user = Value(optional_user);
+                        if (response != LOG_EVENT::SKIP) {
+                          if (response == LOG_EVENT::CTFO) {
+                            ++card.ctfo_count;
+                            DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
+                                              CIDToString(cid).c_str(),
+                                              card.ctfo_count));
+                            user.score += 50u;
+                            DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
+                                              UIDToString(uid).c_str(),
+                                              50u));
+                          }
+                          if (response == LOG_EVENT::TFU) {
+                            ++card.tfu_count;
+                            DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
+                                              CIDToString(cid).c_str(),
+                                              card.tfu_count));
+                            user.score += 50u;
+                            DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
+                                              UIDToString(uid).c_str(),
+                                              50u));
+                          }
+                          if (user.level < LEVEL_SCORES.size() - 1 &&
+                              user.score > LEVEL_SCORES[user.level + 1]) {
+                            user.score -= LEVEL_SCORES[user.level + 1];
+                            ++user.level;
+                            DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got promoted to a new level = %u",
+                                              UIDToString(uid).c_str(),
+                                              user.level));
+                          }
+                          data.cards.Insert(card);
+                          data.users.Insert(user);
+                          // Emit the "new votes on my card" notification.
+                          const auto iterable = data.card_authors.Rows()[cid];
+                          if (Exists(iterable)) {
+                            // Of course, there can only be one author, but meh. -- D.K.
+                            for (const auto& authors : Value(iterable)) {
+                              const UID author_uid = authors.uid;
+                              if (author_uid != UID::INVALID_USER && author_uid != uid) {
+                                data.notifications.Add(
+                                    Notification(author_uid,
+                                                 static_cast<uint64_t>(bricks::time::Now()),
+                                                 std::make_shared<NotificationNewVotesOnMyCard>(uid, cid)));
+                              }
+                            }
+                          }
+                        }
                       }
-                      if (response == RESPONSE::TFU) {
-                        ++card.tfu_count;
-                        DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
-                                          CIDToString(cid).c_str(),
-                                          card.tfu_count));
-                        user.score += 50u;
-                        DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
-                                          UIDToString(uid).c_str(),
-                                          50u));
-                      }
-                      if (user.level < LEVEL_SCORES.size() - 1 && user.score > LEVEL_SCORES[user.level + 1]) {
-                        user.score -= LEVEL_SCORES[user.level + 1];
-                        ++user.level;
-                        DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got promoted to a new level = %u",
-                                          UIDToString(uid).c_str(),
-                                          user.level));
-                      }
-                      data.cards.Insert(card);
-                      data.users.Insert(user);
-                      // Emit the "new votes on my card" notification.
-                      const auto iterable = data.card_authors.Rows()[cid];
-                      if (Exists(iterable)) {
-                        // Of course, there can only be one author, but meh. -- D.K.
-                        for (const auto& authors : Value(iterable)) {
-                          const UID author_uid = authors.uid;
-                          if (author_uid != UID::INVALID_USER && author_uid != uid) {
-                            data.notifications.Add(
-                                Notification(author_uid,
-                                             static_cast<uint64_t>(bricks::time::Now()),
-                                             std::make_shared<NotificationNewVotesOnMyCard>(uid, cid)));
+                    } else {
+                      DebugPrint(Printf("[UpdateStateOnEvent] Answer already exists: [%s, %s, %d]",
+                                        UIDToString(uid).c_str(),
+                                        CIDToString(cid).c_str(),
+                                        static_cast<int>(Value(answers_mutator.Get(uid, cid)).answer)));
+                    }
+                  } else if (response == LOG_EVENT::FAV_CARD || response == LOG_EVENT::UNFAV_CARD) {
+                    if (cid == CID::INVALID_CARD) {
+                      DebugPrint("[UpdateStateOnEvent] No CID.");
+                      return;
+                    }
+                    if (!Exists(data.cards[cid])) {
+                      DebugPrint(
+                          Printf("[UpdateStateOnEvent] Nonexistent CID '%s' FAV/UNFAV.", cid_str.c_str()));
+                      return;
+                    }
+                    auto& favorites_mutator = data.favorites;
+                    favorites_mutator.Add(Favorite(uid, cid, (response == LOG_EVENT::FAV_CARD)));
+                    DebugPrint(Printf("[UpdateStateOnEvent] Added favorite: [%s, %s, %s]",
+                                      UIDToString(uid).c_str(),
+                                      CIDToString(cid).c_str(),
+                                      (response == LOG_EVENT::FAV_CARD) ? "Favorite" : "Unfavorite"));
+
+                    if (response == LOG_EVENT::FAV_CARD) {
+                      // Emit the "my card starred" notification.
+                      const auto star_notification_key = UIDAndCID(uid, cid);
+                      if (!Exists(data.starred_notification_already_sent[star_notification_key])) {
+                        // Only send the notification about the behavior of this { user, card } once.
+                        data.starred_notification_already_sent.Insert(
+                            StarNotificationAlreadySent{star_notification_key});
+                        const auto iterable = data.card_authors.Rows()[cid];
+                        if (Exists(iterable)) {
+                          // Of course, there can only be one author, but meh. -- D.K.
+                          for (const auto& authors : Value(iterable)) {
+                            const UID author_uid = authors.uid;
+                            if (author_uid != UID::INVALID_USER && author_uid != uid) {
+                              data.notifications.Add(
+                                  Notification(author_uid,
+                                               static_cast<uint64_t>(bricks::time::Now()),
+                                               std::make_shared<NotificationMyCardStarred>(uid, cid)));
+                            }
                           }
                         }
                       }
                     }
-                  }
-                } else {
-                  DebugPrint(Printf("[UpdateStateOnEvent] Answer already exists: [%s, %s, %d]",
-                                    UIDToString(uid).c_str(),
-                                    CIDToString(cid).c_str(),
-                                    static_cast<int>(Value(answers_mutator.Get(uid, cid)).answer)));
-                }
-              } else if (response == RESPONSE::FAV_CARD || response == RESPONSE::UNFAV_CARD) {
-                if (cid == CID::INVALID_CARD) {
-                  DebugPrint("[UpdateStateOnEvent] No CID.");
-                  return;
-                }
-                if (!Exists(data.cards[cid])) {
-                  DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' FAV/UNFAV.", cid_str.c_str()));
-                  return;
-                }
-                auto& favorites_mutator = data.favorites;
-                favorites_mutator.Add(Favorite(uid, cid, (response == RESPONSE::FAV_CARD)));
-                DebugPrint(Printf("[UpdateStateOnEvent] Added favorite: [%s, %s, %s]",
-                                  UIDToString(uid).c_str(),
-                                  CIDToString(cid).c_str(),
-                                  (response == RESPONSE::FAV_CARD) ? "Favorite" : "Unfavorite"));
+                  } else if (response == LOG_EVENT::LIKE_COMMENT || response == LOG_EVENT::UNLIKE_COMMENT ||
+                             response == LOG_EVENT::FLAG_COMMENT) {
+                    if (oid == OID::INVALID_COMMENT) {
+                      DebugPrint("[UpdateStateOnEvent] No OID.");
+                      return;
+                    }
+                    if (!data.comments.Cols().Has(oid)) {
+                      DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent OID '%s' LIKE/UNLIKE/FLAG.",
+                                        oid_str.c_str()));
+                      return;
+                    }
+                    if (response == LOG_EVENT::LIKE_COMMENT) {
+                      DebugPrint(Printf(
+                          "[UpdateStateOnEvent] Like comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
+                      CommentLike like;
+                      like.oid = oid;
+                      like.uid = uid;
+                      data.comment_likes.Add(like);
 
-                if (response == RESPONSE::FAV_CARD) {
-                  // Emit the "my card starred" notification.
-                  const auto star_notification_key = UIDAndCID(uid, cid);
-                  if (!Exists(data.starred_notification_already_sent[star_notification_key])) {
-                    // Only send the notification about the behavior of this { user, card } once.
-                    data.starred_notification_already_sent.Insert(
-                        StarNotificationAlreadySent{star_notification_key});
-                    const auto iterable = data.card_authors.Rows()[cid];
-                    if (Exists(iterable)) {
-                      // Of course, there can only be one author, but meh. -- D.K.
-                      for (const auto& authors : Value(iterable)) {
-                        const UID author_uid = authors.uid;
-                        if (author_uid != UID::INVALID_USER && author_uid != uid) {
-                          data.notifications.Add(
-                              Notification(author_uid,
-                                           static_cast<uint64_t>(bricks::time::Now()),
-                                           std::make_shared<NotificationMyCardStarred>(uid, cid)));
+                      // Emit the "my comment liked" notification.
+                      const auto comments_iterator = data.comments.Cols()[oid];
+                      if (Exists(comments_iterator)) {
+                        const auto comments = Value(comments_iterator);
+                        if (comments.Size() == 1u) {
+                          const Comment& comment = *comments.begin();
+                          UID comment_author_uid = comment.author_uid;
+                          if (comment_author_uid != UID::INVALID_USER && comment_author_uid != like.uid) {
+                            data.notifications.Add(
+                                Notification(comment_author_uid,
+                                             static_cast<uint64_t>(bricks::time::Now()),
+                                             std::make_shared<NotificationMyCommentLiked>(like.uid, comment)));
+                          }
                         }
                       }
-                    }
-                  }
-                }
-              } else if (response == RESPONSE::LIKE_COMMENT || response == RESPONSE::UNLIKE_COMMENT ||
-                         response == RESPONSE::FLAG_COMMENT) {
-                if (oid == OID::INVALID_COMMENT) {
-                  DebugPrint("[UpdateStateOnEvent] No OID.");
-                  return;
-                }
-                if (!data.comments.Cols().Has(oid)) {
-                  DebugPrint(
-                      Printf("[UpdateStateOnEvent] Nonexistent OID '%s' LIKE/UNLIKE/FLAG.", oid_str.c_str()));
-                  return;
-                }
-                if (response == RESPONSE::LIKE_COMMENT) {
-                  DebugPrint(
-                      Printf("[UpdateStateOnEvent] Like comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
-                  CommentLike like;
-                  like.oid = oid;
-                  like.uid = uid;
-                  data.comment_likes.Add(like);
 
-                  // Emit the "my comment liked" notification.
-                  const auto comments_iterator = data.comments.Cols()[oid];
-                  if (Exists(comments_iterator)) {
-                    const auto comments = Value(comments_iterator);
-                    if (comments.Size() == 1u) {
-                      const Comment& comment = *comments.begin();
-                      UID comment_author_uid = comment.author_uid;
-                      if (comment_author_uid != UID::INVALID_USER && comment_author_uid != like.uid) {
-                        data.notifications.Add(
-                            Notification(comment_author_uid,
-                                         static_cast<uint64_t>(bricks::time::Now()),
-                                         std::make_shared<NotificationMyCommentLiked>(like.uid, comment)));
+                    } else if (response == LOG_EVENT::UNLIKE_COMMENT) {
+                      DebugPrint(Printf(
+                          "[UpdateStateOnEvent] Unlike comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
+                      data.comment_likes.Delete(oid, uid);
+                    } else if (response == LOG_EVENT::FLAG_COMMENT) {
+                      DebugPrint(Printf(
+                          "[UpdateStateOnEvent] Flag comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
+                      CommentFlagAsInappropriate flag;
+                      flag.oid = oid;
+                      flag.uid = uid;
+                      data.flagged_comments.Add(flag);
+                    } else {
+                      DebugPrint(
+                          Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
+                                 static_cast<int>(response),
+                                 uid_str.c_str(),
+                                 cid_str.c_str(),
+                                 token.c_str()));
+                    }
+                  } else if (response == LOG_EVENT::FLAG_CARD) {
+                    if (cid == CID::INVALID_CARD) {
+                      DebugPrint("[UpdateStateOnEvent] No CID.");
+                      return;
+                    }
+                    if (!Exists(data.cards[cid])) {
+                      DebugPrint(
+                          Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in FLAG_CARD.", cid_str.c_str()));
+                      return;
+                    }
+                    DebugPrint(
+                        Printf("[UpdateStateOnEvent] Flag card '%s' '%s'.", uid_str.c_str(), cid_str.c_str()));
+                    CardFlagAsInappropriate flag;
+                    flag.cid = cid;
+                    flag.uid = uid;
+                    data.flagged_cards.Add(flag);
+                  } else if (response == LOG_EVENT::REPORT_USER || response == LOG_EVENT::BLOCK_USER) {
+                    if (whom == UID::INVALID_USER) {
+                      DebugPrint("[UpdateStateOnEvent] No WHOM.");
+                      return;
+                    }
+                    if (whom == uid) {
+                      DebugPrint("[UpdateStateOnEvent] WHOM == UID.");
+                      return;
+                    }
+                    if (whom == admin_uid) {
+                      DebugPrint("[UpdateStateOnEvent] WHOM == ADMIN_UID.");
+                      return;
+                    }
+                    DebugPrint(Printf("[UpdateStateOnEvent] '%s' %s '%s'.",
+                                      uid_str.c_str(),
+                                      (response == LOG_EVENT::REPORT_USER) ? "reported" : "blocked",
+                                      whom_str.c_str()));
+                    if (response == LOG_EVENT::REPORT_USER) {
+                      data.user_reported_user.Add(UserReportedUser(uid, whom));
+                    } else {
+                      data.user_blocked_user.Add(UserBlockedUser(uid, whom));
+                    }
+                    {
+                      const auto blocks = data.user_blocked_user.Cols()[whom];
+                      const auto reports = data.user_reported_user.Cols()[whom];
+                      if ((Exists(blocks) && Value(blocks).Size() >= FLAGS_blocks_to_ban) ||
+                          (Exists(reports) && Value(reports).Size() >= FLAGS_reports_to_ban)) {
+                        BanUser(data, whom);
                       }
                     }
+                  } else {
+                    DebugPrint(
+                        Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
+                               static_cast<int>(response),
+                               uid_str.c_str(),
+                               cid_str.c_str(),
+                               token.c_str()));
                   }
-
-                } else if (response == RESPONSE::UNLIKE_COMMENT) {
-                  DebugPrint(Printf(
-                      "[UpdateStateOnEvent] Unlike comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
-                  data.comment_likes.Delete(oid, uid);
-                } else if (response == RESPONSE::FLAG_COMMENT) {
-                  DebugPrint(
-                      Printf("[UpdateStateOnEvent] Flag comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
-                  CommentFlagAsInappropriate flag;
-                  flag.oid = oid;
-                  flag.uid = uid;
-                  data.flagged_comments.Add(flag);
                 } else {
                   DebugPrint(
-                      Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
-                             static_cast<int>(response),
-                             uid_str.c_str(),
-                             cid_str.c_str(),
-                             token.c_str()));
+                      Printf("[UpdateStateOnEvent] Not valid token '%s' found in event.", token.c_str()));
                 }
-              } else if (response == RESPONSE::FLAG_CARD) {
-                if (cid == CID::INVALID_CARD) {
-                  DebugPrint("[UpdateStateOnEvent] No CID.");
-                  return;
-                }
-                if (!Exists(data.cards[cid])) {
-                  DebugPrint(
-                      Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in FLAG_CARD.", cid_str.c_str()));
-                  return;
-                }
-                DebugPrint(
-                    Printf("[UpdateStateOnEvent] Flag card '%s' '%s'.", uid_str.c_str(), cid_str.c_str()));
-                CardFlagAsInappropriate flag;
-                flag.cid = cid;
-                flag.uid = uid;
-                data.flagged_cards.Add(flag);
-              } else {
-                DebugPrint(Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
-                                  static_cast<int>(response),
-                                  uid_str.c_str(),
-                                  cid_str.c_str(),
-                                  token.c_str()));
-              }
-            } else {
-              DebugPrint(Printf("[UpdateStateOnEvent] Not valid token '%s' found in event.", token.c_str()));
-            }
-          });
+              });
         } else {
           DebugPrint("[UpdateStateOnEvent] Invalid UID.");
         }
@@ -1544,6 +1625,8 @@ class CTFOServer final {
       DebugPrint("[UpdateStateOnEvent] Not an `iOSGenericEvent`: " + CerealizeJSON(event));
     }
   }
+
+  void BanUser(StorageAPI::T_DATA data, const UID uid) { data.banned_users.Insert(BannedUser(uid)); }
 };
 }  // namespace CTFO
 
