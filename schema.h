@@ -437,6 +437,32 @@ struct CommentFlagAsInappropriate : Super {
   }
 };
 
+// Because Cereal is not friendly with `std::pair<>`. :-(
+struct UIDAndCID {
+  UID uid;
+  CID cid;
+  UIDAndCID(UID uid = UID::INVALID_USER, CID cid = CID::INVALID_CARD) : uid(uid), cid(cid) {}
+  bool operator<(const UIDAndCID& rhs) const { return std::tie(uid, cid) < std::tie(rhs.uid, rhs.cid); }
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(uid), CEREAL_NVP(cid));
+  }
+};
+
+// To make sure the "star-unstar-repeat" actions sequence only sends the notification once.
+struct StarNotificationAlreadySent : Super {
+  UIDAndCID key;
+
+  StarNotificationAlreadySent() = default;
+  StarNotificationAlreadySent(const UIDAndCID& key) : key(key) {}
+
+  template <typename A>
+  void serialize(A& ar) {
+    Super::serialize(ar);
+    ar(CEREAL_NVP(key));
+  }
+};
+
 // Data structures for generating RESTful responses.
 struct ResponseUserEntry {
   std::string uid = "uINVALID";    // User id, format 'u01XXX...'.

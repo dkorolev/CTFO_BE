@@ -71,6 +71,8 @@ struct StorageAPIImpl {
   LightweightMatrix<CardFlagAsInappropriate, POLICY> flagged_cards{"flagged_cards", instance};
   LightweightMatrix<CommentFlagAsInappropriate, POLICY> flagged_comments{"flagged_comments", instance};
   LightweightMatrix<Notification, POLICY> notifications{"notifications", instance};
+  OrderedDictionary<StarNotificationAlreadySent, POLICY> starred_notification_already_sent{
+      "starred_notification_already_sent", instance};
 
   // TODO(dkorolev): A templated version of the constructor.
   StorageAPIImpl(const std::string& filename) : instance(filename) { instance.Run(); }
@@ -955,17 +957,23 @@ class CTFOServer final {
 
               comments_mutator.Add(comment);
 
-              // Emit the "new comment" notification.
+              // Emit the "new comment on my card" notification.
               if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
-                data.notifications.Add(Notification(
-                    card_author_uid, now, std::make_shared<NotificationMyCardNewComment>(comment)));
+                // Do not send "new comment on my card" if it is the reply to my own comment.
+                if (parent_comment_author_uid == UID::INVALID_USER ||
+                    parent_comment_author_uid != card_author_uid) {
+                  data.notifications.Add(Notification(
+                      card_author_uid, now, std::make_shared<NotificationMyCardNewComment>(comment)));
+                }
               }
 
               // Emit the "new comment on a card you starred" notification.
               const auto card_favoriters = data.favorites.Cols()[cid];
               if (Exists(card_favoriters)) {
                 for (const Favorite& fav : Value(card_favoriters)) {
-                  if (fav.uid != uid) {
+                  // Do not send the notification if the favoriter is the author of the card.
+                  // (As the code above has already sent the "new comment on my card" notification.)
+                  if (fav.uid != uid && fav.uid != card_author_uid) {
                     data.notifications.Add(Notification(
                         fav.uid, now, std::make_shared<NotificationNewCommentOnCardIStarred>(uid, comment)));
                   }
@@ -1422,17 +1430,25 @@ class CTFOServer final {
                                   CIDToString(cid).c_str(),
                                   (response == RESPONSE::FAV_CARD) ? "Favorite" : "Unfavorite"));
 
-                // Emit the "my card starred" notification.
-                const auto iterable = data.card_authors.Rows()[cid];
-                if (Exists(iterable)) {
-                  // Of course, there can only be one author, but meh. -- D.K.
-                  for (const auto& authors : Value(iterable)) {
-                    const UID author_uid = authors.uid;
-                    if (author_uid != UID::INVALID_USER && author_uid != uid) {
-                      data.notifications.Add(
-                          Notification(author_uid,
-                                       static_cast<uint64_t>(bricks::time::Now()),
-                                       std::make_shared<NotificationMyCardStarred>(uid, cid)));
+                if (response == RESPONSE::FAV_CARD) {
+                  // Emit the "my card starred" notification.
+                  const auto star_notification_key = UIDAndCID(uid, cid);
+                  if (!Exists(data.starred_notification_already_sent[star_notification_key])) {
+                    // Only send the notification about the behavior of this { user, card } once.
+                    data.starred_notification_already_sent.Insert(
+                        StarNotificationAlreadySent{star_notification_key});
+                    const auto iterable = data.card_authors.Rows()[cid];
+                    if (Exists(iterable)) {
+                      // Of course, there can only be one author, but meh. -- D.K.
+                      for (const auto& authors : Value(iterable)) {
+                        const UID author_uid = authors.uid;
+                        if (author_uid != UID::INVALID_USER && author_uid != uid) {
+                          data.notifications.Add(
+                              Notification(author_uid,
+                                           static_cast<uint64_t>(bricks::time::Now()),
+                                           std::make_shared<NotificationMyCardStarred>(uid, cid)));
+                        }
+                      }
                     }
                   }
                 }
