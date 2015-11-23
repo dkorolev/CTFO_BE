@@ -524,10 +524,16 @@ struct ResponseUserEntry {
   uint8_t level = 0u;              // User level, [0, 9].
   uint64_t score = 0u;             // User score.
   uint64_t next_level_score = 0u;  // Score value when user is promoted to the next level.
+  bool banned = false;             // Whether the user is banned.
 
   template <typename A>
   void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(token), CEREAL_NVP(level), CEREAL_NVP(score), CEREAL_NVP(next_level_score));
+    ar(CEREAL_NVP(uid),
+       CEREAL_NVP(token),
+       CEREAL_NVP(level),
+       CEREAL_NVP(score),
+       CEREAL_NVP(next_level_score),
+       CEREAL_NVP(banned));
   }
 };
 
@@ -737,7 +743,6 @@ struct ResponseNotification {
 struct ResponseFeed {
   uint64_t ms;                                      // Server timestamp, milliseconds from epoch.
   ResponseUserEntry user;                           // User information.
-  bool banned = false;                              // Whether the user is banned.
   std::vector<ResponseCardEntry> feed_hot;          // "Hot" cards feeds.
   std::vector<ResponseCardEntry> feed_recent;       // "Recent" cards feeds.
   std::vector<ResponseNotification> notifications;  // Notifications.
@@ -746,7 +751,6 @@ struct ResponseFeed {
   void serialize(A& ar) {
     ar(CEREAL_NVP(ms),
        CEREAL_NVP(user),
-       CEREAL_NVP(banned),
        CEREAL_NVP(feed_hot),
        CEREAL_NVP(feed_recent),
        CEREAL_NVP(notifications));

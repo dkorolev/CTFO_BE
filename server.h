@@ -252,10 +252,10 @@ class CTFOServer final {
                                 app_key.c_str(),
                                 token.c_str()));
 
-              CopyUserInfoToResponseEntry(user, user_entry);
+              CopyUserInfoToResponseEntry(user, Exists(data.banned_users[uid]), user_entry);
               user_entry.token = token;
 
-              ResponseFeed rfeed = GenerateResponseFeed(data, uid, user_entry, feed_count, notifications_since);
+              ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
               return Response(rfeed, "feed");
             },
             std::move(r));
@@ -303,10 +303,10 @@ class CTFOServer final {
                 DebugPrint(Printf("[/ctfo/feed] Token validated. Requested URL = '%s'", requested_url.c_str()));
                 const auto user = Value(data.users[uid]);
                 ResponseUserEntry user_entry;
-                CopyUserInfoToResponseEntry(user, user_entry);
+                CopyUserInfoToResponseEntry(user, Exists(data.banned_users[uid]), user_entry);
                 user_entry.token = token;
                 ResponseFeed rfeed =
-                    GenerateResponseFeed(data, uid, user_entry, feed_count, notifications_since);
+                    GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
                 return Response(rfeed, "feed");
               }
             },
@@ -353,7 +353,7 @@ class CTFOServer final {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
               ResponseFavs rfavs;
-              CopyUserInfoToResponseEntry(Value(user), rfavs.user);
+              CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_users[uid]), rfavs.user);
 
               const auto& answers = data.answers;
 
@@ -473,7 +473,7 @@ class CTFOServer final {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
               ResponseMyCards r_my_cards;
-              CopyUserInfoToResponseEntry(Value(user), r_my_cards.user);
+              CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_users[uid]), r_my_cards.user);
 
               const auto& answers = data.answers;
               const auto& favorites = data.favorites;
@@ -1106,7 +1106,7 @@ class CTFOServer final {
     }
   }
 
-  void CopyUserInfoToResponseEntry(const User& user, ResponseUserEntry& entry) {
+  void CopyUserInfoToResponseEntry(const User& user, bool banned, ResponseUserEntry& entry) {
     entry.uid = UIDToString(user.uid);
     entry.score = user.score;
     entry.level = user.level;
@@ -1115,10 +1115,10 @@ class CTFOServer final {
     } else {
       entry.next_level_score = 0u;
     }
+    entry.banned = banned;
   }
 
   ResponseFeed GenerateResponseFeed(StorageAPI::T_DATA data,
-                                    UID user_uid,
                                     ResponseUserEntry user_entry,
                                     size_t feed_size,
                                     uint64_t notifications_since) {
@@ -1126,10 +1126,6 @@ class CTFOServer final {
     constexpr size_t FEED_SIZE_LIMIT = 300ul;
     const size_t max_count = std::min(feed_size, FEED_SIZE_LIMIT);
     response.user = user_entry;
-    response.banned = Exists(data.banned_users[user_uid]);
-    if (response.banned) {
-      return response;
-    }
 
     const auto& cards = data.cards;
     const auto& answers = data.answers;
