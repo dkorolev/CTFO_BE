@@ -1415,8 +1415,7 @@ class CTFOServer final {
                             DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
                                               UIDToString(uid).c_str(),
                                               50u));
-                          }
-                          if (response == LOG_EVENT::TFU) {
+                          } else if (response == LOG_EVENT::TFU) {
                             ++card.tfu_count;
                             DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
                                               CIDToString(cid).c_str(),
@@ -1425,6 +1424,8 @@ class CTFOServer final {
                             DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
                                               UIDToString(uid).c_str(),
                                               50u));
+                          } else if (response == LOG_EVENT::SKIP) {
+                            ++card.skip_count;
                           }
                           if (user.level < LEVEL_SCORES.size() - 1 &&
                               user.score > LEVEL_SCORES[user.level + 1]) {
