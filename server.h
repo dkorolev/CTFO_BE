@@ -305,8 +305,7 @@ class CTFOServer final {
                 ResponseUserEntry user_entry;
                 CopyUserInfoToResponseEntry(user, Exists(data.banned_users[uid]), user_entry);
                 user_entry.token = token;
-                ResponseFeed rfeed =
-                    GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
+                ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
                 return Response(rfeed, "feed");
               }
             },
@@ -1405,38 +1404,40 @@ class CTFOServer final {
                       if (Exists(optional_card) && Exists(optional_user)) {
                         Card card = Value(optional_card);
                         User user = Value(optional_user);
+                        if (response == LOG_EVENT::CTFO) {
+                          ++card.ctfo_count;
+                          DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
+                                            CIDToString(cid).c_str(),
+                                            card.ctfo_count));
+                          user.score += 50u;
+                          DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
+                                            UIDToString(uid).c_str(),
+                                            50u));
+                        } else if (response == LOG_EVENT::TFU) {
+                          ++card.tfu_count;
+                          DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
+                                            CIDToString(cid).c_str(),
+                                            card.tfu_count));
+                          user.score += 50u;
+                          DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
+                                            UIDToString(uid).c_str(),
+                                            50u));
+                        } else if (response == LOG_EVENT::SKIP) {
+                          ++card.skip_count;
+                        }
+
+                        if (response != LOG_EVENT::SKIP && user.level < LEVEL_SCORES.size() - 1 &&
+                            user.score > LEVEL_SCORES[user.level + 1]) {
+                          user.score -= LEVEL_SCORES[user.level + 1];
+                          ++user.level;
+                          DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got promoted to a new level = %u",
+                                            UIDToString(uid).c_str(),
+                                            user.level));
+                        }
+                        data.cards.Insert(card);
+                        data.users.Insert(user);
+
                         if (response != LOG_EVENT::SKIP) {
-                          if (response == LOG_EVENT::CTFO) {
-                            ++card.ctfo_count;
-                            DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
-                                              CIDToString(cid).c_str(),
-                                              card.ctfo_count));
-                            user.score += 50u;
-                            DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
-                                              UIDToString(uid).c_str(),
-                                              50u));
-                          } else if (response == LOG_EVENT::TFU) {
-                            ++card.tfu_count;
-                            DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
-                                              CIDToString(cid).c_str(),
-                                              card.tfu_count));
-                            user.score += 50u;
-                            DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
-                                              UIDToString(uid).c_str(),
-                                              50u));
-                          } else if (response == LOG_EVENT::SKIP) {
-                            ++card.skip_count;
-                          }
-                          if (user.level < LEVEL_SCORES.size() - 1 &&
-                              user.score > LEVEL_SCORES[user.level + 1]) {
-                            user.score -= LEVEL_SCORES[user.level + 1];
-                            ++user.level;
-                            DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got promoted to a new level = %u",
-                                              UIDToString(uid).c_str(),
-                                              user.level));
-                          }
-                          data.cards.Insert(card);
-                          data.users.Insert(user);
                           // Emit the "new votes on my card" notification.
                           const auto iterable = data.card_authors.Rows()[cid];
                           if (Exists(iterable)) {
