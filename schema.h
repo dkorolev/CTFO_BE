@@ -437,6 +437,86 @@ struct CommentFlagAsInappropriate : Super {
   }
 };
 
+// Because Cereal is not friendly with `std::pair<>`. :-(
+struct UIDAndCID {
+  UID uid;
+  CID cid;
+  UIDAndCID(UID uid = UID::INVALID_USER, CID cid = CID::INVALID_CARD) : uid(uid), cid(cid) {}
+  bool operator<(const UIDAndCID& rhs) const { return std::tie(uid, cid) < std::tie(rhs.uid, rhs.cid); }
+  template <typename A>
+  void serialize(A& ar) {
+    ar(CEREAL_NVP(uid), CEREAL_NVP(cid));
+  }
+};
+
+// To make sure the "star-unstar-repeat" actions sequence only sends the notification once.
+struct StarNotificationAlreadySent : Super {
+  UIDAndCID key;
+
+  StarNotificationAlreadySent() = default;
+  StarNotificationAlreadySent(const UIDAndCID& key) : key(key) {}
+
+  template <typename A>
+  void serialize(A& ar) {
+    Super::serialize(ar);
+    ar(CEREAL_NVP(key));
+  }
+};
+
+// To enable reporting users.
+struct UserReportedUser : Super {
+  UID who;
+  UID whom;
+
+  UID row() const { return who; }
+  void set_row(const UID value) { who = value; }
+  UID col() const { return whom; }
+  void set_col(const UID value) { whom = value; }
+
+  UserReportedUser(UID who = UID::INVALID_USER, UID whom = UID::INVALID_USER) : who(who), whom(whom) {}
+
+  template <typename A>
+  void serialize(A& ar) {
+    Super::serialize(ar);
+    ar(CEREAL_NVP(who), CEREAL_NVP(whom));
+  }
+};
+
+// To enable blocking users.
+struct UserBlockedUser : Super {
+  UID who;
+  UID whom;
+
+  UID row() const { return who; }
+  void set_row(const UID value) { who = value; }
+  UID col() const { return whom; }
+  void set_col(const UID value) { whom = value; }
+
+  UserBlockedUser(UID who = UID::INVALID_USER, UID whom = UID::INVALID_USER) : who(who), whom(whom) {}
+
+  template <typename A>
+  void serialize(A& ar) {
+    Super::serialize(ar);
+    ar(CEREAL_NVP(who), CEREAL_NVP(whom));
+  }
+};
+
+// To enable banned users support.
+struct BannedUser : Super {
+  UID banned_uid;
+
+  BannedUser(const UID uid = UID::INVALID_USER) : banned_uid(uid) {}
+
+  UID key() const { return banned_uid; }
+  void set_key(const UID value) { banned_uid = value; }
+
+  template <typename A>
+  void serialize(A& ar) {
+    Super::serialize(ar);
+    ar(CEREAL_NVP(banned_uid));
+  }
+};
+
 // Data structures for generating RESTful responses.
 struct ResponseUserEntry {
   std::string uid = "uINVALID";    // User id, format 'u01XXX...'.
@@ -444,10 +524,16 @@ struct ResponseUserEntry {
   uint8_t level = 0u;              // User level, [0, 9].
   uint64_t score = 0u;             // User score.
   uint64_t next_level_score = 0u;  // Score value when user is promoted to the next level.
+  bool banned = false;             // Whether the user is banned.
 
   template <typename A>
   void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(token), CEREAL_NVP(level), CEREAL_NVP(score), CEREAL_NVP(next_level_score));
+    ar(CEREAL_NVP(uid),
+       CEREAL_NVP(token),
+       CEREAL_NVP(level),
+       CEREAL_NVP(score),
+       CEREAL_NVP(next_level_score),
+       CEREAL_NVP(banned));
   }
 };
 
