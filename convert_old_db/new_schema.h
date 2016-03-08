@@ -57,7 +57,6 @@ CURRENT_STRUCT(User) {
 
   CURRENT_DEFAULT_CONSTRUCTOR(User) {}
 
-  using T_BRIEF = User;
   void InitializeOwnKey() {}
 };
 
@@ -84,7 +83,6 @@ CURRENT_STRUCT(Card) {
 
   CURRENT_DEFAULT_CONSTRUCTOR(Card) {}
 
-  using T_BRIEF = Card;
   void InitializeOwnKey() {}
 };
 
