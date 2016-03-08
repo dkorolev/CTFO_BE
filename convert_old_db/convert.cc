@@ -37,8 +37,7 @@ SOFTWARE.
 DEFINE_string(input, "db.json", "The name of the input data to convert.");
 DEFINE_string(output, "new_db.json", "The name of the input data to convert.");
 
-// TODO(dkorolev) + TODO(mzhurovich): Should we expose `T_FIELDS_VARIANT` or `T_TRANSACTION` from Storage?
-using T_PERSISTED_VARIANT = Variant<Persisted_UserUpdated, Persisted_CardUpdated>;
+using T_PERSISTED_VARIANT = typename NewCTFO<SherlockStreamPersister>::T_TRANSACTION::T_VARIANT;
 
 template<typename T_RECORD, typename T_PERSISTED_RECORD>
 std::string DictionaryUpdate(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
