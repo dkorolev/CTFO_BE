@@ -55,7 +55,7 @@ CURRENT_STRUCT(User) {
   CURRENT_USE_FIELD_AS_KEY(uid);
   CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
   CURRENT_FIELD(level, uint8_t, 0u);           // User level [0, 9].
-  CURRENT_FIELD(score, uint64_t, score = 0u);  // User score.
+  CURRENT_FIELD(score, uint64_t, 0u);  // User score.
 
   CURRENT_DEFAULT_CONSTRUCTOR(User) {}
 
