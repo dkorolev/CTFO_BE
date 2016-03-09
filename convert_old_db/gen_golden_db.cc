@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
 
   if (Value(result)) {
     db.Transaction([](MutableFields<DB> fields) {
-      User user;
+      new_ctfo::User user;
       user.uid = static_cast<UID>(42);
       user.level = 1;
       user.score = 9001;
@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
     }).Go();
 
     db.Transaction([](MutableFields<DB> fields) {
-      Card card;
+      new_ctfo::Card card;
       card.cid = static_cast<CID>(42);
       card.text = "В лесу родилась ёлочка";
       card.color.green = 0xff;
