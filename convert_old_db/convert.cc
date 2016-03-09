@@ -42,7 +42,7 @@ DEFINE_string(output, "new_db.json", "The name of the input data to convert.");
 using T_PERSISTED_VARIANT = typename NewCTFO<SherlockStreamPersister>::T_TRANSACTION::T_VARIANT;
 
 template <typename T_RECORD, typename T_PERSISTED_RECORD>
-std::string DictionaryUpdate(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
+std::string GenericUpdate(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
   assert(tsv.size() == 3u);
 
   current::storage::Transaction<T_PERSISTED_VARIANT> transaction;
@@ -100,6 +100,24 @@ std::string DictionaryErase(const std::chrono::microseconds timestamp, const std
   return JSON(transaction);
 }
 
+template <typename T_RECORD, typename T_PERSISTED_RECORD>
+std::string MatrixErase(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
+  assert(tsv.size() == 4u);
+
+  current::storage::Transaction<T_PERSISTED_VARIANT> transaction;
+
+  transaction.meta.timestamp = timestamp;
+  using T_ROW = current::storage::sfinae::ENTRY_ROW_TYPE<T_RECORD>;
+  using T_COL = current::storage::sfinae::ENTRY_COL_TYPE<T_RECORD>;
+  const T_ROW row = static_cast<T_ROW>(ParseJSON<OldDictionarySimpleKeyEntry>(tsv[2]).data);
+  const T_COL col = static_cast<T_COL>(ParseJSON<OldDictionarySimpleKeyEntry>(tsv[3]).data);
+  auto delete_event = T_PERSISTED_RECORD();
+  delete_event.key = std::make_pair(row, col);
+  transaction.mutations.emplace_back(delete_event);
+
+  return JSON(transaction);
+}
+
 int main(int argc, char** argv) {
   ParseDFlags(&argc, &argv);
 
@@ -113,17 +131,39 @@ int main(int argc, char** argv) {
       handlers;
 
   // Dictionaries.
-  handlers["users.insert"] = DictionaryUpdate<User, Persisted_UserUpdated>;
-  handlers["users.erase"] = DictionaryErase<User, Persisted_UserDeleted>;
-  handlers["cards.insert"] = DictionaryUpdate<Card, Persisted_CardUpdated>;
-  handlers["cards.erase"] = DictionaryErase<User, Persisted_CardDeleted>;
+  handlers["users.insert"] = GenericUpdate<new_ctfo::User, Persisted_UserUpdated>;
+  handlers["users.erase"] = DictionaryErase<new_ctfo::User, Persisted_UserDeleted>;
+  handlers["cards.insert"] = GenericUpdate<new_ctfo::Card, Persisted_CardUpdated>;
+  handlers["cards.erase"] = DictionaryErase<new_ctfo::User, Persisted_CardDeleted>;
   // We never erase smth in the dictionaries below.
   handlers["starred_notification_already_sent.insert"] =
-      StarredNotificationsSentDictionaryUpdate<StarNotificationAlreadySent,
+      StarredNotificationsSentDictionaryUpdate<new_ctfo::StarNotificationAlreadySent,
                                                Persisted_StarNotificationAlreadySentUpdated>;
-  handlers["banned_users.insert"] = DictionaryUpdate<BannedUser, Persisted_BannedUserUpdated>;
-  // TODO(dkorolev): Matrix mutations.
-  // TODO(dkorolev): Matrix deletions.
+  handlers["banned_users.insert"] = GenericUpdate<new_ctfo::BannedUser, Persisted_BannedUserUpdated>;
+
+  // Matrix updates.
+  handlers["auth_token.add"] = GenericUpdate<new_ctfo::AuthKeyTokenPair, Persisted_AuthKeyTokenPairUpdated>;
+  handlers["auth_uid.add"] = GenericUpdate<new_ctfo::AuthKeyUIDPair, Persisted_AuthKeyUIDPairUpdated>;
+  handlers["card_authors.add"] = GenericUpdate<new_ctfo::CardAuthor, Persisted_CardAuthorUpdated>;
+  handlers["answers.add"] = GenericUpdate<new_ctfo::Answer, Persisted_AnswerUpdated>;
+  handlers["favorites.add"] = GenericUpdate<new_ctfo::Favorite, Persisted_FavoriteUpdated>;
+  handlers["comments.add"] = GenericUpdate<new_ctfo::Comment, Persisted_CommentUpdated>;
+  handlers["comment_likes.add"] = GenericUpdate<new_ctfo::CommentLike, Persisted_CommentLikeUpdated>;
+  handlers["flagged_cards.add"] =
+      GenericUpdate<new_ctfo::CardFlagAsInappropriate, Persisted_CardFlagAsInappropriateUpdated>;
+  handlers["flagged_comments.add"] =
+      GenericUpdate<new_ctfo::CommentFlagAsInappropriate, Persisted_CommentFlagAsInappropriateUpdated>;
+  handlers["user_reported_user.add"] =
+      GenericUpdate<new_ctfo::UserReportedUser, Persisted_UserReportedUserUpdated>;
+  handlers["user_blocked_user.add"] =
+      GenericUpdate<new_ctfo::UserBlockedUser, Persisted_UserBlockedUserUpdated>;
+
+  // Rare matrix deletes.
+  handlers["card_authors.delete"] = MatrixErase<new_ctfo::CardAuthor, Persisted_CardAuthorDeleted>;
+  handlers["comments.delete"] = MatrixErase<new_ctfo::Comment, Persisted_CommentDeleted>;
+  handlers["comment_likes.delete"] = MatrixErase<new_ctfo::CommentLike, Persisted_CommentLikeDeleted>;
+
+  // TODO(dkorolev): Notifications.
   // TODO(dkorolev): Matrix REST support.
 
   size_t total_lines = 0u;
