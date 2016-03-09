@@ -30,17 +30,45 @@ SOFTWARE.
 #include "../../Current/Storage/storage.h"
 #include "../../Current/Storage/persister/sherlock.h"
 
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, User, Persisted_User);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, Card, Persisted_Card);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::User, Persisted_User);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix, new_ctfo::AuthKeyTokenPair, Persisted_AuthKeyTokenPair);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix, new_ctfo::AuthKeyUIDPair, Persisted_AuthKeyUIDPair);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::Card, Persisted_Card);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix, new_ctfo::CardAuthor, Persisted_CardAuthor);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix, new_ctfo::Answer, Persisted_Answer);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix, new_ctfo::Favorite, Persisted_Favorite);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix, new_ctfo::Comment, Persisted_Comment);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix, new_ctfo::CommentLike, Persisted_CommentLike);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix,
+                            new_ctfo::CardFlagAsInappropriate,
+                            Persisted_CardFlagAsInappropriate);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix,
+                            new_ctfo::CommentFlagAsInappropriate,
+                            Persisted_CommentFlagAsInappropriate);
+// CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix, new_ctfo::Notification, Persisted_Notification);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary,
-                            StarNotificationAlreadySent,
+                            new_ctfo::StarNotificationAlreadySent,
                             Persisted_StarNotificationAlreadySent);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, BannedUser, Persisted_BannedUser);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix, new_ctfo::UserReportedUser, Persisted_UserReportedUser);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix, new_ctfo::UserBlockedUser, Persisted_UserBlockedUser);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::BannedUser, Persisted_BannedUser);
 
 CURRENT_STORAGE(NewCTFO) {
   CURRENT_STORAGE_FIELD(user, Persisted_User);
+  CURRENT_STORAGE_FIELD(auth_token, Persisted_AuthKeyTokenPair);
+  CURRENT_STORAGE_FIELD(auth_uid, Persisted_AuthKeyUIDPair);
   CURRENT_STORAGE_FIELD(card, Persisted_Card);
+  CURRENT_STORAGE_FIELD(card_author, Persisted_CardAuthor);
+  CURRENT_STORAGE_FIELD(answer, Persisted_Answer);
+  CURRENT_STORAGE_FIELD(favorite, Persisted_Favorite);
+  CURRENT_STORAGE_FIELD(comment, Persisted_Comment);
+  CURRENT_STORAGE_FIELD(comment_like, Persisted_CommentLike);
+  CURRENT_STORAGE_FIELD(flagged_card, Persisted_CardFlagAsInappropriate);
+  CURRENT_STORAGE_FIELD(flagged_comment, Persisted_CommentFlagAsInappropriate);
+  //  CURRENT_STORAGE_FIELD(notification, Persisted_Notification);
   CURRENT_STORAGE_FIELD(starred_notification_already_sent, Persisted_StarNotificationAlreadySent);
+  CURRENT_STORAGE_FIELD(user_reported_user, Persisted_UserReportedUser);
+  CURRENT_STORAGE_FIELD(user_blocked_user, Persisted_UserBlockedUser);
   CURRENT_STORAGE_FIELD(banned_user, Persisted_BannedUser);
 };
 
