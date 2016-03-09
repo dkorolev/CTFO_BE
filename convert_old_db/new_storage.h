@@ -32,10 +32,16 @@ SOFTWARE.
 
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, User, Persisted_User);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, Card, Persisted_Card);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary,
+                            StarNotificationAlreadySent,
+                            Persisted_StarNotificationAlreadySent);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, BannedUser, Persisted_BannedUser);
 
 CURRENT_STORAGE(NewCTFO) {
   CURRENT_STORAGE_FIELD(user, Persisted_User);
   CURRENT_STORAGE_FIELD(card, Persisted_Card);
+  CURRENT_STORAGE_FIELD(starred_notification_already_sent, Persisted_StarNotificationAlreadySent);
+  CURRENT_STORAGE_FIELD(banned_user, Persisted_BannedUser);
 };
 
 #endif  // NEW_STORAGE_H

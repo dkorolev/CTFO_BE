@@ -2,6 +2,7 @@
 The MIT License (MIT)
 
 Copyright (c) 2016 Dmitry "Dima" Korolev <dmitry.korolev@gmail.com>
+          (c) 2016 Maxim Zhurovich <zhurovich@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,25 +23,24 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *******************************************************************************/
 
-#include <cassert>
-#include <fstream>
+#ifndef NEW_SCHEMA_BASE_H
+#define NEW_SCHEMA_BASE_H
 
-#include "new_storage.h"
+#include <functional>
 
-#include "../../Current/Bricks/dflags/dflags.h"
+#include "../../Current/TypeSystem/struct.h"
+#include "../../Current/TypeSystem/enum.h"
+#include "../../Current/Storage/container/matrix.h"  // For `PairHash`.
 
-DEFINE_string(db, "new_db.json", "The name of the input DB to print the stats for.");
+CURRENT_ENUM(UID, uint64_t){INVALID_USER = 0u};
+CURRENT_ENUM(CID, uint64_t){INVALID_CARD = 0u};
 
-int main(int argc, char** argv) {
-  ParseDFlags(&argc, &argv);
-
-  using DB = NewCTFO<SherlockStreamPersister>;
-  DB db(FLAGS_db);
-
-  db.Transaction([](MutableFields<DB> fields) {
-    std::cerr << fields.user.Size() << " users.\n";
-    std::cerr << fields.card.Size() << " cards.\n";
-    std::cerr << fields.starred_notification_already_sent.Size() << " starred_notification_already_sent.\n";
-    std::cerr << fields.banned_user.Size() << " banned users.\n";
-  }).Go();
+using UIDAndCID = std::pair<UID, CID>;
+namespace std {
+template <>
+struct hash<UIDAndCID> {
+  size_t operator()(const UIDAndCID& s) const { return current::storage::container::PairHash()(s); }
+};
 }
+
+#endif  // NEW_SCHEMA_BASE_H

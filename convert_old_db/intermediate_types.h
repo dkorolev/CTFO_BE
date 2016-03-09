@@ -1,7 +1,7 @@
 /*******************************************************************************
 The MIT License (MIT)
 
-Copyright (c) 2016 Dmitry "Dima" Korolev <dmitry.korolev@gmail.com>
+Copyright (c) 2016 Maxim Zhurovich <zhurovich@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,25 +22,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *******************************************************************************/
 
-#include <cassert>
-#include <fstream>
+#ifndef INTERMEDIATE_TYPES_H
+#define INTERMEDIATE_TYPES_H
 
-#include "new_storage.h"
+#include "new_schema_base.h"
 
-#include "../../Current/Bricks/dflags/dflags.h"
+// Temporary struct for parsing old dictionary simple key entries.
+CURRENT_STRUCT(OldDictionarySimpleKeyEntry) { CURRENT_FIELD(data, uint64_t); };
 
-DEFINE_string(db, "new_db.json", "The name of the input DB to print the stats for.");
+// Temporary struct for parsing old dictionary `UIDAndCID` entries.
+CURRENT_STRUCT(OldDictionaryUIDAndCIDEntry) {
+  CURRENT_FIELD(uid, UID);
+  CURRENT_FIELD(cid, CID);
+};
 
-int main(int argc, char** argv) {
-  ParseDFlags(&argc, &argv);
-
-  using DB = NewCTFO<SherlockStreamPersister>;
-  DB db(FLAGS_db);
-
-  db.Transaction([](MutableFields<DB> fields) {
-    std::cerr << fields.user.Size() << " users.\n";
-    std::cerr << fields.card.Size() << " cards.\n";
-    std::cerr << fields.starred_notification_already_sent.Size() << " starred_notification_already_sent.\n";
-    std::cerr << fields.banned_user.Size() << " banned users.\n";
-  }).Go();
-}
+#endif  // INTERMEDIATE_TYPES_H
