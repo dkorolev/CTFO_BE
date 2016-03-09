@@ -52,7 +52,8 @@ int main(int argc, char** argv) {
 #ifdef USE_BASIC_HYPERMEDIA
   RESTfulStorage<DB, current::storage::rest::Hypermedia> rest(db, FLAGS_port, FLAGS_route, FLAGS_restful_route);
 #else
-  RESTfulStorage<DB, current::storage::rest::AdvancedHypermedia> rest(db, FLAGS_port, FLAGS_route, FLAGS_restful_route);
+  RESTfulStorage<DB, current::storage::rest::AdvancedHypermedia> rest(
+      db, FLAGS_port, FLAGS_route, FLAGS_restful_route);
 #endif
 
   HTTP(FLAGS_port).Join();
