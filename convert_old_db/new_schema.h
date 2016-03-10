@@ -25,7 +25,8 @@ SOFTWARE.
 #ifndef NEW_SCHEMA_H
 #define NEW_SCHEMA_H
 
-#include "new_schema_base.h"
+#include "new_schema_public.h"
+#include "util.h"
 
 #if 0
 // Original schema:
@@ -54,7 +55,7 @@ CURRENT_STRUCT(User) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
   CURRENT_USE_FIELD_AS_KEY(uid);
   CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
-  CURRENT_FIELD(level, uint8_t, 0u);           // User level [0, 9].
+  CURRENT_FIELD(level, uint8_t, 0u);   // User level [0, 9].
   CURRENT_FIELD(score, uint64_t, 0u);  // User score.
 
   CURRENT_DEFAULT_CONSTRUCTOR(User) {}
@@ -102,15 +103,6 @@ CURRENT_STRUCT(AuthKeyUIDPair) {
 
   CURRENT_DEFAULT_CONSTRUCTOR(AuthKeyUIDPair) {}
   CURRENT_CONSTRUCTOR(AuthKeyUIDPair)(const AuthKey& auth_key, const UID uid) : auth_key(auth_key), uid(uid) {}
-};
-
-CURRENT_STRUCT(Color) {
-  CURRENT_FIELD(red, uint8_t);
-  CURRENT_FIELD(green, uint8_t);
-  CURRENT_FIELD(blue, uint8_t);
-
-  CURRENT_DEFAULT_CONSTRUCTOR(Color) : red(0u), green(0u), blue(0u) {}
-  CURRENT_CONSTRUCTOR(Color)(uint8_t red, uint8_t green, uint8_t blue) : red(red), green(green), blue(blue) {}
 };
 
 CURRENT_STRUCT(Card) {
@@ -249,184 +241,141 @@ CURRENT_STRUCT(BannedUser) {
   void InitializeOwnKey() {}
 };
 
-#if 0
-// Ensure the notifications are ordered by time; force Yoda to choose map over hashmap.
-struct ComparableNonHashableTimestamp {
-  uint64_t ms;
-  ComparableNonHashableTimestamp(uint64_t ms = 0ull) : ms(ms) {}
-  bool operator<(const ComparableNonHashableTimestamp& rhs) const { return ms < rhs.ms; }
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(ms));
-  }
-};
-
-CURRENT_CTRUCT(AbstractNotification) {
-  virtual void PopulateResponseNotification(ResponseNotification& output) const = 0;
+// Notifications.
+CURRENT_STRUCT(AbstractNotification) {
+  virtual void PopulateResponseNotification(ResponseNotification & output) const = 0;
   virtual CID GetCID() const = 0;  // To return full card bodies in the payload; can be CID::INVALID_CARD.
 };
 
-CURRENT_STRUCT(Notification) {
-  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
-  CURRENT_FIELD(timestamp, ComparableNonHashableTimestamp);
-  std::shared_ptr<AbstractNotification> notification;
+CURRENT_STRUCT(NotificationMyCardNewComment, AbstractNotification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that comment.
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);     // To what card.
+  CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);  // Which comment.
+  CURRENT_FIELD(text, std::string, "");           // Text of the newly added comment.
 
-  Notification() = default;
-  Notification(UID uid, uint64_t ms, std::shared_ptr<AbstractNotification> notification)
-      : uid(uid), timestamp(ms), notification(notification) {}
-
-  // Commented out until we support `std::move` or `Emplace` in Yoda. For now, use `shared_ptr`. -- D.K.
-  // Notification(Notification&& rhs)
-  //     : uid(rhs.uid), timestamp(rhs.timestamp), notification(std::move(rhs.notification)) {}
-
-  UID row() const { return uid; }
-  void set_row(UID value) { uid = value; }
-  const ComparableNonHashableTimestamp& col() const { return timestamp; }
-  void set_col(const ComparableNonHashableTimestamp& value) { timestamp = value; }
-
-  ResponseNotification BuildResponseNotification() const {
-    ResponseNotification result;
-    result.ms = timestamp.ms;
-    result.nid = NIDToString(static_cast<NID>(ID_RANGE * 5 + timestamp.ms * 1000ull));
-    notification->PopulateResponseNotification(result);
-    return result;
-  }
-  CID GetCID() const { return notification->GetCID(); }
-
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(timestamp), CEREAL_NVP(notification));
-  }
-};
-
-struct NotificationMyCardNewComment : AbstractNotification {
-  UID uid;           // Who left that comment.
-  CID cid;           // To what card.
-  OID oid;           // Which comment.
-  std::string text;  // Text of the newly added comment.
-  NotificationMyCardNewComment() = default;
-  NotificationMyCardNewComment(UID uid, CID cid, OID oid, std::string text)
+  CURRENT_DEFAULT_CONSTRUCTOR(NotificationMyCardNewComment) {}
+  CURRENT_CONSTRUCTOR(NotificationMyCardNewComment)(UID uid, CID cid, OID oid, std::string text)
       : uid(uid), cid(cid), oid(oid), text(text) {}
-  NotificationMyCardNewComment(const Comment& comment)
+  CURRENT_CONSTRUCTOR(NotificationMyCardNewComment)(const Comment& comment)
       : uid(comment.author_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(text));
-  }
-  void PopulateResponseNotification(ResponseNotification& output) const override {
+
+  void PopulateResponseNotification(ResponseNotification & output) const {
     output.type = "MyCardNewComment";
     output.uid = UIDToString(uid);
     output.cid = CIDToString(cid);
     output.oid = OIDToString(oid);
     output.text = text;
   }
-  CID GetCID() const override { return cid; }
+  CID GetCID() const { return cid; }
 };
 
-struct NotificationNewReplyToMyComment : AbstractNotification {
-  UID uid;           // Who left that comment.
-  CID cid;           // To what card.
-  OID oid;           // Which comment.
-  std::string text;  // Text of the newly added comment.
-  NotificationNewReplyToMyComment() = default;
-  NotificationNewReplyToMyComment(const Comment& comment)
+CURRENT_STRUCT(NotificationNewReplyToMyComment, AbstractNotification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that reply.
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);     // To what card.
+  CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);  // Which comment.
+  CURRENT_FIELD(text, std::string, "");           // Text of the newly added comment.
+
+  CURRENT_DEFAULT_CONSTRUCTOR(NotificationNewReplyToMyComment) {}
+  CURRENT_CONSTRUCTOR(NotificationNewReplyToMyComment)(const Comment& comment)
       : uid(comment.author_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(text));
-  }
-  void PopulateResponseNotification(ResponseNotification& output) const override {
+
+  void PopulateResponseNotification(ResponseNotification & output) const {
     output.type = "NewReplyToMyComment";
     output.uid = UIDToString(uid);
     output.cid = CIDToString(cid);
     output.oid = OIDToString(oid);
     output.text = text;
   }
-  CID GetCID() const override { return cid; }
+  CID GetCID() const { return cid; }
 };
 
-struct NotificationMyCommentLiked : AbstractNotification {
-  UID uid;           // Who liked my comment.
-  CID cid;           // On what card.
-  OID oid;           // Which comment of mine.
-  std::string text;  // Text of that comment of mine.
-  NotificationMyCommentLiked() = default;
-  NotificationMyCommentLiked(UID liker_uid, const Comment& comment)
+CURRENT_STRUCT(NotificationMyCommentLiked, AbstractNotification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who liked my comment.
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);     // On what card.
+  CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);  // Which comment of mine.
+  CURRENT_FIELD(text, std::string, "");           // Text of that comment of mine.
+
+  CURRENT_DEFAULT_CONSTRUCTOR(NotificationMyCommentLiked) {}
+  CURRENT_CONSTRUCTOR(NotificationMyCommentLiked)(UID liker_uid, const Comment& comment)
       : uid(liker_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(text));
-  }
-  void PopulateResponseNotification(ResponseNotification& output) const override {
+
+  void PopulateResponseNotification(ResponseNotification & output) const {
     output.type = "MyCommentLiked";
     output.uid = UIDToString(uid);
     output.cid = CIDToString(cid);
     output.oid = OIDToString(oid);
     output.text = text;
   }
-  CID GetCID() const override { return cid; }
+  CID GetCID() const { return cid; }
 };
 
-struct NotificationNewCommentOnCardIStarred : AbstractNotification {
-  UID uid;           // Who left that comment.
-  CID cid;           // On what card.
-  OID oid;           // Which comment.
-  std::string text;  // Text of the newly added comment.
-  NotificationNewCommentOnCardIStarred() = default;
-  NotificationNewCommentOnCardIStarred(UID new_comment_author_uid, const Comment& comment)
+CURRENT_STRUCT(NotificationNewCommentOnCardIStarred, AbstractNotification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that comment.
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);     // On what card.
+  CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);  // Which comment.
+  CURRENT_FIELD(text, std::string, "");           // Text of the comment.
+  CURRENT_DEFAULT_CONSTRUCTOR(NotificationNewCommentOnCardIStarred) {}
+  CURRENT_CONSTRUCTOR(NotificationNewCommentOnCardIStarred)(UID new_comment_author_uid, const Comment& comment)
       : uid(new_comment_author_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(text));
-  }
-  void PopulateResponseNotification(ResponseNotification& output) const override {
+
+  void PopulateResponseNotification(ResponseNotification & output) const {
     output.type = "NewCommentOnCardIStarred";
     output.uid = UIDToString(uid);
     output.cid = CIDToString(cid);
     output.oid = OIDToString(oid);
     output.text = text;
   }
-  CID GetCID() const override { return cid; }
+  CID GetCID() const { return cid; }
 };
 
-struct NotificationMyCardStarred : AbstractNotification {
-  UID uid;  // Who starred my card.
-  CID cid;  // Which card.
-  NotificationMyCardStarred() = default;
-  NotificationMyCardStarred(UID starrer_uid, CID cid) : uid(starrer_uid), cid(cid) {}
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid));
-  }
-  void PopulateResponseNotification(ResponseNotification& output) const override {
+CURRENT_STRUCT(NotificationMyCardStarred, AbstractNotification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);  // Who starred my card.
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);  // Which card.
+
+  CURRENT_DEFAULT_CONSTRUCTOR(NotificationMyCardStarred) {}
+  CURRENT_CONSTRUCTOR(NotificationMyCardStarred)(UID starrer_uid, CID cid) : uid(starrer_uid), cid(cid) {}
+
+  void PopulateResponseNotification(ResponseNotification & output) const {
     output.type = "MyCardStarred";
     output.uid = UIDToString(uid);
     output.cid = CIDToString(cid);
     output.oid = "";
     output.text = "";
   }
-  CID GetCID() const override { return cid; }
+  CID GetCID() const { return cid; }
 };
 
-struct NotificationNewVotesOnMyCard : AbstractNotification {
-  UID uid;  // Who (grouped later at transmission phase).
-  CID cid;  // On which card.
-  NotificationNewVotesOnMyCard() = default;
-  NotificationNewVotesOnMyCard(UID uid, CID cid) : uid(uid), cid(cid) {}
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid));
-  }
-  void PopulateResponseNotification(ResponseNotification& output) const override {
+CURRENT_STRUCT(NotificationNewVotesOnMyCard, AbstractNotification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);  // Who (grouped later at transmission phase).
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);  // On which card.
+
+  CURRENT_DEFAULT_CONSTRUCTOR(NotificationNewVotesOnMyCard) {}
+  CURRENT_CONSTRUCTOR(NotificationNewVotesOnMyCard)(UID uid, CID cid) : uid(uid), cid(cid) {}
+
+  void PopulateResponseNotification(ResponseNotification & output) const {
     output.type = "NewVotesOnMyCard";
     output.cid = CIDToString(cid);
     output.uid = UIDToString(uid);
     output.oid = "";
     output.text = "";
   }
-  CID GetCID() const override { return cid; }
+  CID GetCID() const { return cid; }
 };
-#endif
+
+using T_NOTIFICATIONS_VARIANT = Variant<NotificationMyCardNewComment,
+                                        NotificationNewReplyToMyComment,
+                                        NotificationMyCommentLiked,
+                                        NotificationNewCommentOnCardIStarred,
+                                        NotificationMyCardStarred,
+                                        NotificationNewVotesOnMyCard>;
+
+CURRENT_STRUCT(Notification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_ROW(uid);
+  CURRENT_FIELD(timestamp, std::chrono::milliseconds);
+  CURRENT_USE_FIELD_AS_COL(timestamp);
+  CURRENT_FIELD(notification, T_NOTIFICATIONS_VARIANT);
+};
 
 }  // namespace new_ctfo
 

@@ -48,4 +48,13 @@ CURRENT_ENUM(NID, uint64_t){INVALID_NOTIFICATION = 0u};
 CURRENT_ENUM(ANSWER, int8_t){UNSEEN = 0, CTFO = 1, TFU = 2, SKIP = -1};
 CURRENT_ENUM(AUTH_TYPE, uint8_t){UNDEFINED = 0u, IOS = 1u};
 
+CURRENT_STRUCT(Color) {
+  CURRENT_FIELD(red, uint8_t);
+  CURRENT_FIELD(green, uint8_t);
+  CURRENT_FIELD(blue, uint8_t);
+
+  CURRENT_DEFAULT_CONSTRUCTOR(Color) : red(0u), green(0u), blue(0u) {}
+  CURRENT_CONSTRUCTOR(Color)(uint8_t red, uint8_t green, uint8_t blue) : red(red), green(green), blue(blue) {}
+};
+
 #endif  // NEW_SCHEMA_BASE_H

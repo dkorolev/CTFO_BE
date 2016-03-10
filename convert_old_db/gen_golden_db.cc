@@ -66,5 +66,14 @@ int main(int argc, char** argv) {
       card.tfu_count = 987654321;
       fields.card.Add(card);
     }).Go();
+
+    db.Transaction([](MutableFields<DB> fields) {
+      new_ctfo::Notification notification;
+      new_ctfo::NotificationMyCardNewComment new_comment;
+      notification.uid = static_cast<UID>(42);
+      notification.timestamp = std::chrono::milliseconds(100);
+      notification.notification = new_comment;
+      fields.notification.Add(notification);
+    }).Go();
   }
 }

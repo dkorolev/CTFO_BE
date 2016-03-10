@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
     std::cerr << fields.comment_like.Size() << " comment likes.\n";
     std::cerr << fields.flagged_card.Size() << " flagged cards.\n";
     std::cerr << fields.flagged_comment.Size() << " flagged comments.\n";
+    std::cerr << fields.notification.Size() << " notifications.\n";
     std::cerr << fields.starred_notification_already_sent.Size()
               << " `starred_notification_already_sent` entries.\n";
     std::cerr << fields.user_reported_user.Size() << " `user_reported_user` entries.\n";

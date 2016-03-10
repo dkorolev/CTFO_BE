@@ -45,7 +45,7 @@ CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix,
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix,
                             new_ctfo::CommentFlagAsInappropriate,
                             Persisted_CommentFlagAsInappropriate);
-// CURRENT_STORAGE_FIELD_ENTRY(UnorderedMatrix, new_ctfo::Notification, Persisted_Notification);
+CURRENT_STORAGE_FIELD_ENTRY(OrderedMatrix, new_ctfo::Notification, Persisted_Notification);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary,
                             new_ctfo::StarNotificationAlreadySent,
                             Persisted_StarNotificationAlreadySent);
@@ -65,7 +65,7 @@ CURRENT_STORAGE(NewCTFO) {
   CURRENT_STORAGE_FIELD(comment_like, Persisted_CommentLike);
   CURRENT_STORAGE_FIELD(flagged_card, Persisted_CardFlagAsInappropriate);
   CURRENT_STORAGE_FIELD(flagged_comment, Persisted_CommentFlagAsInappropriate);
-  //  CURRENT_STORAGE_FIELD(notification, Persisted_Notification);
+  CURRENT_STORAGE_FIELD(notification, Persisted_Notification);
   CURRENT_STORAGE_FIELD(starred_notification_already_sent, Persisted_StarNotificationAlreadySent);
   CURRENT_STORAGE_FIELD(user_reported_user, Persisted_UserReportedUser);
   CURRENT_STORAGE_FIELD(user_blocked_user, Persisted_UserBlockedUser);
