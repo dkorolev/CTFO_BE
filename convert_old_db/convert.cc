@@ -74,7 +74,6 @@ std::string StarredNotificationsSentDictionaryUpdate(const std::chrono::microsec
     old_key = ParseJSON<OldDictionaryUIDAndCIDEntry>(key_match[1].str());
   } else {
     std::cerr << "Key field search failed in `StarredNotificationsSentDictionaryUpdate()`." << std::endl;
-    std::cerr << key_match.size() << std::endl;
     std::cerr << tsv[2] << std::endl;
     std::exit(-1);
   }
@@ -116,6 +115,68 @@ std::string MatrixErase(const std::chrono::microseconds timestamp, const std::ve
   transaction.mutations.emplace_back(delete_event);
 
   return JSON(transaction);
+}
+
+// Special case to convert notifications.
+std::string NotificationsUpdate(const std::chrono::microseconds timestamp,
+                                const std::vector<std::string>& tsv) {
+  assert(tsv.size() == 3u);
+
+  using T_TRANSACTION = current::storage::Transaction<T_PERSISTED_VARIANT>;
+  T_TRANSACTION transaction;
+  transaction.meta.timestamp = timestamp;
+
+  new_ctfo::Notification notification;
+  notification.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(timestamp);
+
+  std::regex mega_regex(
+      ".*\"uid\":([0-9]+).*\"polymorphic_name\":\"([a-zA-Z]+)\".*\"data\":(\\{[^\\}]+\\})[\\}]+");
+  std::smatch mega_match;
+  std::string notification_type;
+  std::string notification_data;
+  if (std::regex_match(tsv[2], mega_match, mega_regex) && mega_match.size() == 4) {
+    notification.uid = new_ctfo::StringToUID("u0" + mega_match[1].str());
+    assert(notification.uid != UID::INVALID_USER);
+    // TODO(dk+mz): ignore notifications for admin user?
+    notification_type = mega_match[2].str();
+    notification_data = mega_match[3].str();
+  } else {
+    std::cerr << "Notification mega search failed in `NotificationsUpdate()`." << std::endl;
+    std::cerr << tsv[2] << std::endl;
+    std::exit(-1);
+  }
+
+  if (notification_type == "NotificationMyCardNewComment") {
+    notification.notification = new_ctfo::NotificationMyCardNewComment();
+  } else if (notification_type == "NotificationNewReplyToMyComment") {
+    notification.notification = new_ctfo::NotificationNewReplyToMyComment();
+  } else if (notification_type == "NotificationMyCommentLiked") {
+    notification.notification = new_ctfo::NotificationMyCommentLiked();
+  } else if (notification_type == "NotificationNewCommentOnCardIStarred") {
+    notification.notification = new_ctfo::NotificationNewCommentOnCardIStarred();
+  } else if (notification_type == "NotificationMyCardStarred") {
+    notification.notification = new_ctfo::NotificationMyCardStarred();
+  } else if (notification_type == "NotificationNewVotesOnMyCard") {
+    notification.notification = new_ctfo::NotificationNewVotesOnMyCard();
+  } else {
+    std::cerr << "Unknown notification type: " << notification_type << std::endl;
+    std::exit(-1);
+  }
+  transaction.mutations.push_back(Persisted_NotificationUpdated(notification));
+
+  std::string json = JSON(transaction);
+  const size_t type_offset = json.find(notification_type);
+  assert(type_offset != std::string::npos);
+  const size_t value_begin = json.find("{", type_offset);
+  assert(value_begin != std::string::npos);
+  // Assume there are no complex objects inside.
+  const size_t value_end = json.find("}", value_begin);
+  assert(value_end != std::string::npos);
+
+  const std::string result = json.substr(0u, value_begin) + notification_data + json.substr(value_end + 1);
+  // Check if result is parsable JSON.
+  ParseJSON<T_TRANSACTION>(result);
+  return result;
 }
 
 int main(int argc, char** argv) {
@@ -163,7 +224,9 @@ int main(int argc, char** argv) {
   handlers["comments.delete"] = MatrixErase<new_ctfo::Comment, Persisted_CommentDeleted>;
   handlers["comment_likes.delete"] = MatrixErase<new_ctfo::CommentLike, Persisted_CommentLikeDeleted>;
 
-  // TODO(dkorolev): Notifications.
+  // Notifications.
+  handlers["notifications.add"] = NotificationsUpdate;
+
   // TODO(dkorolev): Matrix REST support.
 
   size_t total_lines = 0u;
