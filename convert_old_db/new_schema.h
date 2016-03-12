@@ -243,8 +243,10 @@ CURRENT_STRUCT(BannedUser) {
 
 // Notifications.
 CURRENT_STRUCT(AbstractNotification) {
-  virtual void PopulateResponseNotification(ResponseNotification & output) const = 0;
-  virtual CID GetCID() const = 0;  // To return full card bodies in the payload; can be CID::INVALID_CARD.
+  // Sadly, can't be pure virtual with `g++`. -- @dkorolev, @mzhurovich.
+  virtual void PopulateResponseNotification(ResponseNotification&) const {}
+  // To return full card bodies in the payload; can be CID::INVALID_CARD.
+  virtual CID GetCID() const { return CID::INVALID_CARD; }
 };
 
 CURRENT_STRUCT(NotificationMyCardNewComment, AbstractNotification) {

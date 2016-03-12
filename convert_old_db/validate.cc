@@ -40,21 +40,23 @@ int main(int argc, char** argv) {
   std::cerr << "Replay done." << std::endl;
 
   db.Transaction([](MutableFields<DB> fields) {
-    std::cerr << fields.user.Size() << " users.\n";
-    std::cerr << fields.card.Size() << " cards.\n";
-    std::cerr << fields.auth_token.Size() << " `auth_token` entries.\n";
-    std::cerr << fields.auth_uid.Size() << " `auth_uid` entries.\n";
-    std::cerr << fields.card_author.Size() << " card authors.\n";
-    std::cerr << fields.answer.Size() << " answers.\n";
-    std::cerr << fields.comment.Size() << " comments.\n";
-    std::cerr << fields.comment_like.Size() << " comment likes.\n";
-    std::cerr << fields.flagged_card.Size() << " flagged cards.\n";
-    std::cerr << fields.flagged_comment.Size() << " flagged comments.\n";
-    std::cerr << fields.notification.Size() << " notifications.\n";
-    std::cerr << fields.starred_notification_already_sent.Size()
-              << " `starred_notification_already_sent` entries.\n";
-    std::cerr << fields.user_reported_user.Size() << " `user_reported_user` entries.\n";
-    std::cerr << fields.user_blocked_user.Size() << " `user_blocked_user` entries.\n";
-    std::cerr << fields.banned_user.Size() << " banned users.\n";
+#define REPORT_SIZE(x) std::cerr << #x ": " << fields.x.Size() << " records.\n";
+      REPORT_SIZE(user);
+      REPORT_SIZE(auth_token);
+      REPORT_SIZE(auth_uid);
+      REPORT_SIZE(card);
+      REPORT_SIZE(card_author);
+      REPORT_SIZE(answer);
+      REPORT_SIZE(favorite);
+      REPORT_SIZE(comment);
+      REPORT_SIZE(comment_like);
+      REPORT_SIZE(flagged_card);
+      REPORT_SIZE(flagged_comment);
+      REPORT_SIZE(notification);
+      REPORT_SIZE(starred_notification_already_sent);
+      REPORT_SIZE(user_reported_user);
+      REPORT_SIZE(user_blocked_user);
+      REPORT_SIZE(banned_user);
+#undef REPORT_SIZE
   }).Go();
 }
