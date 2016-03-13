@@ -127,7 +127,9 @@ std::string NotificationsUpdate(const std::chrono::microseconds timestamp,
   transaction.meta.timestamp = timestamp;
 
   new_ctfo::Notification notification;
-  notification.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(timestamp);
+  // Just to make REST compile wrt `{To/From}String()` -- D.K.
+  // notification.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(timestamp);
+  notification.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(timestamp).count();
 
   std::regex mega_regex(
       ".*\"uid\":([0-9]+).*\"polymorphic_name\":\"([a-zA-Z]+)\".*\"data\":(\\{[^\\}]+\\})[\\}]+");

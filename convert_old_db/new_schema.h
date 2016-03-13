@@ -79,6 +79,15 @@ CURRENT_STRUCT(AuthKey) {
   // TODO(dkorolev): Revisit this. For now, I just assume all `key`-s are distinct.
   size_t Hash() const { return std::hash<std::string>()(key); }
   bool operator==(const AuthKey& rhs) const { return key == rhs.key && type == rhs.type; }
+
+  const std::string& ToString() const {
+    return key;
+  }
+
+  void FromString(const std::string& s) {
+    key = s;
+    type = AUTH_TYPE::UNDEFINED;  // TODO(dkorolev): Wrong, just to have this REST compile. -- D.K.
+  }
 };
 
 CURRENT_STRUCT(AuthKeyTokenPair) {
@@ -108,7 +117,8 @@ CURRENT_STRUCT(AuthKeyUIDPair) {
 CURRENT_STRUCT(Card) {
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_KEY(cid);
-  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
+  // CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
+  CURRENT_FIELD(ms, uint64_t, 0);  // To have REST compile, `{To/From}String`. -- D.K.
   CURRENT_FIELD(text, std::string);
   CURRENT_FIELD(color, Color);
   CURRENT_FIELD(ctfo_count, uint32_t, 0u);    // Number of users, who said "CTFO" on this card.
@@ -374,7 +384,8 @@ using T_NOTIFICATIONS_VARIANT = Variant<NotificationMyCardNewComment,
 CURRENT_STRUCT(Notification) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
   CURRENT_USE_FIELD_AS_ROW(uid);
-  CURRENT_FIELD(timestamp, std::chrono::milliseconds);
+  // CURRENT_FIELD(timestamp, std::chrono::milliseconds);
+  CURRENT_FIELD(timestamp, uint64_t, 0);  // To have REST compile, `{To/From}String`. -- D.K.
   CURRENT_USE_FIELD_AS_COL(timestamp);
   CURRENT_FIELD(notification, T_NOTIFICATIONS_VARIANT);
 };
