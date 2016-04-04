@@ -1392,8 +1392,13 @@ class CTFOServer final {
                                         cid_str.c_str()));
                       return;
                     }
-                    auto& answers_mutator = data.answers;
-                    if (!answers_mutator.Has(uid, cid)) {  // Do not overwrite existing answers.
+                    // Do not overwrite existing answers, except for CTFO/TFU can and should overwrite SKIP.
+                    const bool has_answer = data.answers.Has(uid, cid);
+                    const bool skip_to_overwrite = 
+                        response != LOG_EVENT::SKIP &&
+                        has_answer &&
+                        Value(data.answers.Get(uid, cid)).answer == ANSWER::SKIP;
+                    if (!has_answer || skip_to_overwrite) {
                       data.answers.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
                       DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
                                         UIDToString(uid).c_str(),
@@ -1404,26 +1409,37 @@ class CTFOServer final {
                       if (Exists(optional_card) && Exists(optional_user)) {
                         Card card = Value(optional_card);
                         User user = Value(optional_user);
-                        if (response == LOG_EVENT::CTFO) {
-                          ++card.ctfo_count;
-                          DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
-                                            CIDToString(cid).c_str(),
-                                            card.ctfo_count));
-                          user.score += 50u;
-                          DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
-                                            UIDToString(uid).c_str(),
-                                            50u));
-                        } else if (response == LOG_EVENT::TFU) {
-                          ++card.tfu_count;
-                          DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
-                                            CIDToString(cid).c_str(),
-                                            card.tfu_count));
-                          user.score += 50u;
-                          DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
-                                            UIDToString(uid).c_str(),
-                                            50u));
-                        } else if (response == LOG_EVENT::SKIP) {
+                        if (response == LOG_EVENT::SKIP) {
                           ++card.skip_count;
+                        } else {
+                          if (skip_to_overwrite) {
+                            if (card.skip_count) {
+                              // Extra safety just in case it's zero.
+                              --card.skip_count;
+                            }
+                          }
+                          if (response == LOG_EVENT::CTFO) {
+                            ++card.ctfo_count;
+                            DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
+                                              CIDToString(cid).c_str(),
+                                              card.ctfo_count));
+                            user.score += 50u;
+                            DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
+                                              UIDToString(uid).c_str(),
+                                              50u));
+                          } else if (response == LOG_EVENT::TFU) {
+                            ++card.tfu_count;
+                            if (skip_to_overwrite) {
+                              --card.skip_count;
+                            }
+                            DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
+                                              CIDToString(cid).c_str(),
+                                              card.tfu_count));
+                            user.score += 50u;
+                            DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
+                                              UIDToString(uid).c_str(),
+                                              50u));
+                          }
                         }
 
                         if (response != LOG_EVENT::SKIP && user.level < LEVEL_SCORES.size() - 1 &&
@@ -1458,7 +1474,7 @@ class CTFOServer final {
                       DebugPrint(Printf("[UpdateStateOnEvent] Answer already exists: [%s, %s, %d]",
                                         UIDToString(uid).c_str(),
                                         CIDToString(cid).c_str(),
-                                        static_cast<int>(Value(answers_mutator.Get(uid, cid)).answer)));
+                                        static_cast<int>(Value(data.answers.Get(uid, cid)).answer)));
                     }
                   } else if (response == LOG_EVENT::FAV_CARD || response == LOG_EVENT::UNFAV_CARD) {
                     if (cid == CID::INVALID_CARD) {
