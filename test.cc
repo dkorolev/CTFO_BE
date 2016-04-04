@@ -323,9 +323,42 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(0u, one_fav_response.cards[0].skip_count);
   }
 
-  // Cast a vote on this card.
+  // First, skip this card. This test casting the "CTFO" vote is possible after the card was skipped.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(14001));
+    iOSGenericEvent ctfo_event;
+    ctfo_event.event = "SKIP";
+    ctfo_event.fields["uid"] = actual_uid;
+    ctfo_event.fields["cid"] = cid2;
+    ctfo_event.fields["token"] = actual_token;
+    const auto post_ctfo_response = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
+                                              WithBaseType<MidichloriansEvent>(ctfo_event)));
+    EXPECT_EQ(200, static_cast<int>(post_ctfo_response.code));
+    EXPECT_EQ("OK\n", post_ctfo_response.body);
+  }
+
+  // Confirm the card has one "SKIP" counter.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(14002));
+    const auto feed_with_skip_made_on_fav = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
+                                                            FLAGS_api_port,
+                                                            actual_uid.c_str(),
+                                                            actual_token.c_str())));
+    EXPECT_EQ(200, static_cast<int>(feed_with_skip_made_on_fav.code));
+    const auto skip_made_response = CerealizeParseJSON<ResponseFavs>(feed_with_skip_made_on_fav.body);
+    EXPECT_EQ(14002u, skip_made_response.ms);
+    EXPECT_EQ(actual_uid, skip_made_response.user.uid);
+    ASSERT_EQ(1u, skip_made_response.cards.size());
+    EXPECT_EQ(cid2, skip_made_response.cards[0].cid);
+    EXPECT_EQ("", skip_made_response.cards[0].vote);
+    EXPECT_EQ(0u, skip_made_response.cards[0].ctfo_count);
+    EXPECT_EQ(0u, skip_made_response.cards[0].tfu_count);
+    EXPECT_EQ(1u, skip_made_response.cards[0].skip_count);
+  }
+
+  // Cast a vote on this card.
+  {
+    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(14003));
     iOSGenericEvent ctfo_event;
     ctfo_event.event = "CTFO";
     ctfo_event.fields["uid"] = actual_uid;
