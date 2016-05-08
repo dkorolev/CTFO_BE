@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
   DB db(FLAGS_db);
   std::cerr << "Replay done." << std::endl;
 
-  db.Transaction([](MutableFields<DB> fields) {
+  db.ReadOnlyTransaction([](ImmutableFields<DB> fields) {
 #define REPORT_SIZE(x) std::cerr << #x ": " << fields.x.Size() << " records.\n";
       REPORT_SIZE(user);
       REPORT_SIZE(auth_token);

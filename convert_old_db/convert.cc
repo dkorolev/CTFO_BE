@@ -39,7 +39,7 @@ SOFTWARE.
 DEFINE_string(input, "db.json", "The name of the input data to convert.");
 DEFINE_string(output, "new_db.json", "The name of the input data to convert.");
 
-using T_PERSISTED_VARIANT = typename NewCTFO<SherlockStreamPersister>::T_TRANSACTION::T_VARIANT;
+using T_PERSISTED_VARIANT = typename NewCTFO<SherlockStreamPersister>::transaction_t::variant_t;
 
 template <typename T_RECORD, typename T_PERSISTED_RECORD>
 std::string GenericUpdate(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
@@ -106,8 +106,8 @@ std::string MatrixErase(const std::chrono::microseconds timestamp, const std::ve
   current::storage::Transaction<T_PERSISTED_VARIANT> transaction;
 
   transaction.meta.timestamp = timestamp;
-  using T_ROW = current::storage::sfinae::ENTRY_ROW_TYPE<T_RECORD>;
-  using T_COL = current::storage::sfinae::ENTRY_COL_TYPE<T_RECORD>;
+  using T_ROW = current::storage::sfinae::entry_row_t<T_RECORD>;
+  using T_COL = current::storage::sfinae::entry_col_t<T_RECORD>;
   const T_ROW row = static_cast<T_ROW>(ParseJSON<OldDictionarySimpleKeyEntry>(tsv[2]).data);
   const T_COL col = static_cast<T_COL>(ParseJSON<OldDictionarySimpleKeyEntry>(tsv[3]).data);
   auto delete_event = T_PERSISTED_RECORD();
