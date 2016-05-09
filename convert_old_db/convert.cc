@@ -100,7 +100,9 @@ std::string DictionaryErase(const std::chrono::microseconds timestamp, const std
 }
 
 template <typename T_RECORD, typename T_PERSISTED_RECORD>
-std::string MatrixErase(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
+std::string GenericMatrixErase(const std::chrono::microseconds timestamp,
+                               const std::vector<std::string>& tsv,
+                               bool swap) {
   assert(tsv.size() == 4u);
 
   current::storage::Transaction<T_PERSISTED_VARIANT> transaction;
@@ -108,13 +110,23 @@ std::string MatrixErase(const std::chrono::microseconds timestamp, const std::ve
   transaction.meta.timestamp = timestamp;
   using T_ROW = current::storage::sfinae::entry_row_t<T_RECORD>;
   using T_COL = current::storage::sfinae::entry_col_t<T_RECORD>;
-  const T_ROW row = static_cast<T_ROW>(ParseJSON<OldDictionarySimpleKeyEntry>(tsv[2]).data);
-  const T_COL col = static_cast<T_COL>(ParseJSON<OldDictionarySimpleKeyEntry>(tsv[3]).data);
+  const T_ROW row = static_cast<T_ROW>(ParseJSON<OldDictionarySimpleKeyEntry>(tsv[swap ? 3 : 2]).data);
+  const T_COL col = static_cast<T_COL>(ParseJSON<OldDictionarySimpleKeyEntry>(tsv[swap ? 2 : 3]).data);
   auto delete_event = T_PERSISTED_RECORD();
   delete_event.key = std::make_pair(row, col);
   transaction.mutations.emplace_back(delete_event);
 
   return JSON(transaction);
+}
+
+template <typename T_RECORD, typename T_PERSISTED_RECORD>
+std::string MatrixErase(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
+  return GenericMatrixErase<T_RECORD, T_PERSISTED_RECORD>(timestamp, tsv, false /*swap*/);
+}
+
+template <typename T_RECORD, typename T_PERSISTED_RECORD>
+std::string MatrixEraseSwapped(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
+  return GenericMatrixErase<T_RECORD, T_PERSISTED_RECORD>(timestamp, tsv, true /*swap*/);
 }
 
 // Special case to convert notifications.
@@ -222,7 +234,7 @@ int main(int argc, char** argv) {
       GenericUpdate<new_ctfo::UserBlockedUser, Persisted_UserBlockedUserUpdated>;
 
   // Rare matrix deletes.
-  handlers["card_authors.delete"] = MatrixErase<new_ctfo::CardAuthor, Persisted_CardAuthorDeleted>;
+  handlers["card_authors.delete"] = MatrixEraseSwapped<new_ctfo::CardAuthor, Persisted_CardAuthorDeleted>;
   handlers["comments.delete"] = MatrixErase<new_ctfo::Comment, Persisted_CommentDeleted>;
   handlers["comment_likes.delete"] = MatrixErase<new_ctfo::CommentLike, Persisted_CommentLikeDeleted>;
 
