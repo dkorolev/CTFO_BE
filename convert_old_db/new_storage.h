@@ -31,12 +31,12 @@ SOFTWARE.
 #include "../../Current/Storage/persister/sherlock.h"
 
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::User, Persisted_User);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany,
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany,
                             new_ctfo::AuthKeyTokenPair,
                             Persisted_AuthKeyTokenPair);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::AuthKeyUIDPair, Persisted_AuthKeyUIDPair);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, new_ctfo::AuthKeyUIDPair, Persisted_AuthKeyUIDPair);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::Card, Persisted_Card);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::CardAuthor, Persisted_CardAuthor);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, new_ctfo::CardAuthor, Persisted_CardAuthor);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::Answer, Persisted_Answer);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::Favorite, Persisted_Favorite);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::Comment, Persisted_Comment);
