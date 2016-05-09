@@ -125,6 +125,8 @@ CURRENT_STRUCT(Card) {
   CURRENT_FIELD(startup_index, double, 0.0);  // Cards with `startup_index != 0` will be on the top.
 
   CURRENT_DEFAULT_CONSTRUCTOR(Card) {}
+  CURRENT_CONSTRUCTOR(Card)(CID cid, const std::string& text, const Color& color)
+      : cid(cid), text(text), color(color) {}
 
   void InitializeOwnKey() {}
 };
@@ -134,6 +136,7 @@ CURRENT_STRUCT(AuthorCard) {
   CURRENT_USE_FIELD_AS_ROW(uid);
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_COL(cid);
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
 
   CURRENT_DEFAULT_CONSTRUCTOR(AuthorCard) {}
   CURRENT_CONSTRUCTOR(AuthorCard)(UID uid, CID cid) : uid(uid), cid(cid) {}
@@ -155,6 +158,7 @@ CURRENT_STRUCT(Favorite) {
   CURRENT_USE_FIELD_AS_ROW(uid);
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_COL(cid);
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
   CURRENT_FIELD(favorited, bool, false);
 
   CURRENT_DEFAULT_CONSTRUCTOR(Favorite) {}
