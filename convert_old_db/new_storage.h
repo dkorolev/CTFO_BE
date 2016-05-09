@@ -34,9 +34,9 @@ CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::User, Persisted_User)
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany,
                             new_ctfo::AuthKeyTokenPair,
                             Persisted_AuthKeyTokenPair);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, new_ctfo::AuthKeyUIDPair, Persisted_AuthKeyUIDPair);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, new_ctfo::UIDAuthKeyPair, Persisted_UIDAuthKeyPair);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::Card, Persisted_Card);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, new_ctfo::CardAuthor, Persisted_CardAuthor);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, new_ctfo::AuthorCard, Persisted_AuthorCard);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::Answer, Persisted_Answer);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::Favorite, Persisted_Favorite);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::Comment, Persisted_Comment);
@@ -60,9 +60,9 @@ CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::BannedUser, Persisted
 CURRENT_STORAGE(NewCTFO) {
   CURRENT_STORAGE_FIELD(user, Persisted_User);
   CURRENT_STORAGE_FIELD(auth_token, Persisted_AuthKeyTokenPair);
-  CURRENT_STORAGE_FIELD(auth_uid, Persisted_AuthKeyUIDPair);
+  CURRENT_STORAGE_FIELD(uid_auth, Persisted_UIDAuthKeyPair);
   CURRENT_STORAGE_FIELD(card, Persisted_Card);
-  CURRENT_STORAGE_FIELD(card_author, Persisted_CardAuthor);
+  CURRENT_STORAGE_FIELD(author_card, Persisted_AuthorCard);
   CURRENT_STORAGE_FIELD(answer, Persisted_Answer);
   CURRENT_STORAGE_FIELD(favorite, Persisted_Favorite);
   CURRENT_STORAGE_FIELD(comment, Persisted_Comment);

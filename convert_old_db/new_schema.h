@@ -102,14 +102,14 @@ CURRENT_STRUCT(AuthKeyTokenPair) {
       : auth_key(auth_key), token(token), valid(valid) {}
 };
 
-CURRENT_STRUCT(AuthKeyUIDPair) {
+CURRENT_STRUCT(UIDAuthKeyPair) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
   CURRENT_USE_FIELD_AS_ROW(uid);
   CURRENT_FIELD(auth_key, AuthKey);
   CURRENT_USE_FIELD_AS_COL(auth_key);
 
-  CURRENT_DEFAULT_CONSTRUCTOR(AuthKeyUIDPair) {}
-  CURRENT_CONSTRUCTOR(AuthKeyUIDPair)(const AuthKey& auth_key, const UID uid) : auth_key(auth_key), uid(uid) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(UIDAuthKeyPair) {}
+  CURRENT_CONSTRUCTOR(UIDAuthKeyPair)(const UID uid, const AuthKey& auth_key) : uid(uid), auth_key(auth_key) {}
 };
 
 CURRENT_STRUCT(Card) {
@@ -129,14 +129,14 @@ CURRENT_STRUCT(Card) {
   void InitializeOwnKey() {}
 };
 
-CURRENT_STRUCT(CardAuthor) {
+CURRENT_STRUCT(AuthorCard) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
   CURRENT_USE_FIELD_AS_ROW(uid);
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_COL(cid);
 
-  CURRENT_DEFAULT_CONSTRUCTOR(CardAuthor) {}
-  CURRENT_CONSTRUCTOR(CardAuthor)(CID cid, UID uid) : cid(cid), uid(uid) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(AuthorCard) {}
+  CURRENT_CONSTRUCTOR(AuthorCard)(UID uid, CID cid) : uid(uid), cid(cid) {}
 };
 
 CURRENT_STRUCT(Answer) {
