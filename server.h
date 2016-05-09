@@ -44,14 +44,11 @@ SOFTWARE.
 
 #include "../Current/EventCollector/event_collector.h"
 
-#include "schema.h"
+#include "storage.h"
 #include "util.h"
 
 // Structured iOS events.
-#include "../Current/Midichlorians/Dev/Beta/MidichloriansDataDictionary.h"
-
-using namespace bricks::random;
-using namespace bricks::strings;
+#include "../Current/Midichlorians/MidichloriansDataDictionary.h"
 
 // TODO(dkorolev): Make these constructor parameters of `CTFOServer`.
 static const size_t FLAGS_blocks_to_ban = 5u;
@@ -59,69 +56,16 @@ static const size_t FLAGS_reports_to_ban = 10u;
 
 namespace CTFO {
 
-template <typename POLICY>
-struct StorageAPIImpl {
-  typename POLICY::Instance instance;
-
-  OrderedDictionary<User, POLICY> users{"users", instance};
-  OrderedDictionary<Card, POLICY> cards{"cards", instance};
-  LightweightMatrix<AuthKeyTokenPair, POLICY> auth_token{"auth_token", instance};
-  LightweightMatrix<AuthKeyUIDPair, POLICY> auth_uid{"auth_uid", instance};
-  LightweightMatrix<CardAuthor, POLICY> card_authors{"card_authors", instance};
-  LightweightMatrix<Answer, POLICY> answers{"answers", instance};
-  LightweightMatrix<Favorite, POLICY> favorites{"favorites", instance};
-  LightweightMatrix<Comment, POLICY> comments{"comments", instance};
-  LightweightMatrix<CommentLike, POLICY> comment_likes{"comment_likes", instance};
-  LightweightMatrix<CardFlagAsInappropriate, POLICY> flagged_cards{"flagged_cards", instance};
-  LightweightMatrix<CommentFlagAsInappropriate, POLICY> flagged_comments{"flagged_comments", instance};
-  LightweightMatrix<Notification, POLICY> notifications{"notifications", instance};
-  OrderedDictionary<StarNotificationAlreadySent, POLICY> starred_notification_already_sent{
-      "starred_notification_already_sent", instance};
-  LightweightMatrix<UserReportedUser, POLICY> user_reported_user{"user_reported_user", instance};
-  LightweightMatrix<UserBlockedUser, POLICY> user_blocked_user{"user_blocked_user", instance};
-  OrderedDictionary<BannedUser, POLICY> banned_users{"banned_users", instance};
-
-  // TODO(dkorolev): A templated version of the constructor.
-  StorageAPIImpl(const std::string& filename) : instance(filename) { instance.Run(); }
-};
-
-struct StorageAPI {
-  using T_DATA_IMPL = StorageAPIImpl<ReplayFromAndAppendToFileUsingCereal>;
-  typedef T_DATA_IMPL& T_DATA;
-
-  T_DATA_IMPL actual_data;
-
-  // Because meh. -- D.K.
-  struct SomethingThatCanWaitAndGo {
-    void Go() {}
-    void Wait() {}
-  };
-
-  template <typename F>
-  SomethingThatCanWaitAndGo Transaction(F&& f) {
-    f(actual_data);
-    return SomethingThatCanWaitAndGo();
-  }
-
-  template <typename F1, typename F2>
-  SomethingThatCanWaitAndGo Transaction(F1&& f1, F2&& f2) {
-    f2(f1(actual_data));
-    return SomethingThatCanWaitAndGo();
-  }
-
-  StorageAPI(const char* now_useless_name, const std::string& filename) : actual_data(filename) {
-    static_cast<void>(now_useless_name);
-  }
-};
-
 class CTFOServer final {
  public:
+  using Storage = CTFOStorage<SherlockStreamPersister>;
+
   explicit CTFOServer(const std::string& cards_file,
                       int port,
                       const std::string& storage_file,
                       int event_log_port,
                       const std::string& event_log_file,
-                      const bricks::time::MILLISECONDS_INTERVAL tick_interval_ms,
+                      const std::chrono::milliseconds tick_interval_ms,
                       const bool debug_print_to_stderr = false)
       : port_(port),
         event_log_file_(event_log_file),
@@ -132,21 +76,23 @@ class CTFOServer final {
                          "OK\n",
                          std::bind(&CTFOServer::OnMidichloriansEvent, this, std::placeholders::_1)),
         debug_print_(debug_print_to_stderr),
-        storage_("CTFO storage", storage_file) {
+        storage_(storage_file) {
     event_log_stream_.open(event_log_file_, std::ofstream::out | std::ofstream::app);
 
-    bricks::cerealize::CerealFileParser<Card, bricks::cerealize::CerealFormat::JSON> cf(cards_file);
-    storage_.Transaction([&cf](StorageAPI::T_DATA data) {
+    // bricks::cerealize::CerealFileParser<Card, bricks::cerealize::CerealFormat::JSON> cf(cards_file);
+    std::ifstream cf(cards_file);
+    assert(cf.good());
+    storage_.ReadWriteTransaction([&cf](MutableFields<Storage> data) {
       User admin_user;
       admin_user.uid = admin_uid;
       admin_user.level = 80;         // Superuser 80lvl.
       admin_user.score = 999999999;  // With one short to one billion points.
-      data.users.Insert(admin_user);
-      while (cf.Next([&data](const Card& card) {
-        data.cards.Insert(card);
-        data.card_authors.Add(CardAuthor{card.cid, admin_uid});
-      })) {
-        ;
+      data.user.Add(admin_user);
+      std::string line;
+      while (std::getline(cf, line)) {
+        const Card card = ParseJSON<Card>(line);
+        data.card.Add(card);
+        data.author_card.Add(AuthorCard{admin_uid, card.cid});
       }
     }).Go();
 
@@ -193,28 +139,25 @@ class CTFOServer final {
       const std::string& notifications_since_as_string = r.url.query["notifications_since"];
       const uint64_t notifications_since = notifications_since_as_string.empty()
                                                ? static_cast<uint64_t>(-1)
-                                               : FromString<uint64_t>(notifications_since_as_string);
+                                               : current::FromString<uint64_t>(notifications_since_as_string);
       if (device_id.empty() || app_key.empty()) {
         DebugPrint(Printf("[/ctfo/auth/ios] Wrong query parameters. Requested URL = '%s'",
                           r.url.ComposeURL().c_str()));
         r("NEED VALID ID-KEY PAIR\n", HTTPResponseCode.BadRequest);
       } else {
-        const size_t feed_count = FromString<size_t>(r.url.query.get("feed_count", "20"));
+        const size_t feed_count = current::FromString<size_t>(r.url.query.get("feed_count", "20"));
         // Searching for users with the corresponding authentication key.
-        storage_.Transaction(
-            [this, device_id, app_key, feed_count, notifications_since](StorageAPI::T_DATA data) {
+        storage_.ReadWriteTransaction(
+            [this, device_id, app_key, feed_count, notifications_since](MutableFields<Storage> data) {
               AuthKey auth_key("iOS::" + device_id + "::" + app_key, AUTH_TYPE::IOS);
               UID uid = UID::INVALID_USER;
               User user;
               ResponseUserEntry user_entry;
               std::string token;
 
-              const auto& auth_uid_accessor = data.auth_uid;
-              if (auth_uid_accessor.Rows().Has(auth_key)) {
-                // Something went terribly wrong
-                // if we have more than one UID for authentication key.
-                assert(Value(auth_uid_accessor.Rows()[auth_key]).Size() == 1u);
-                uid = Value(auth_uid_accessor.Rows()[auth_key]).begin()->uid;
+              const auto& uid_auth_accessor = data.uid_auth;
+              if (uid_auth_accessor.Cols().Has(auth_key)) {
+                uid = Value(uid_auth_accessor.GetEntryFromCol(auth_key)).uid;
               }
 
               auto& auth_token_mutator = data.auth_token;
@@ -223,7 +166,7 @@ class CTFOServer final {
                 for (const auto& auth_token : Value(auth_token_mutator.Rows()[auth_key])) {
                   auth_token_mutator.Add(AuthKeyTokenPair(auth_key, auth_token.token, false));
                 }
-                user = Value(data.users[uid]);
+                user = Value(data.user[uid]);
               }
 
               // Generate a new token.
@@ -243,8 +186,8 @@ class CTFOServer final {
               } else {  // New user.
                 uid = RandomUID();
                 user.uid = uid;
-                data.users.Insert(user);
-                data.auth_uid.Add(AuthKeyUIDPair(auth_key, user.uid));
+                data.user.Add(user);
+                data.uid_auth.Add(UIDAuthKeyPair(user.uid, auth_key));
               }
               DebugPrint(Printf("[/ctfo/auth/ios] New user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
                                 UIDToString(uid).c_str(),
@@ -252,7 +195,7 @@ class CTFOServer final {
                                 app_key.c_str(),
                                 token.c_str()));
 
-              CopyUserInfoToResponseEntry(user, Exists(data.banned_users[uid]), user_entry);
+              CopyUserInfoToResponseEntry(user, Exists(data.banned_user[uid]), user_entry);
               user_entry.token = token;
 
               ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
@@ -267,7 +210,7 @@ class CTFOServer final {
     const std::string& notifications_since_as_string = r.url.query["notifications_since"];
     const uint64_t notifications_since = notifications_since_as_string.empty()
                                              ? static_cast<uint64_t>(-1)
-                                             : FromString<uint64_t>(notifications_since_as_string);
+                                             : current::FromString<uint64_t>(notifications_since_as_string);
     const std::string token = r.url.query["token"];
     if (r.method != "GET") {
       DebugPrint(Printf("[/ctfo/feed] Wrong method '%s'. Requested URL = '%s'",
@@ -279,21 +222,18 @@ class CTFOServer final {
         DebugPrint(Printf("[/ctfo/feed] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
       } else {
-        const size_t feed_count = FromString<size_t>(r.url.query.get("feed_count", "20"));
+        const size_t feed_count = current::FromString<size_t>(r.url.query.get("feed_count", "20"));
         const std::string requested_url = r.url.ComposeURL();
-        storage_.Transaction(
-            [this, uid, token, requested_url, feed_count, notifications_since](StorageAPI::T_DATA data) {
+        storage_.ReadOnlyTransaction(
+            [this, uid, token, requested_url, feed_count, notifications_since](ImmutableFields<Storage> data) {
               bool token_is_valid = false;
               const auto& auth_token_accessor = data.auth_token;
               if (auth_token_accessor.Cols().Has(token)) {
-                // Something went terribly wrong
-                // if we have more than one authentication key for token.
-                assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-                if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
+                if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
                   // Double check, if the provided `uid` is correct as well.
-                  const auto& auth_uid_accessor = data.auth_uid;
-                  token_is_valid =
-                      auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
+                  const auto& uid_auth_accessor = data.uid_auth;
+                  token_is_valid = Exists(
+                      uid_auth_accessor.Get(uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
                 }
               }
               if (!token_is_valid) {
@@ -301,9 +241,9 @@ class CTFOServer final {
                 return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
               } else {
                 DebugPrint(Printf("[/ctfo/feed] Token validated. Requested URL = '%s'", requested_url.c_str()));
-                const auto user = Value(data.users[uid]);
+                const auto user = Value(data.user[uid]);
                 ResponseUserEntry user_entry;
-                CopyUserInfoToResponseEntry(user, Exists(data.banned_users[uid]), user_entry);
+                CopyUserInfoToResponseEntry(user, Exists(data.banned_user[uid]), user_entry);
                 user_entry.token = token;
                 ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
                 return Response(rfeed, "feed");
@@ -328,18 +268,15 @@ class CTFOServer final {
         DebugPrint(Printf("[/ctfo/favs] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
       } else {
-        storage_.Transaction([this, uid, token](StorageAPI::T_DATA data) {
+        storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<Storage> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
           if (auth_token_accessor.Cols().Has(token)) {
-            // Something went terribly wrong
-            // if we have more than one authentication key for token.
-            assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-            if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
+            if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto& auth_uid_accessor = data.auth_uid;
-              token_is_valid =
-                  auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
+              const auto& uid_auth_accessor = data.uid_auth;
+              token_is_valid = Exists(
+                  uid_auth_accessor.Get(uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
             }
           }
           if (!token_is_valid) {
@@ -347,24 +284,21 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint("[/ctfo/favs] Token validated.");
-            const auto user = data.users[uid];
+            const auto user = data.user[uid];
             if (!Exists(user)) {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
               ResponseFavs rfavs;
-              CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_users[uid]), rfavs.user);
+              CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_user[uid]), rfavs.user);
 
-              const auto& answers = data.answers;
+              const auto& answers = data.answer;
 
               // Get favs.
               std::vector<std::pair<uint64_t, CID>> favs;
-              const auto& favorites = data.favorites;
-              const auto& per_user_favs = favorites.Rows()[uid];
-              if (Exists(per_user_favs)) {
-                for (const auto& fav : Value(per_user_favs)) {
-                  if (fav.favorited) {
-                    favs.emplace_back(fav.ms, fav.cid);
-                  }
+              const auto& favorites = data.favorite;
+              for (const auto& fav : favorites.Row(uid)) {
+                if (Value(fav).favorited) {
+                  favs.emplace_back(Value(fav).ms, Value(fav).cid);
                 }
               }
 
@@ -372,28 +306,23 @@ class CTFOServer final {
               std::sort(favs.rbegin(), favs.rend());
 
               // And publish them.
-              const auto& card_authors = data.card_authors;
-              const auto& comments = data.comments;
+              const auto& author_card = data.author_card;
+              const auto& comments = data.comment;
               const auto GenerateCardForFavs =
-                  [this, uid, &answers, &card_authors, &comments](const Card& card) {
+                  [this, uid, &answers, &author_card, &comments](const Card& card) {
                     ResponseCardEntry card_entry;
                     card_entry.cid = CIDToString(card.cid);
-                    const auto iterable = card_authors.Rows()[card.cid];
-                    if (Exists(iterable)) {
-                      const auto value = Value(iterable);
-                      if (value.Size() == 1u) {
-                        const UID author_uid = (*value.begin()).uid;
-                        card_entry.author_uid = UIDToString(author_uid);
-                        card_entry.is_my_card = (uid == author_uid);
-                      }
+                    const auto card_auth = author_card.GetEntryFromCol(card.cid);
+                    if (Exists(card_auth)) {
+                      const UID author_uid = Value(card_auth).uid;
+                      card_entry.author_uid = UIDToString(author_uid);
+                      card_entry.is_my_card = (uid == author_uid);
                     }
-                    const auto comments_per_card = comments.Rows()[card.cid];
-                    if (Exists(comments_per_card)) {
-                      card_entry.number_of_comments = Value(comments_per_card).Size();
-                    }
-                    const auto now = static_cast<uint64_t>(bricks::time::Now());
+                    card_entry.number_of_comments = comments.Row(card.cid).Size();
+                    const uint64_t now =
+                        std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now()).count();
                     card_entry.text = card.text;
-                    card_entry.ms = card.ms;
+                    card_entry.ms = std::chrono::milliseconds(card.ms);
                     card_entry.color = card.color;
                     card_entry.relevance =
                         0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
@@ -419,13 +348,13 @@ class CTFOServer final {
                   };
 
               for (const auto& c : favs) {
-                const auto card = data.cards[c.second];
+                const auto card = data.card[c.second];
                 if (Exists(card)) {
                   rfavs.cards.push_back(GenerateCardForFavs(Value(card)));
                 }
               }
 
-              rfavs.ms = static_cast<uint64_t>(bricks::time::Now());
+              rfavs.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
               return Response(rfavs, "favs");
             }
           }
@@ -448,18 +377,15 @@ class CTFOServer final {
         DebugPrint(Printf("[/ctfo/my_cards] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
       } else {
-        storage_.Transaction([this, uid, token](StorageAPI::T_DATA data) {
+        storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<Storage> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
-          if (auth_token_accessor.Cols().Has(token)) {
-            // Something went terribly wrong
-            // if we have more than one authentication key for token.
-            assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-            if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
+          if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
+            if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto& auth_uid_accessor = data.auth_uid;
-              token_is_valid =
-                  auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
+              const auto& uid_auth_accessor = data.uid_auth;
+              token_is_valid = Exists(
+                  uid_auth_accessor.Get(uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
             }
           }
           if (!token_is_valid) {
@@ -467,51 +393,43 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint("[/ctfo/my_cards] Token validated.");
-            const auto user = data.users[uid];
+            const auto user = data.user[uid];
             if (!Exists(user)) {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
               ResponseMyCards r_my_cards;
-              CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_users[uid]), r_my_cards.user);
+              CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_user[uid]), r_my_cards.user);
 
-              const auto& answers = data.answers;
-              const auto& favorites = data.favorites;
+              const auto& answers = data.answer;
+              const auto& favorites = data.favorite;
 
               // Get my cards.
               std::vector<std::pair<uint64_t, CID>> my_cards;
-              const auto& cards_by_author = data.card_authors.Cols()[uid];
-              if (Exists(cards_by_author)) {
-                for (const auto& my_card : Value(cards_by_author)) {
-                  my_cards.emplace_back(my_card.ms, my_card.cid);
-                }
+              for (const auto& my_card : data.author_card.Row(uid)) {
+                my_cards.emplace_back(Value(my_card).ms, Value(my_card).cid);
               }
 
               // In reverse chronological order.
               std::sort(my_cards.rbegin(), my_cards.rend());
 
               // And publish them.
-              const auto& card_authors = data.card_authors;
-              const auto& comments = data.comments;
+              const auto& author_cards = data.author_card;
+              const auto& comments = data.comment;
               const auto GenerateCardForMyCards =
-                  [this, uid, &answers, &favorites, &card_authors, &comments](const Card& card) {
+                  [this, uid, &answers, &favorites, &author_cards, &comments](const Card& card) {
                     ResponseCardEntry card_entry;
                     card_entry.cid = CIDToString(card.cid);
-                    const auto card_authors_iterator = card_authors.Rows()[card.cid];
-                    if (Exists(card_authors_iterator)) {
-                      const auto value = Value(card_authors_iterator);
-                      if (value.Size() == 1u) {
-                        const UID author_uid = (*value.begin()).uid;
-                        card_entry.author_uid = UIDToString(author_uid);
-                        card_entry.is_my_card = (uid == author_uid);
-                      }
+                    const auto card_auth = author_cards.GetEntryFromCol(card.cid);
+                    if (Exists(card_auth)) {
+                      const UID author_uid = Value(card_auth).uid;
+                      card_entry.author_uid = UIDToString(author_uid);
+                      card_entry.is_my_card = (uid == author_uid);
                     }
-                    const auto comments_iterator = comments.Rows()[card.cid];
-                    if (Exists(comments_iterator)) {
-                      card_entry.number_of_comments = Value(comments_iterator).Size();
-                    }
-                    const auto now = static_cast<uint64_t>(bricks::time::Now());
+                    card_entry.number_of_comments = comments.Row(card.cid).Size();
+                    const uint64_t now =
+                        std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now()).count();
                     card_entry.text = card.text;
-                    card_entry.ms = card.ms;
+                    card_entry.ms = std::chrono::milliseconds(card.ms);
                     card_entry.color = card.color;
                     card_entry.relevance =
                         0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
@@ -541,13 +459,13 @@ class CTFOServer final {
                   };
 
               for (const auto& c : my_cards) {
-                const auto card = data.cards[c.second];
+                const auto card = data.card[c.second];
                 if (Exists(card)) {
                   r_my_cards.cards.push_back(GenerateCardForMyCards(Value(card)));
                 }
               }
 
-              r_my_cards.ms = static_cast<uint64_t>(bricks::time::Now());
+              r_my_cards.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
               return Response(r_my_cards, "my_cards");
             }
           }
@@ -570,34 +488,28 @@ class CTFOServer final {
             Printf("[/ctfo/card] Non-empty yet invalid UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED EMPTY OR VALID UID\n", HTTPResponseCode.BadRequest);
       } else {
-        storage_.Transaction([this, cid, uid](StorageAPI::T_DATA data) {
-          const auto card_wrapper = data.cards[cid];
+        storage_.ReadOnlyTransaction([this, cid, uid](ImmutableFields<Storage> data) {
+          const auto card_wrapper = data.card[cid];
           if (!Exists(card_wrapper)) {
             return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
           } else {
             const Card& card = Value(card_wrapper);
-            const auto& answers = data.answers;
-            const auto& comments = data.comments;
-            const auto& favorites = data.favorites;
-            const auto& card_authors = data.card_authors;
+            const auto& answers = data.answer;
+            const auto& comments = data.comment;
+            const auto& favorites = data.favorite;
+            const auto& author_cards = data.author_card;
             // TODO(dkorolev): This beautiful copy-paste will eventually go away.
             ResponseCardEntry card_entry;
             card_entry.cid = CIDToString(card.cid);
-            const auto iterable = card_authors.Rows()[card.cid];
-            if (Exists(iterable)) {
-              const auto v = Value(iterable);
-              if (v.Size() == 1u) {
-                const UID author_uid = (*v.begin()).uid;
-                card_entry.author_uid = UIDToString(author_uid);
-                card_entry.is_my_card = (uid == UID::INVALID_USER ? false : (uid == author_uid));
-              }
+            const auto card_auth = author_cards.GetEntryFromCol(card.cid);
+            if (Exists(card_auth)) {
+              const UID author_uid = Value(card_auth).uid;
+              card_entry.author_uid = UIDToString(author_uid);
+              card_entry.is_my_card = (uid == UID::INVALID_USER ? false : (uid == author_uid));
             }
-            const auto comments_iterator = comments.Rows()[card.cid];
-            if (Exists(comments_iterator)) {
-              card_entry.number_of_comments = Value(comments_iterator).Size();
-            }
+            card_entry.number_of_comments = comments.Row(card.cid).Size();
             card_entry.text = card.text;
-            card_entry.ms = card.ms;
+            card_entry.ms = std::chrono::milliseconds(card.ms);
             card_entry.color = card.color;
             card_entry.relevance = 1.0;  // When `GET`-ting a card, make it 1.0.
             card_entry.ctfo_score = 50u;
@@ -640,54 +552,54 @@ class CTFOServer final {
         try {
           AddCardRequest request;
           try {
-            CerealizeParseJSON(r.body, request);
-          } catch (const bricks::ParseJSONException&) {
-            const auto short_request = CerealizeParseJSON<AddCardShortRequest>(r.body);
+            ParseJSON<AddCardRequest>(r.body, request);
+          } catch (const current::TypeSystemParseJSONException&) {
+            const auto short_request = ParseJSON<AddCardShortRequest>(r.body);
             request.text = short_request.text;
             request.color = CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()];
           }
-          storage_.Transaction([this, cid, uid, token, request, requested_url](StorageAPI::T_DATA data) {
-            bool token_is_valid = false;
-            const auto& auth_token_accessor = data.auth_token;
-            if (auth_token_accessor.Cols().Has(token)) {
-              // Something went terribly wrong
-              // if we have more than one authentication key for token.
-              assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-              if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
-                // Double check, if the provided `uid` is correct as well.
-                const auto& auth_uid_accessor = data.auth_uid;
-                token_is_valid =
-                    auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
-              }
-            }
-            if (!token_is_valid) {
-              DebugPrint(Printf("[/ctfo/card] Invalid token. Requested URL = '%s'", requested_url.c_str()));
-              return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
-            } else {
-              DebugPrint(Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
-              const auto now = static_cast<uint64_t>(bricks::time::Now());
+          storage_.ReadWriteTransaction(
+              [this, cid, uid, token, request, requested_url](MutableFields<Storage> data) {
+                bool token_is_valid = false;
+                const auto& auth_token_accessor = data.auth_token;
+                if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
+                  if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+                    // Double check, if the provided `uid` is correct as well.
+                    const auto& uid_auth_accessor = data.uid_auth;
+                    token_is_valid = Exists(
+                        uid_auth_accessor.Get(uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
+                  }
+                }
+                if (!token_is_valid) {
+                  DebugPrint(Printf("[/ctfo/card] Invalid token. Requested URL = '%s'", requested_url.c_str()));
+                  return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                } else {
+                  DebugPrint(
+                      Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
+                  const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
 
-              auto& cards_mutator = data.cards;
-              auto& authors_mutator = data.card_authors;
+                  auto& cards_mutator = data.card;
+                  auto& authors_mutator = data.author_card;
 
-              Card card;
-              card.cid = cid;
-              card.text = request.text;
-              card.color = request.color;
-              cards_mutator.Insert(card);
+                  Card card;
+                  card.cid = cid;
+                  card.text = request.text;
+                  card.color = request.color;
+                  cards_mutator.Add(card);
 
-              CardAuthor author;
-              author.uid = uid;
-              author.cid = cid;
-              authors_mutator.Add(author);
+                  AuthorCard author;
+                  author.uid = uid;
+                  author.cid = cid;
+                  authors_mutator.Add(author);
 
-              AddCardResponse response;
-              response.ms = now;
-              response.cid = CIDToString(cid);
-              return Response(response, "created");
-            }
-          }, std::move(r));
-        } catch (const bricks::ParseJSONException&) {
+                  AddCardResponse response;
+                  response.ms = now;
+                  response.cid = CIDToString(cid);
+                  return Response(response, "created");
+                }
+              },
+              std::move(r));
+        } catch (const current::TypeSystemParseJSONException&) {
           DebugPrint(Printf("[/ctfo/card] Could not parse POST body. Requested URL = '%s'",
                             r.url.ComposeURL().c_str()));
           r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
@@ -1083,7 +995,7 @@ class CTFOServer final {
   EventCollectorHTTPServer event_collector_;
   const bool debug_print_;
 
-  StorageAPI storage_;
+  Storage storage_;
 
   const std::map<std::string, LOG_EVENT> valid_responses_ = {{"CTFO", LOG_EVENT::CTFO},
                                                              {"TFU", LOG_EVENT::TFU},
@@ -1117,7 +1029,7 @@ class CTFOServer final {
     entry.banned = banned;
   }
 
-  ResponseFeed GenerateResponseFeed(StorageAPI::T_DATA data,
+  ResponseFeed GenerateResponseFeed(ImmutableFields<Storage> data,
                                     ResponseUserEntry user_entry,
                                     size_t feed_size,
                                     uint64_t notifications_since) {
@@ -1325,7 +1237,7 @@ class CTFOServer final {
   }
 
   void OnMidichloriansEvent(const LogEntryWithHeaders& entry) {
-    std::unique_ptr<MidichloriansEvent> event;
+    std::unique_ptr<current::midichlorians::MidichloriansBaseEvent> event;
     if (entry.m == "POST") {
       try {
         CerealizeParseJSON(entry.b, event);
@@ -1341,7 +1253,7 @@ class CTFOServer final {
     }
   }
 
-  void UpdateStateOnEvent(const std::unique_ptr<MidichloriansEvent>& event) {
+  void UpdateStateOnEvent(const std::unique_ptr<current::midichlorians::MidichloriansBaseEvent>& event) {
     DebugPrint("[UpdateStateOnEvent] Parsing event.");
     try {
       const iOSGenericEvent& ge = dynamic_cast<const iOSGenericEvent&>(*event.get());
@@ -1394,10 +1306,8 @@ class CTFOServer final {
                     }
                     // Do not overwrite existing answers, except for CTFO/TFU can and should overwrite SKIP.
                     const bool has_answer = data.answers.Has(uid, cid);
-                    const bool skip_to_overwrite = 
-                        response != LOG_EVENT::SKIP &&
-                        has_answer &&
-                        Value(data.answers.Get(uid, cid)).answer == ANSWER::SKIP;
+                    const bool skip_to_overwrite = response != LOG_EVENT::SKIP && has_answer &&
+                                                   Value(data.answers.Get(uid, cid)).answer == ANSWER::SKIP;
                     if (!has_answer || skip_to_overwrite) {
                       data.answers.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
                       DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
@@ -1640,7 +1550,7 @@ class CTFOServer final {
     }
   }
 
-  void BanUser(StorageAPI::T_DATA data, const UID uid) { data.banned_users.Insert(BannedUser(uid)); }
+  void BanUser(MutableFields<Storage> data, const UID uid) { data.banned_users.Insert(BannedUser(uid)); }
 };
 }  // namespace CTFO
 

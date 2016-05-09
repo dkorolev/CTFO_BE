@@ -26,15 +26,36 @@ SOFTWARE.
 #ifndef CTFO_SCHEMA_BASE_H
 #define CTFO_SCHEMA_BASE_H
 
+#include <functional>
+
+#include "../Current/Bricks/util/comparators.h"  // For `CurrentHashFunction`.
+#include "../Current/TypeSystem/struct.h"
+#include "../Current/TypeSystem/enum.h"
+
 namespace CTFO {
 
-// Data structures for internal storage.
-enum class UID : uint64_t { INVALID_USER = 0u };
-enum class CID : uint64_t { INVALID_CARD = 0u };
-enum class OID : uint64_t { INVALID_COMMENT = 0u };
-enum class NID : uint64_t { INVALID_NOTIFICATION = 0u };
-enum class ANSWER : int { UNSEEN = 0, CTFO = 1, TFU = 2, SKIP = -1 };
-enum class AUTH_TYPE : int { UNDEFINED = 0, IOS };
+CURRENT_ENUM(UID, uint64_t){INVALID_USER = 0u};
+CURRENT_ENUM(CID, uint64_t){INVALID_CARD = 0u};
+
+using UIDAndCID = std::pair<UID, CID>;
+
+}  // namespace CTFO
+
+namespace std {
+template <>
+struct hash<CTFO::UIDAndCID> {
+  size_t operator()(const CTFO::UIDAndCID& s) const {
+    return current::CurrentHashFunction<CTFO::UIDAndCID>()(s);
+  }
+};
+}
+
+namespace CTFO {
+
+CURRENT_ENUM(OID, uint64_t){INVALID_COMMENT = 0u};
+CURRENT_ENUM(NID, uint64_t){INVALID_NOTIFICATION = 0u};
+CURRENT_ENUM(ANSWER, int8_t){UNSEEN = 0, CTFO = 1, TFU = 2, SKIP = -1};
+CURRENT_ENUM(AUTH_TYPE, uint8_t){UNDEFINED = 0u, IOS = 1u};
 
 // To parse incoming Midichlorians logs.
 enum class LOG_EVENT : int {
@@ -49,6 +70,15 @@ enum class LOG_EVENT : int {
   FLAG_CARD = 301,
   REPORT_USER = 401,
   BLOCK_USER = 402
+};
+
+CURRENT_STRUCT(Color) {
+  CURRENT_FIELD(red, uint8_t);
+  CURRENT_FIELD(green, uint8_t);
+  CURRENT_FIELD(blue, uint8_t);
+
+  CURRENT_DEFAULT_CONSTRUCTOR(Color) : red(0u), green(0u), blue(0u) {}
+  CURRENT_CONSTRUCTOR(Color)(uint8_t red, uint8_t green, uint8_t blue) : red(red), green(green), blue(blue) {}
 };
 
 }  // namespace CTFO

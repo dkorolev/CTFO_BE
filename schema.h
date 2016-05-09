@@ -27,31 +27,11 @@ SOFTWARE.
 #define CTFO_SCHEMA_H
 
 #include <vector>
-#include <string>
 
-#include "schema_base.h"
+#include "schema_public.h"
 #include "util.h"
 
-#include "../Current/Bricks/cerealize/cerealize.h"
-
-#include "../Current/TransactionalStorage/storage.h"
-
 namespace CTFO {
-// Common data structures.
-struct Color {
-  uint8_t red;
-  uint8_t green;
-  uint8_t blue;
-
-  Color() : red(0u), green(0u), blue(0u) {}
-  Color(uint8_t red, uint8_t green, uint8_t blue) : red(red), green(green), blue(blue) {}
-  Color(const Color&) = default;
-
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(red), CEREAL_NVP(green), CEREAL_NVP(blue));
-  }
-};
 
 // Constants.
 const std::vector<unsigned int> LEVEL_SCORES{
@@ -182,31 +162,16 @@ const std::vector<Color> CARD_COLORS{{0x0A, 0xB2, 0xCB},
                                      {0xF0, 0xB2, 0x4F},
                                      {0xF5, 0xC6, 0x7A}};
 
-struct Super {
-  uint64_t ms;
+CURRENT_STRUCT(User) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_KEY(uid);
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
+  CURRENT_FIELD(level, uint8_t, 0u);   // User level [0, 9].
+  CURRENT_FIELD(score, uint64_t, 0u);  // User score.
 
-  Super() : ms(static_cast<uint64_t>(bricks::time::Now())) {}
-  virtual ~Super() {}
+  CURRENT_DEFAULT_CONSTRUCTOR(User) {}
 
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(ms));
-  }
-};
-
-struct User : Super {
-  UID uid = UID::INVALID_USER;
-  uint8_t level = 0u;   // User level [0, 9].
-  uint64_t score = 0u;  // User score.
-
-  UID key() const { return uid; }
-  void set_key(const UID value) { uid = value; }
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(uid), CEREAL_NVP(level), CEREAL_NVP(score));
-  }
+  void InitializeOwnKey() {}
 };
 
 // AuthKey structure defines generic authentication key.
@@ -215,736 +180,330 @@ struct User : Super {
 // For `type = AUTH_TYPE::IOS`:
 //   key = "iOS::" + <Device ID> + "::" + <Application Key>
 //   Application key is a random number, generated once in a lifetime in iOS application on its first launch.
-struct AuthKey {
-  std::string key = "";
-  AUTH_TYPE type = AUTH_TYPE::UNDEFINED;
+CURRENT_STRUCT(AuthKey) {
+  CURRENT_FIELD(key, std::string, "");
+  CURRENT_FIELD(type, AUTH_TYPE, AUTH_TYPE::UNDEFINED);
 
-  AuthKey() = default;
-  AuthKey(const std::string& key, AUTH_TYPE type) : key(key), type(type) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(AuthKey) {}
+  CURRENT_CONSTRUCTOR(AuthKey)(const std::string& key, AUTH_TYPE type) : key(key), type(type) {}
 
   // TODO(dkorolev): Revisit this. For now, I just assume all `key`-s are distinct.
-  // size_t Hash() const { return std::hash<std::string>()(key); }
-  // bool operator==(const AuthKey& rhs) const { return key == rhs.key && type == rhs.type; }
-  bool operator<(const AuthKey& rhs) const { return key < rhs.key; }
+  size_t Hash() const { return std::hash<std::string>()(key); }
+  bool operator==(const AuthKey& rhs) const { return key == rhs.key && type == rhs.type; }
 
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(key), CEREAL_NVP(type));
+  const std::string& ToString() const { return key; }
+
+  void FromString(const std::string& s) {
+    key = s;
+    type = AUTH_TYPE::UNDEFINED;  // TODO(dkorolev): Wrong, just to have this REST compile. -- D.K.
   }
 };
 
-struct AuthKeyTokenPair : Super {
-  AuthKey auth_key;
-  std::string token = "";
-  bool valid = false;
+CURRENT_STRUCT(AuthKeyTokenPair) {
+  CURRENT_FIELD(auth_key, AuthKey);
+  CURRENT_USE_FIELD_AS_ROW(auth_key);
+  CURRENT_FIELD(token, std::string, "");
+  CURRENT_USE_FIELD_AS_COL(token);
+  CURRENT_FIELD(valid, bool, false);
 
-  AuthKeyTokenPair() = default;
-  AuthKeyTokenPair(const AuthKeyTokenPair&) = default;
-  AuthKeyTokenPair(const AuthKey& auth_key, const std::string& token, bool valid = false)
+  CURRENT_DEFAULT_CONSTRUCTOR(AuthKeyTokenPair) {}
+  CURRENT_CONSTRUCTOR(AuthKeyTokenPair)(const AuthKeyTokenPair& rhs)
+      : auth_key(rhs.auth_key), token(rhs.token), valid(rhs.valid) {}
+  CURRENT_CONSTRUCTOR(AuthKeyTokenPair)(const AuthKey& auth_key, const std::string& token, bool valid = false)
       : auth_key(auth_key), token(token), valid(valid) {}
-
-  const AuthKey& row() const { return auth_key; }
-  void set_row(const AuthKey& value) { auth_key = value; }
-  const std::string& col() const { return token; }
-  void set_col(const std::string& value) { token = value; }
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(auth_key), CEREAL_NVP(token), CEREAL_NVP(valid));
-  }
 };
 
-struct AuthKeyUIDPair : Super {
-  AuthKey auth_key;
-  UID uid = UID::INVALID_USER;
+CURRENT_STRUCT(UIDAuthKeyPair) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_ROW(uid);
+  CURRENT_FIELD(auth_key, AuthKey);
+  CURRENT_USE_FIELD_AS_COL(auth_key);
 
-  AuthKeyUIDPair() = default;
-  AuthKeyUIDPair(const AuthKey& auth_key, const UID uid) : auth_key(auth_key), uid(uid) {}
-
-  const AuthKey& row() const { return auth_key; }
-  void set_row(const AuthKey& value) { auth_key = value; }
-  UID col() const { return uid; }
-  void set_col(const UID value) { uid = value; }
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(auth_key), CEREAL_NVP(uid));
-  }
+  CURRENT_DEFAULT_CONSTRUCTOR(UIDAuthKeyPair) {}
+  CURRENT_CONSTRUCTOR(UIDAuthKeyPair)(const UID uid, const AuthKey& auth_key) : uid(uid), auth_key(auth_key) {}
 };
 
-struct Card : Super {
-  CID cid = CID::INVALID_CARD;
-  std::string text = "";       // Plain text.
-  Color color;                 // Color.
-  uint64_t ctfo_count = 0u;    // Number of users, who said "CTFO" on this card.
-  uint64_t tfu_count = 0u;     // Number of users, who said "TFU" on this card.
-  uint64_t skip_count = 0u;    // Number of users, who said "SKIP" on this card.
-  double startup_index = 0.0;  // Cards where this index is nonzero will be on the top, lower index first.
+CURRENT_STRUCT(Card) {
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
+  CURRENT_USE_FIELD_AS_KEY(cid);
+  // CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
+  CURRENT_FIELD(ms, uint64_t, 0);  // To have REST compile, `{To/From}String`. -- D.K.
+  CURRENT_FIELD(text, std::string);
+  CURRENT_FIELD(color, Color);
+  CURRENT_FIELD(ctfo_count, uint32_t, 0u);    // Number of users, who said "CTFO" on this card.
+  CURRENT_FIELD(tfu_count, uint32_t, 0u);     // Number of users, who said "TFU" on this card.
+  CURRENT_FIELD(skip_count, uint32_t, 0u);    // Number of users, who said "SKIP" on this card.
+  CURRENT_FIELD(startup_index, double, 0.0);  // Cards with `startup_index != 0` will be on the top.
 
-  Card() = default;
-  Card(const Card&) = default;
-  Card(CID cid, const std::string& text, const Color& color) : cid(cid), text(text), color(color) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(Card) {}
+  CURRENT_CONSTRUCTOR(Card)(CID cid, const std::string& text, const Color& color)
+      : cid(cid), text(text), color(color) {}
 
-  CID key() const { return cid; }
-  void set_key(const CID value) { cid = value; }
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(cid),
-       CEREAL_NVP(text),
-       CEREAL_NVP(color),
-       CEREAL_NVP(ctfo_count),
-       CEREAL_NVP(tfu_count),
-       CEREAL_NVP(skip_count),
-       CEREAL_NVP(startup_index));
-  }
+  void InitializeOwnKey() {}
 };
 
-struct CardAuthor : Super {
-  CID cid = CID::INVALID_CARD;
-  UID uid = UID::INVALID_USER;
+CURRENT_STRUCT(AuthorCard) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_ROW(uid);
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
+  CURRENT_USE_FIELD_AS_COL(cid);
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
 
-  CardAuthor() = default;
-  CardAuthor(const CardAuthor&) = default;
-  CardAuthor(CID cid, UID uid) : cid(cid), uid(uid) {}
-
-  CID row() const { return cid; }
-  void set_row(const CID value) { cid = value; }
-  UID col() const { return uid; }
-  void set_col(const UID value) { uid = value; }
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(cid), CEREAL_NVP(uid));
-  }
+  CURRENT_DEFAULT_CONSTRUCTOR(AuthorCard) {}
+  CURRENT_CONSTRUCTOR(AuthorCard)(UID uid, CID cid) : uid(uid), cid(cid) {}
 };
 
-struct Answer : Super {
-  UID uid = UID::INVALID_USER;
-  CID cid = CID::INVALID_CARD;
-  ANSWER answer = ANSWER::UNSEEN;
+CURRENT_STRUCT(Answer) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_ROW(uid);
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
+  CURRENT_USE_FIELD_AS_COL(cid);
+  CURRENT_FIELD(answer, ANSWER, ANSWER::UNSEEN);
 
-  Answer() = default;
-  Answer(const Answer&) = default;
-  Answer(UID uid, CID cid, ANSWER answer) : uid(uid), cid(cid), answer(answer) {}
-
-  UID row() const { return uid; }
-  void set_row(const UID value) { uid = value; }
-  CID col() const { return cid; }
-  void set_col(const CID value) { cid = value; }
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(answer));
-  }
+  CURRENT_DEFAULT_CONSTRUCTOR(Answer) {}
+  CURRENT_CONSTRUCTOR(Answer)(UID uid, CID cid, ANSWER answer) : uid(uid), cid(cid), answer(answer) {}
 };
 
-struct Favorite : Super {
-  UID uid = UID::INVALID_USER;
-  CID cid = CID::INVALID_CARD;
-  bool favorited = false;
+CURRENT_STRUCT(Favorite) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_ROW(uid);
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
+  CURRENT_USE_FIELD_AS_COL(cid);
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
+  CURRENT_FIELD(favorited, bool, false);
 
-  Favorite() = default;
-  Favorite(const UID uid, const CID cid, bool favorited = false) : uid(uid), cid(cid), favorited(favorited) {}
-
-  UID row() const { return uid; }
-  void set_row(const UID value) { uid = value; }
-  CID col() const { return cid; }
-  void set_col(const CID value) { cid = value; }
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(favorited));
-  }
+  CURRENT_DEFAULT_CONSTRUCTOR(Favorite) {}
+  CURRENT_CONSTRUCTOR(Favorite)(const UID uid, const CID cid, bool favorited = false)
+      : uid(uid), cid(cid), favorited(favorited) {}
 };
 
-struct Comment : Super {
-  CID cid = CID::INVALID_CARD;     // Row key: Card ID.
-  OID oid = OID::INVALID_COMMENT;  // Col key: Comment ID.
+CURRENT_STRUCT(Comment) {
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
+  CURRENT_USE_FIELD_AS_ROW(cid);
+  CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);
+  CURRENT_USE_FIELD_AS_COL(oid);
+  CURRENT_FIELD(parent_oid,
+                OID,
+                OID::INVALID_COMMENT);  // `INVALID_COMMENT` for a top-level comment, parent OID otherwise.
+  CURRENT_FIELD(author_uid, UID, UID::INVALID_USER);
+  CURRENT_FIELD(text, std::string, "");
 
-  OID parent_oid = OID::INVALID_COMMENT;  // `INVALID_COMMENT` for a top-level comment, parent OID otherwise.
-
-  UID author_uid = UID::INVALID_USER;
-  std::string text;
-
-  Comment() = default;
-  Comment(const CID cid, const OID oid, const OID parent_oid, const UID author_uid, const std::string& text)
+  CURRENT_DEFAULT_CONSTRUCTOR(Comment) {}
+  CURRENT_CONSTRUCTOR(Comment)(
+      const CID cid, const OID oid, const OID parent_oid, const UID author_uid, const std::string& text)
       : cid(cid), oid(oid), parent_oid(parent_oid), author_uid(author_uid), text(text) {}
-
-  CID row() const { return cid; }
-  void set_row(const CID value) { cid = value; }
-  OID col() const { return oid; }
-  void set_col(const OID value) { oid = value; }
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(parent_oid), CEREAL_NVP(author_uid), CEREAL_NVP(text));
-  }
 };
 
-struct CommentLike : Super {
-  OID oid;
-  UID uid;
+CURRENT_STRUCT(CommentLike) {
+  CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);
+  CURRENT_USE_FIELD_AS_ROW(oid);
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_COL(uid);
 
-  OID row() const { return oid; }
-  void set_row(const OID value) { oid = value; }
-  UID col() const { return uid; }
-  void set_col(const UID value) { uid = value; }
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(oid), CEREAL_NVP(uid));
-  }
+  CURRENT_DEFAULT_CONSTRUCTOR(CommentLike) {}
 };
 
-struct CardFlagAsInappropriate : Super {
-  CID cid;
-  UID uid;
+CURRENT_STRUCT(CardFlagAsInappropriate) {
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
+  CURRENT_USE_FIELD_AS_ROW(cid);
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_COL(uid);
 
-  CID row() const { return cid; }
-  void set_row(const CID value) { cid = value; }
-  UID col() const { return uid; }
-  void set_col(const UID value) { uid = value; }
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(cid), CEREAL_NVP(uid));
-  }
+  CURRENT_DEFAULT_CONSTRUCTOR(CardFlagAsInappropriate) {}
 };
 
-struct CommentFlagAsInappropriate : Super {
-  OID oid;
-  UID uid;
+CURRENT_STRUCT(CommentFlagAsInappropriate) {
+  CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);
+  CURRENT_USE_FIELD_AS_ROW(oid);
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_COL(uid);
 
-  OID row() const { return oid; }
-  void set_row(const OID value) { oid = value; }
-  UID col() const { return uid; }
-  void set_col(const UID value) { uid = value; }
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(oid), CEREAL_NVP(uid));
-  }
-};
-
-// Because Cereal is not friendly with `std::pair<>`. :-(
-struct UIDAndCID {
-  UID uid;
-  CID cid;
-  UIDAndCID(UID uid = UID::INVALID_USER, CID cid = CID::INVALID_CARD) : uid(uid), cid(cid) {}
-  bool operator<(const UIDAndCID& rhs) const { return std::tie(uid, cid) < std::tie(rhs.uid, rhs.cid); }
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid));
-  }
-};
-
-// To make sure the "star-unstar-repeat" actions sequence only sends the notification once.
-struct StarNotificationAlreadySent : Super {
-  UIDAndCID key;
-
-  StarNotificationAlreadySent() = default;
-  StarNotificationAlreadySent(const UIDAndCID& key) : key(key) {}
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(key));
-  }
+  CURRENT_DEFAULT_CONSTRUCTOR(CommentFlagAsInappropriate) {}
 };
 
 // To enable reporting users.
-struct UserReportedUser : Super {
-  UID who;
-  UID whom;
+CURRENT_STRUCT(UserReportedUser) {
+  CURRENT_FIELD(who, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_ROW(who);
+  CURRENT_FIELD(whom, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_COL(whom);
 
-  UID row() const { return who; }
-  void set_row(const UID value) { who = value; }
-  UID col() const { return whom; }
-  void set_col(const UID value) { whom = value; }
-
-  UserReportedUser(UID who = UID::INVALID_USER, UID whom = UID::INVALID_USER) : who(who), whom(whom) {}
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(who), CEREAL_NVP(whom));
-  }
+  CURRENT_DEFAULT_CONSTRUCTOR(UserReportedUser) {}
+  CURRENT_CONSTRUCTOR(UserReportedUser)(UID who, UID whom) : who(who), whom(whom) {}
 };
 
 // To enable blocking users.
-struct UserBlockedUser : Super {
-  UID who;
-  UID whom;
+CURRENT_STRUCT(UserBlockedUser) {
+  CURRENT_FIELD(who, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_ROW(who);
+  CURRENT_FIELD(whom, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_COL(whom);
 
-  UID row() const { return who; }
-  void set_row(const UID value) { who = value; }
-  UID col() const { return whom; }
-  void set_col(const UID value) { whom = value; }
+  CURRENT_DEFAULT_CONSTRUCTOR(UserBlockedUser) {}
+  CURRENT_CONSTRUCTOR(UserBlockedUser)(UID who, UID whom) : who(who), whom(whom) {}
+};
 
-  UserBlockedUser(UID who = UID::INVALID_USER, UID whom = UID::INVALID_USER) : who(who), whom(whom) {}
+// To make sure the "star-unstar-repeat" actions sequence only sends the notification once.
+CURRENT_STRUCT(StarNotificationAlreadySent) {
+  CURRENT_FIELD(key, UIDAndCID, (UID::INVALID_USER, CID::INVALID_CARD));
 
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(who), CEREAL_NVP(whom));
-  }
+  CURRENT_DEFAULT_CONSTRUCTOR(StarNotificationAlreadySent) {}
+  CURRENT_CONSTRUCTOR(StarNotificationAlreadySent)(const UIDAndCID& key) : key(key) {}
+
+  void InitializeOwnKey() {}
 };
 
 // To enable banned users support.
-struct BannedUser : Super {
-  UID banned_uid;
+CURRENT_STRUCT(BannedUser) {
+  CURRENT_FIELD(banned_uid, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_KEY(banned_uid);
 
-  BannedUser(const UID uid = UID::INVALID_USER) : banned_uid(uid) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(BannedUser) {}
+  CURRENT_CONSTRUCTOR(BannedUser)(const UID uid) : banned_uid(uid) {}
 
-  UID key() const { return banned_uid; }
-  void set_key(const UID value) { banned_uid = value; }
-
-  template <typename A>
-  void serialize(A& ar) {
-    Super::serialize(ar);
-    ar(CEREAL_NVP(banned_uid));
-  }
+  void InitializeOwnKey() {}
 };
 
-// Data structures for generating RESTful responses.
-struct ResponseUserEntry {
-  std::string uid = "uINVALID";    // User id, format 'u01XXX...'.
-  std::string token = "";          // User token.
-  uint8_t level = 0u;              // User level, [0, 9].
-  uint64_t score = 0u;             // User score.
-  uint64_t next_level_score = 0u;  // Score value when user is promoted to the next level.
-  bool banned = false;             // Whether the user is banned.
+// Notifications.
+CURRENT_STRUCT(AbstractNotification){// Sadly, can't be pure virtual with `g++`. -- @dkorolev, @mzhurovich.
+                                     virtual void PopulateResponseNotification(ResponseNotification&)const {}
+                                     // To return full card bodies in the payload; can be CID::INVALID_CARD.
+                                     virtual CID GetCID() const {return CID::INVALID_CARD;
+}
+}
+;
 
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid),
-       CEREAL_NVP(token),
-       CEREAL_NVP(level),
-       CEREAL_NVP(score),
-       CEREAL_NVP(next_level_score),
-       CEREAL_NVP(banned));
-  }
-};
+CURRENT_STRUCT(NotificationMyCardNewComment, AbstractNotification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that comment.
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);     // To what card.
+  CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);  // Which comment.
+  CURRENT_FIELD(text, std::string, "");           // Text of the newly added comment.
 
-struct ResponseCardEntry {
-  std::string cid = "cINVALID";         // Card id, format 'c02XXX...'.
-  std::string author_uid = "uINVALID";  // The author of this comment.
-  std::string text = "";                // Card text.
-  uint64_t ms = 0ull;                   // Card timestamp, milliseconds from epoch.
-  Color color;                          // Card color.
-  double relevance = 0.0;               // Card relevance for particular user, [0.0, 1.0].
-  uint64_t ctfo_score = 0u;             // Number of points, which user gets for "CTFO" answer.
-  uint64_t tfu_score = 0u;              // Number of points, which user gets for "TFU" answer.
-  uint64_t ctfo_count = 0u;             // Number of users, who said "CTFO" on this card.
-  uint64_t tfu_count = 0u;              // Number of users, who said "TFU" on this card.
-  uint64_t skip_count = 0u;             // Number of users, who said "SKIP" on this card.
-  std::string vote = "";                // "CTFO", "TFU", or empty string.
-  bool favorited = false;               // True if the current user has favorited this card.
-  bool is_my_card = false;              // True if this card has been created by this user.
-  size_t number_of_comments = 0u;       // The total number of comments left for this card.
-
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(cid),
-       CEREAL_NVP(author_uid),
-       CEREAL_NVP(text),
-       CEREAL_NVP(ms),
-       CEREAL_NVP(color),
-       CEREAL_NVP(relevance),
-       CEREAL_NVP(ctfo_score),
-       CEREAL_NVP(tfu_score),
-       CEREAL_NVP(ctfo_count),
-       CEREAL_NVP(tfu_count),
-       CEREAL_NVP(skip_count),
-       CEREAL_NVP(vote),
-       CEREAL_NVP(favorited),
-       CEREAL_NVP(is_my_card),
-       CEREAL_NVP(number_of_comments));
-  }
-};
-
-// Favorites response schema.
-struct ResponseFavs {
-  uint64_t ms;                           // Server timestamp, milliseconds from epoch.
-  ResponseUserEntry user;                // User information.
-  std::vector<ResponseCardEntry> cards;  // Favorited cards.
-
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(ms), CEREAL_NVP(user), CEREAL_NVP(cards));
-  }
-};
-
-// "My cards" response schema. Yes, it's the same as favorites. -- D.K.
-struct ResponseMyCards {
-  uint64_t ms;                           // Server timestamp, milliseconds from epoch.
-  ResponseUserEntry user;                // User information.
-  std::vector<ResponseCardEntry> cards;  // Cards created by this user.
-
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(ms), CEREAL_NVP(user), CEREAL_NVP(cards));
-  }
-};
-
-// Schema for the POST request to add a new card.
-struct AddCardRequest {
-  std::string text = "";  // Plain text.
-  Color color;            // Color.
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(text), CEREAL_NVP(color));
-  }
-};
-
-// A shortened version of `AddCardRequest`.
-struct AddCardShortRequest {
-  std::string text = "";  // Plain text.
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(text));
-  }
-};
-
-// Schema for the response of the POST request to add a new card.
-struct AddCardResponse {
-  uint64_t ms;
-  std::string cid;
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(ms), CEREAL_NVP(cid));
-  }
-};
-
-// Schema for the response of the DELETE request for a card.
-struct DeleteCardResponse {
-  uint64_t ms;
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(ms));
-  }
-};
-
-// Schema for the POST request to add a new comment.
-struct AddCommentRequest {
-  std::string text = "";  // Plain text.
-  std::string parent_oid = "";
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(text), CEREAL_NVP(parent_oid));
-  }
-};
-
-// A shortened version of `AddCommentRequest`.
-struct AddCommentShortRequest {
-  std::string text = "";  // Plain text.
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(text));
-  }
-};
-
-// Schema for the response of the POST request to add a new comment.
-struct AddCommentResponse {
-  uint64_t ms;
-  std::string oid;
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(ms), CEREAL_NVP(oid));
-  }
-};
-
-// Schema for the response of the DELETE request for a comment.
-struct DeleteCommentResponse {
-  uint64_t ms;
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(ms));
-  }
-};
-
-// Comments response schema.
-struct ResponseComment {
-  std::string oid = "oINVALID";         // Comment id, format 'o05XXX...'.
-  std::string parent_oid = "";          // Empty string or parent comment id. NOTE: Two levels of comments only.
-  std::string author_uid = "uINVALID";  // User id, format 'u01XXX...'.
-  uint8_t author_level = 0u;            // Author user level, [0, 9].
-  std::string text;                     // Comment text.
-  size_t number_of_likes = 0u;          // Number of likes in this comment.
-  bool liked = false;                   // Whether the current user has liked this comment.
-  bool flagged_inappropriate = false;   // Whether the current user has flagged this comment as inappropriate.
-  uint64_t ms;                          // Comment timestamp, milliseconds from epoch.
-  // TODO(dkorolev): User name? Tier status?
-  // TODO(dkorolev): Color?
-
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(oid),
-       CEREAL_NVP(parent_oid),
-       CEREAL_NVP(author_uid),
-       CEREAL_NVP(author_level),
-       CEREAL_NVP(text),
-       CEREAL_NVP(number_of_likes),
-       CEREAL_NVP(liked),
-       CEREAL_NVP(flagged_inappropriate),
-       CEREAL_NVP(ms));
-  }
-};
-
-struct ResponseComments {
-  uint64_t ms;                            // Server timestamp, milliseconds from epoch.
-  std::vector<ResponseComment> comments;  // Comments.
-
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(ms), CEREAL_NVP(comments));
-  }
-};
-
-// TODO(dkorolev): Constraints on comment length when adding them?
-
-struct ResponseNotification {
-  std::string nid;
-  std::string type;
-  uint64_t ms;
-  std::string uid;
-  std::string cid;
-  std::string oid;
-  std::string text;
-  ResponseCardEntry card;
-  size_t n = 1u;
-
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(nid),
-       CEREAL_NVP(type),
-       CEREAL_NVP(ms),
-       CEREAL_NVP(uid),
-       CEREAL_NVP(cid),
-       CEREAL_NVP(oid),
-       CEREAL_NVP(text),
-       CEREAL_NVP(card),
-       CEREAL_NVP(n));
-  }
-};
-
-// Universal response structure, combining user info & cards payload.
-struct ResponseFeed {
-  uint64_t ms;                                      // Server timestamp, milliseconds from epoch.
-  ResponseUserEntry user;                           // User information.
-  std::vector<ResponseCardEntry> feed_hot;          // "Hot" cards feeds.
-  std::vector<ResponseCardEntry> feed_recent;       // "Recent" cards feeds.
-  std::vector<ResponseNotification> notifications;  // Notifications.
-
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(ms),
-       CEREAL_NVP(user),
-       CEREAL_NVP(feed_hot),
-       CEREAL_NVP(feed_recent),
-       CEREAL_NVP(notifications));
-  }
-};
-
-// Ensure the notifications are ordered by time; force Yoda to choose map over hashmap.
-struct ComparableNonHashableTimestamp {
-  uint64_t ms;
-  ComparableNonHashableTimestamp(uint64_t ms = 0ull) : ms(ms) {}
-  bool operator<(const ComparableNonHashableTimestamp& rhs) const { return ms < rhs.ms; }
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(ms));
-  }
-};
-
-struct AbstractNotification : Super {
-  virtual ~AbstractNotification() {}
-  virtual void PopulateResponseNotification(ResponseNotification& output) const = 0;
-
-  virtual CID GetCID() const = 0;  // To return full card bodies in the payload; can be CID::INVALID_CARD.
-};
-
-struct Notification : Super {
-  UID uid;
-  ComparableNonHashableTimestamp timestamp;
-  std::shared_ptr<AbstractNotification> notification;
-
-  Notification() = default;
-  Notification(UID uid, uint64_t ms, std::shared_ptr<AbstractNotification> notification)
-      : uid(uid), timestamp(ms), notification(notification) {}
-
-  // Commented out until we support `std::move` or `Emplace` in Yoda. For now, use `shared_ptr`. -- D.K.
-  // Notification(Notification&& rhs)
-  //     : uid(rhs.uid), timestamp(rhs.timestamp), notification(std::move(rhs.notification)) {}
-
-  UID row() const { return uid; }
-  void set_row(UID value) { uid = value; }
-  const ComparableNonHashableTimestamp& col() const { return timestamp; }
-  void set_col(const ComparableNonHashableTimestamp& value) { timestamp = value; }
-
-  ResponseNotification BuildResponseNotification() const {
-    ResponseNotification result;
-    result.ms = timestamp.ms;
-    result.nid = NIDToString(static_cast<NID>(ID_RANGE * 5 + timestamp.ms * 1000ull));
-    notification->PopulateResponseNotification(result);
-    return result;
-  }
-  CID GetCID() const { return notification->GetCID(); }
-
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(timestamp), CEREAL_NVP(notification));
-  }
-};
-
-struct NotificationMyCardNewComment : AbstractNotification {
-  UID uid;           // Who left that comment.
-  CID cid;           // To what card.
-  OID oid;           // Which comment.
-  std::string text;  // Text of the newly added comment.
-  NotificationMyCardNewComment() = default;
-  NotificationMyCardNewComment(UID uid, CID cid, OID oid, std::string text)
+  CURRENT_DEFAULT_CONSTRUCTOR(NotificationMyCardNewComment) {}
+  CURRENT_CONSTRUCTOR(NotificationMyCardNewComment)(UID uid, CID cid, OID oid, std::string text)
       : uid(uid), cid(cid), oid(oid), text(text) {}
-  NotificationMyCardNewComment(const Comment& comment)
+  CURRENT_CONSTRUCTOR(NotificationMyCardNewComment)(const Comment& comment)
       : uid(comment.author_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(text));
-  }
-  void PopulateResponseNotification(ResponseNotification& output) const override {
+
+  void PopulateResponseNotification(ResponseNotification & output) const {
     output.type = "MyCardNewComment";
     output.uid = UIDToString(uid);
     output.cid = CIDToString(cid);
     output.oid = OIDToString(oid);
     output.text = text;
   }
-  CID GetCID() const override { return cid; }
+  CID GetCID() const { return cid; }
 };
 
-struct NotificationNewReplyToMyComment : AbstractNotification {
-  UID uid;           // Who left that comment.
-  CID cid;           // To what card.
-  OID oid;           // Which comment.
-  std::string text;  // Text of the newly added comment.
-  NotificationNewReplyToMyComment() = default;
-  NotificationNewReplyToMyComment(const Comment& comment)
+CURRENT_STRUCT(NotificationNewReplyToMyComment, AbstractNotification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that reply.
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);     // To what card.
+  CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);  // Which comment.
+  CURRENT_FIELD(text, std::string, "");           // Text of the newly added comment.
+
+  CURRENT_DEFAULT_CONSTRUCTOR(NotificationNewReplyToMyComment) {}
+  CURRENT_CONSTRUCTOR(NotificationNewReplyToMyComment)(const Comment& comment)
       : uid(comment.author_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(text));
-  }
-  void PopulateResponseNotification(ResponseNotification& output) const override {
+
+  void PopulateResponseNotification(ResponseNotification & output) const {
     output.type = "NewReplyToMyComment";
     output.uid = UIDToString(uid);
     output.cid = CIDToString(cid);
     output.oid = OIDToString(oid);
     output.text = text;
   }
-  CID GetCID() const override { return cid; }
+  CID GetCID() const { return cid; }
 };
 
-struct NotificationMyCommentLiked : AbstractNotification {
-  UID uid;           // Who liked my comment.
-  CID cid;           // On what card.
-  OID oid;           // Which comment of mine.
-  std::string text;  // Text of that comment of mine.
-  NotificationMyCommentLiked() = default;
-  NotificationMyCommentLiked(UID liker_uid, const Comment& comment)
+CURRENT_STRUCT(NotificationMyCommentLiked, AbstractNotification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who liked my comment.
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);     // On what card.
+  CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);  // Which comment of mine.
+  CURRENT_FIELD(text, std::string, "");           // Text of that comment of mine.
+
+  CURRENT_DEFAULT_CONSTRUCTOR(NotificationMyCommentLiked) {}
+  CURRENT_CONSTRUCTOR(NotificationMyCommentLiked)(UID liker_uid, const Comment& comment)
       : uid(liker_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(text));
-  }
-  void PopulateResponseNotification(ResponseNotification& output) const override {
+
+  void PopulateResponseNotification(ResponseNotification & output) const {
     output.type = "MyCommentLiked";
     output.uid = UIDToString(uid);
     output.cid = CIDToString(cid);
     output.oid = OIDToString(oid);
     output.text = text;
   }
-  CID GetCID() const override { return cid; }
+  CID GetCID() const { return cid; }
 };
 
-struct NotificationNewCommentOnCardIStarred : AbstractNotification {
-  UID uid;           // Who left that comment.
-  CID cid;           // On what card.
-  OID oid;           // Which comment.
-  std::string text;  // Text of the newly added comment.
-  NotificationNewCommentOnCardIStarred() = default;
-  NotificationNewCommentOnCardIStarred(UID new_comment_author_uid, const Comment& comment)
+CURRENT_STRUCT(NotificationNewCommentOnCardIStarred, AbstractNotification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that comment.
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);     // On what card.
+  CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);  // Which comment.
+  CURRENT_FIELD(text, std::string, "");           // Text of the comment.
+  CURRENT_DEFAULT_CONSTRUCTOR(NotificationNewCommentOnCardIStarred) {}
+  CURRENT_CONSTRUCTOR(NotificationNewCommentOnCardIStarred)(UID new_comment_author_uid, const Comment& comment)
       : uid(new_comment_author_uid), cid(comment.cid), oid(comment.oid), text(comment.text) {}
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid), CEREAL_NVP(oid), CEREAL_NVP(text));
-  }
-  void PopulateResponseNotification(ResponseNotification& output) const override {
+
+  void PopulateResponseNotification(ResponseNotification & output) const {
     output.type = "NewCommentOnCardIStarred";
     output.uid = UIDToString(uid);
     output.cid = CIDToString(cid);
     output.oid = OIDToString(oid);
     output.text = text;
   }
-  CID GetCID() const override { return cid; }
+  CID GetCID() const { return cid; }
 };
 
-struct NotificationMyCardStarred : AbstractNotification {
-  UID uid;  // Who starred my card.
-  CID cid;  // Which card.
-  NotificationMyCardStarred() = default;
-  NotificationMyCardStarred(UID starrer_uid, CID cid) : uid(starrer_uid), cid(cid) {}
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid));
-  }
-  void PopulateResponseNotification(ResponseNotification& output) const override {
+CURRENT_STRUCT(NotificationMyCardStarred, AbstractNotification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);  // Who starred my card.
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);  // Which card.
+
+  CURRENT_DEFAULT_CONSTRUCTOR(NotificationMyCardStarred) {}
+  CURRENT_CONSTRUCTOR(NotificationMyCardStarred)(UID starrer_uid, CID cid) : uid(starrer_uid), cid(cid) {}
+
+  void PopulateResponseNotification(ResponseNotification & output) const {
     output.type = "MyCardStarred";
     output.uid = UIDToString(uid);
     output.cid = CIDToString(cid);
     output.oid = "";
     output.text = "";
   }
-  CID GetCID() const override { return cid; }
+  CID GetCID() const { return cid; }
 };
 
-struct NotificationNewVotesOnMyCard : AbstractNotification {
-  UID uid;  // Who (grouped later at transmission phase).
-  CID cid;  // On which card.
-  NotificationNewVotesOnMyCard() = default;
-  NotificationNewVotesOnMyCard(UID uid, CID cid) : uid(uid), cid(cid) {}
-  template <typename A>
-  void serialize(A& ar) {
-    ar(CEREAL_NVP(uid), CEREAL_NVP(cid));
-  }
-  void PopulateResponseNotification(ResponseNotification& output) const override {
+CURRENT_STRUCT(NotificationNewVotesOnMyCard, AbstractNotification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);  // Who (grouped later at transmission phase).
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);  // On which card.
+
+  CURRENT_DEFAULT_CONSTRUCTOR(NotificationNewVotesOnMyCard) {}
+  CURRENT_CONSTRUCTOR(NotificationNewVotesOnMyCard)(UID uid, CID cid) : uid(uid), cid(cid) {}
+
+  void PopulateResponseNotification(ResponseNotification & output) const {
     output.type = "NewVotesOnMyCard";
     output.cid = CIDToString(cid);
     output.uid = UIDToString(uid);
     output.oid = "";
     output.text = "";
   }
-  CID GetCID() const override { return cid; }
+  CID GetCID() const { return cid; }
+};
+
+using T_NOTIFICATIONS_VARIANT = Variant<NotificationMyCardNewComment,
+                                        NotificationNewReplyToMyComment,
+                                        NotificationMyCommentLiked,
+                                        NotificationNewCommentOnCardIStarred,
+                                        NotificationMyCardStarred,
+                                        NotificationNewVotesOnMyCard>;
+
+CURRENT_STRUCT(Notification) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_ROW(uid);
+  // CURRENT_FIELD(timestamp, std::chrono::milliseconds);
+  CURRENT_FIELD(timestamp, uint64_t, 0);  // To have REST compile, `{To/From}String`. -- D.K.
+  CURRENT_USE_FIELD_AS_COL(timestamp);
+  CURRENT_FIELD(notification, T_NOTIFICATIONS_VARIANT);
 };
 
 }  // namespace CTFO
-
-// Inner polymorphic types have to be registered. -- D.K.
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCardNewComment, "NotificationMyCardNewComment");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationNewReplyToMyComment, "NotificationNewReplyToMyComment");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCommentLiked, "NotificationMyCommentLiked");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationNewCommentOnCardIStarred,
-                               "NotificationNewCommentOnCardIStarred");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationMyCardStarred, "NotificationMyCardStarred");
-CEREAL_REGISTER_TYPE_WITH_NAME(CTFO::NotificationNewVotesOnMyCard, "NotificationNewVotesOnMyCard");
 
 #endif  // CTFO_SCHEMA_H

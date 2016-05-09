@@ -22,14 +22,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *******************************************************************************/
 
+#include <set>
+
 #include "../Current/Bricks/dflags/dflags.h"
 #include "../Current/Bricks/file/file.h"
 #include "../Current/Bricks/strings/strings.h"
+#include "../Current/TypeSystem/Serialization/json.h"
 
 #include "util.h"
 #include "schema.h"
 
-using namespace bricks::strings;
 using namespace CTFO;
 
 DEFINE_string(in, "cards.txt", "Default input file in raw text format.");
@@ -46,18 +48,19 @@ int main(int argc, char** argv) {
   std::vector<std::string> raw_cards;
 
   if (!FLAGS_append) {
-    bricks::FileSystem::RmFile(FLAGS_out, bricks::FileSystem::RmFileParameters::Silent);
+    current::FileSystem::RmFile(FLAGS_out, current::FileSystem::RmFileParameters::Silent);
   }
 
   try {
-    raw_cards = Split<ByLines>(bricks::FileSystem::ReadFileAsString(FLAGS_in));
-  } catch (const bricks::CannotReadFileException& e) {
+    raw_cards =
+        current::strings::Split<current::strings::ByLines>(current::FileSystem::ReadFileAsString(FLAGS_in));
+  } catch (const current::CannotReadFileException& e) {
     std::cerr << "Unable to read file '" << FLAGS_in << "': " << e.what() << std::endl;
     return -1;
   }
 
-  bricks::cerealize::CerealFileAppender<Card, bricks::DefaultCloner, bricks::cerealize::CerealFormat::JSON>
-      out_json(FLAGS_out);
+  std::ofstream out_json(FLAGS_out);
+  assert(out_json.good());
 
   std::set<CID> cids;
   for (const auto& text : raw_cards) {
@@ -78,7 +81,7 @@ int main(int argc, char** argv) {
         c.startup_index = index;
         c.ms = 2000000000000 - index;
       }
-      out_json << c;
+      out_json << JSON(c) << '\n';
     }
   }
 }
