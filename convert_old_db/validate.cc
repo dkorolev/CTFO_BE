@@ -41,22 +41,22 @@ int main(int argc, char** argv) {
 
   db.ReadOnlyTransaction([](ImmutableFields<DB> fields) {
 #define REPORT_SIZE(x) std::cerr << #x ": " << fields.x.Size() << " records.\n";
-      REPORT_SIZE(user);
-      REPORT_SIZE(auth_token);
-      REPORT_SIZE(auth_uid);
-      REPORT_SIZE(card);
-      REPORT_SIZE(card_author);
-      REPORT_SIZE(answer);
-      REPORT_SIZE(favorite);
-      REPORT_SIZE(comment);
-      REPORT_SIZE(comment_like);
-      REPORT_SIZE(flagged_card);
-      REPORT_SIZE(flagged_comment);
-      REPORT_SIZE(notification);
-      REPORT_SIZE(starred_notification_already_sent);
-      REPORT_SIZE(user_reported_user);
-      REPORT_SIZE(user_blocked_user);
-      REPORT_SIZE(banned_user);
+    REPORT_SIZE(user);
+    REPORT_SIZE(auth_token);
+    REPORT_SIZE(auth_uid);
+    REPORT_SIZE(card);
+    REPORT_SIZE(card_author);
+    REPORT_SIZE(answer);
+    REPORT_SIZE(favorite);
+    REPORT_SIZE(comment);
+    REPORT_SIZE(comment_like);
+    REPORT_SIZE(flagged_card);
+    REPORT_SIZE(flagged_comment);
+    REPORT_SIZE(notification);
+    REPORT_SIZE(starred_notification_already_sent);
+    REPORT_SIZE(user_reported_user);
+    REPORT_SIZE(user_blocked_user);
+    REPORT_SIZE(banned_user);
 #undef REPORT_SIZE
   }).Go();
 }

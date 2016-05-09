@@ -31,7 +31,9 @@ SOFTWARE.
 #include "../../Current/Storage/persister/sherlock.h"
 
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::User, Persisted_User);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::AuthKeyTokenPair, Persisted_AuthKeyTokenPair);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany,
+                            new_ctfo::AuthKeyTokenPair,
+                            Persisted_AuthKeyTokenPair);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::AuthKeyUIDPair, Persisted_AuthKeyUIDPair);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::Card, Persisted_Card);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::CardAuthor, Persisted_CardAuthor);
@@ -49,7 +51,9 @@ CURRENT_STORAGE_FIELD_ENTRY(OrderedManyToOrderedMany, new_ctfo::Notification, Pe
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary,
                             new_ctfo::StarNotificationAlreadySent,
                             Persisted_StarNotificationAlreadySent);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::UserReportedUser, Persisted_UserReportedUser);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany,
+                            new_ctfo::UserReportedUser,
+                            Persisted_UserReportedUser);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::UserBlockedUser, Persisted_UserBlockedUser);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::BannedUser, Persisted_BannedUser);
 

@@ -40,14 +40,15 @@ int main(int argc, char** argv) {
   using DB = NewCTFO<SherlockStreamPersister>;
   DB db(FLAGS_output);
 
-  current::storage::TransactionResult<bool> result = db.ReadOnlyTransaction([](ImmutableFields<DB> fields) -> bool {
-    if (fields.user.Size() || fields.card.Size()) {
-      std::cerr << "Storage loaded from `" << FLAGS_output << "` is not empty. Not adding anything.\n";
-      return false;
-    } else {
-      return true;
-    }
-  }).Go();
+  current::storage::TransactionResult<bool> result =
+      db.ReadOnlyTransaction([](ImmutableFields<DB> fields) -> bool {
+        if (fields.user.Size() || fields.card.Size()) {
+          std::cerr << "Storage loaded from `" << FLAGS_output << "` is not empty. Not adding anything.\n";
+          return false;
+        } else {
+          return true;
+        }
+      }).Go();
 
   if (Value(result)) {
     db.ReadWriteTransaction([](MutableFields<DB> fields) {
