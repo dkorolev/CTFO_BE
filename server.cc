@@ -42,12 +42,12 @@ DEFINE_bool(debug_print, true, "Print debug info to stderr.");
 
 int main(int argc, char **argv) {
   ParseDFlags(&argc, &argv);
-  bricks::random::SetRandomSeed(FLAGS_rand_seed);
+  current::random::SetRandomSeed(FLAGS_rand_seed);
   CTFOServer(FLAGS_cards_file,
              FLAGS_port,
              FLAGS_storage_file,
              FLAGS_event_log_port,
              FLAGS_event_log_file,
-             static_cast<bricks::time::MILLISECONDS_INTERVAL>(FLAGS_tick_interval_ms),
+             std::chrono::milliseconds(FLAGS_tick_interval_ms),
              FLAGS_debug_print).Join();
 }

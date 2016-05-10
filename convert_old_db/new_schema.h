@@ -171,6 +171,7 @@ CURRENT_STRUCT(Comment) {
   CURRENT_USE_FIELD_AS_ROW(cid);
   CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);
   CURRENT_USE_FIELD_AS_COL(oid);
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
   CURRENT_FIELD(parent_oid,
                 OID,
                 OID::INVALID_COMMENT);  // `INVALID_COMMENT` for a top-level comment, parent OID otherwise.
@@ -391,6 +392,18 @@ CURRENT_STRUCT(Notification) {
   CURRENT_FIELD(timestamp, uint64_t, 0);  // To have REST compile, `{To/From}String`. -- D.K.
   CURRENT_USE_FIELD_AS_COL(timestamp);
   CURRENT_FIELD(notification, T_NOTIFICATIONS_VARIANT);
+  CURRENT_DEFAULT_CONSTRUCTOR(Notification) {}
+  CURRENT_CONSTRUCTOR(Notification)(UID uid, uint64_t ms, T_NOTIFICATIONS_VARIANT && notification)
+      : uid(uid), timestamp(ms), notification(std::move(notification)) {}
+
+  ResponseNotification BuildResponseNotification() const {
+    ResponseNotification result;
+    result.ms = std::chrono::milliseconds(timestamp);
+    result.nid = NIDToString(static_cast<NID>(ID_RANGE * 5 + timestamp * 1000ull));
+    ((AbstractNotification*)&notification)->PopulateResponseNotification(result);
+    return result;
+  }
+  CID GetCID() const { return ((AbstractNotification*)&notification)->GetCID(); }
 };
 
 }  // namespace new_ctfo
