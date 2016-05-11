@@ -254,15 +254,7 @@ CURRENT_STRUCT(BannedUser) {
 };
 
 // Notifications.
-CURRENT_STRUCT(AbstractNotification){// Sadly, can't be pure virtual with `g++`. -- @dkorolev, @mzhurovich.
-                                     virtual void PopulateResponseNotification(ResponseNotification&)const {}
-                                     // To return full card bodies in the payload; can be CID::INVALID_CARD.
-                                     virtual CID GetCID() const {return CID::INVALID_CARD;
-}
-}
-;
-
-CURRENT_STRUCT(NotificationMyCardNewComment, AbstractNotification) {
+CURRENT_STRUCT(NotificationMyCardNewComment) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that comment.
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);     // To what card.
   CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);  // Which comment.
@@ -281,10 +273,9 @@ CURRENT_STRUCT(NotificationMyCardNewComment, AbstractNotification) {
     output.oid = OIDToString(oid);
     output.text = text;
   }
-  CID GetCID() const { return cid; }
 };
 
-CURRENT_STRUCT(NotificationNewReplyToMyComment, AbstractNotification) {
+CURRENT_STRUCT(NotificationNewReplyToMyComment) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that reply.
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);     // To what card.
   CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);  // Which comment.
@@ -301,10 +292,9 @@ CURRENT_STRUCT(NotificationNewReplyToMyComment, AbstractNotification) {
     output.oid = OIDToString(oid);
     output.text = text;
   }
-  CID GetCID() const { return cid; }
 };
 
-CURRENT_STRUCT(NotificationMyCommentLiked, AbstractNotification) {
+CURRENT_STRUCT(NotificationMyCommentLiked) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who liked my comment.
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);     // On what card.
   CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);  // Which comment of mine.
@@ -321,10 +311,9 @@ CURRENT_STRUCT(NotificationMyCommentLiked, AbstractNotification) {
     output.oid = OIDToString(oid);
     output.text = text;
   }
-  CID GetCID() const { return cid; }
 };
 
-CURRENT_STRUCT(NotificationNewCommentOnCardIStarred, AbstractNotification) {
+CURRENT_STRUCT(NotificationNewCommentOnCardIStarred) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that comment.
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);     // On what card.
   CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);  // Which comment.
@@ -340,10 +329,9 @@ CURRENT_STRUCT(NotificationNewCommentOnCardIStarred, AbstractNotification) {
     output.oid = OIDToString(oid);
     output.text = text;
   }
-  CID GetCID() const { return cid; }
 };
 
-CURRENT_STRUCT(NotificationMyCardStarred, AbstractNotification) {
+CURRENT_STRUCT(NotificationMyCardStarred) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);  // Who starred my card.
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);  // Which card.
 
@@ -357,10 +345,9 @@ CURRENT_STRUCT(NotificationMyCardStarred, AbstractNotification) {
     output.oid = "";
     output.text = "";
   }
-  CID GetCID() const { return cid; }
 };
 
-CURRENT_STRUCT(NotificationNewVotesOnMyCard, AbstractNotification) {
+CURRENT_STRUCT(NotificationNewVotesOnMyCard) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);  // Who (grouped later at transmission phase).
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);  // On which card.
 
@@ -374,7 +361,6 @@ CURRENT_STRUCT(NotificationNewVotesOnMyCard, AbstractNotification) {
     output.oid = "";
     output.text = "";
   }
-  CID GetCID() const { return cid; }
 };
 
 using T_NOTIFICATIONS_VARIANT = Variant<NotificationMyCardNewComment,
@@ -383,6 +369,38 @@ using T_NOTIFICATIONS_VARIANT = Variant<NotificationMyCardNewComment,
                                         NotificationNewCommentOnCardIStarred,
                                         NotificationMyCardStarred,
                                         NotificationNewVotesOnMyCard>;
+
+struct NotificationCIDGetter {
+  CID cid;
+  void operator()(const NotificationMyCardNewComment& notification) { cid = notification.cid; }
+  void operator()(const NotificationNewReplyToMyComment& notification) { cid = notification.cid; }
+  void operator()(const NotificationMyCommentLiked& notification) { cid = notification.cid; }
+  void operator()(const NotificationNewCommentOnCardIStarred& notification) { cid = notification.cid; }
+  void operator()(const NotificationMyCardStarred& notification) { cid = notification.cid; }
+  void operator()(const NotificationNewVotesOnMyCard& notification) { cid = notification.cid; }
+};
+
+struct ResponseNotificationBuilder {
+  ResponseNotification response;
+  void operator()(const NotificationMyCardNewComment& notification) {
+    notification.PopulateResponseNotification(response);
+  }
+  void operator()(const NotificationNewReplyToMyComment& notification) {
+    notification.PopulateResponseNotification(response);
+  }
+  void operator()(const NotificationMyCommentLiked& notification) {
+    notification.PopulateResponseNotification(response);
+  }
+  void operator()(const NotificationNewCommentOnCardIStarred& notification) {
+    notification.PopulateResponseNotification(response);
+  }
+  void operator()(const NotificationMyCardStarred& notification) {
+    notification.PopulateResponseNotification(response);
+  }
+  void operator()(const NotificationNewVotesOnMyCard& notification) {
+    notification.PopulateResponseNotification(response);
+  }
+};
 
 CURRENT_STRUCT(Notification) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
@@ -396,13 +414,17 @@ CURRENT_STRUCT(Notification) {
       : uid(uid), timestamp(ms), notification(std::move(notification)) {}
 
   ResponseNotification BuildResponseNotification() const {
-    ResponseNotification result;
-    result.us = timestamp;
-    result.nid = NIDToString(static_cast<NID>(ID_RANGE * 5 + timestamp.count()));
-    ((AbstractNotification*)&notification)->PopulateResponseNotification(result);
-    return result;
+    ResponseNotificationBuilder builder;
+    builder.response.us = timestamp;
+    builder.response.nid = NIDToString(static_cast<NID>(ID_RANGE * 5 + timestamp.count()));
+    notification.Call(builder);
+    return builder.response;
   }
-  CID GetCID() const { return ((AbstractNotification*)&notification)->GetCID(); }
+  CID GetCID() const {
+    NotificationCIDGetter getter;
+    notification.Call(getter);
+    return getter.cid;
+  }
 };
 
 }  // namespace new_ctfo
