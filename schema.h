@@ -165,7 +165,7 @@ const std::vector<Color> CARD_COLORS{{0x0A, 0xB2, 0xCB},
 CURRENT_STRUCT(User) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
   CURRENT_USE_FIELD_AS_KEY(uid);
-  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
+  CURRENT_FIELD(us, std::chrono::microseconds, 0);
   CURRENT_FIELD(level, uint8_t, 0u);   // User level [0, 9].
   CURRENT_FIELD(score, uint64_t, 0u);  // User score.
 
@@ -226,8 +226,7 @@ CURRENT_STRUCT(UIDAuthKeyPair) {
 CURRENT_STRUCT(Card) {
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_KEY(cid);
-  // CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
-  CURRENT_FIELD(ms, uint64_t, 0);  // To have REST compile, `{To/From}String`. -- D.K.
+  CURRENT_FIELD(us, std::chrono::microseconds, 0);
   CURRENT_FIELD(text, std::string);
   CURRENT_FIELD(color, Color);
   CURRENT_FIELD(ctfo_count, uint32_t, 0u);    // Number of users, who said "CTFO" on this card.
@@ -247,7 +246,7 @@ CURRENT_STRUCT(AuthorCard) {
   CURRENT_USE_FIELD_AS_ROW(uid);
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_COL(cid);
-  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
+  CURRENT_FIELD(us, std::chrono::microseconds, 0);
 
   CURRENT_DEFAULT_CONSTRUCTOR(AuthorCard) {}
   CURRENT_CONSTRUCTOR(AuthorCard)(UID uid, CID cid) : uid(uid), cid(cid) {}
@@ -269,7 +268,7 @@ CURRENT_STRUCT(Favorite) {
   CURRENT_USE_FIELD_AS_ROW(uid);
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_COL(cid);
-  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
+  CURRENT_FIELD(us, std::chrono::microseconds, 0);
   CURRENT_FIELD(favorited, bool, false);
 
   CURRENT_DEFAULT_CONSTRUCTOR(Favorite) {}
@@ -282,7 +281,7 @@ CURRENT_STRUCT(Comment) {
   CURRENT_USE_FIELD_AS_ROW(cid);
   CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);
   CURRENT_USE_FIELD_AS_COL(oid);
-  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
+  CURRENT_FIELD(us, std::chrono::microseconds, 0);
   CURRENT_FIELD(parent_oid,
                 OID,
                 OID::INVALID_COMMENT);  // `INVALID_COMMENT` for a top-level comment, parent OID otherwise.
@@ -499,18 +498,18 @@ using T_NOTIFICATIONS_VARIANT = Variant<NotificationMyCardNewComment,
 CURRENT_STRUCT(Notification) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
   CURRENT_USE_FIELD_AS_ROW(uid);
-  // CURRENT_FIELD(timestamp, std::chrono::milliseconds);
-  CURRENT_FIELD(timestamp, uint64_t, 0);  // To have REST compile, `{To/From}String`. -- D.K.
+  CURRENT_FIELD(timestamp, std::chrono::microseconds, 0);
   CURRENT_USE_FIELD_AS_COL(timestamp);
   CURRENT_FIELD(notification, T_NOTIFICATIONS_VARIANT);
   CURRENT_DEFAULT_CONSTRUCTOR(Notification) {}
-  CURRENT_CONSTRUCTOR(Notification)(UID uid, uint64_t ms, T_NOTIFICATIONS_VARIANT && notification)
+  CURRENT_CONSTRUCTOR(Notification)(
+      UID uid, std::chrono::microseconds ms, T_NOTIFICATIONS_VARIANT && notification)
       : uid(uid), timestamp(ms), notification(std::move(notification)) {}
 
   ResponseNotification BuildResponseNotification() const {
     ResponseNotification result;
-    result.ms = std::chrono::milliseconds(timestamp);
-    result.nid = NIDToString(static_cast<NID>(ID_RANGE * 5 + timestamp * 1000ull));
+    result.us = timestamp;
+    result.nid = NIDToString(static_cast<NID>(ID_RANGE * 5 + timestamp.count()));
     ((AbstractNotification*)&notification)->PopulateResponseNotification(result);
     return result;
   }

@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
         const int index = static_cast<double>(text[0] - '0');
         c.text = text.substr(2);
         c.startup_index = index;
-        c.ms = 2000000000000 - index;
+        c.us = std::chrono::microseconds((2000000000000 - index) * 1000);
       }
       out_json << JSON(c) << '\n';
     }

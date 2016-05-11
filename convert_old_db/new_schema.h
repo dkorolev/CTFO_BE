@@ -391,13 +391,14 @@ CURRENT_STRUCT(Notification) {
   CURRENT_USE_FIELD_AS_COL(timestamp);
   CURRENT_FIELD(notification, T_NOTIFICATIONS_VARIANT);
   CURRENT_DEFAULT_CONSTRUCTOR(Notification) {}
-  CURRENT_CONSTRUCTOR(Notification)(UID uid, uint64_t ms, T_NOTIFICATIONS_VARIANT && notification)
+  CURRENT_CONSTRUCTOR(Notification)(
+      UID uid, std::chrono::microseconds ms, T_NOTIFICATIONS_VARIANT && notification)
       : uid(uid), timestamp(ms), notification(std::move(notification)) {}
 
   ResponseNotification BuildResponseNotification() const {
     ResponseNotification result;
-    result.ms = std::chrono::milliseconds(timestamp);
-    result.nid = NIDToString(static_cast<NID>(ID_RANGE * 5 + timestamp * 1000ull));
+    result.us = timestamp;
+    result.nid = NIDToString(static_cast<NID>(ID_RANGE * 5 + timestamp.count()));
     ((AbstractNotification*)&notification)->PopulateResponseNotification(result);
     return result;
   }

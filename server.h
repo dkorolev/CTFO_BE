@@ -294,11 +294,11 @@ class CTFOServer final {
               const auto& answers = data.answer;
 
               // Get favs.
-              std::vector<std::pair<std::chrono::milliseconds, CID>> favs;
+              std::vector<std::pair<std::chrono::microseconds, CID>> favs;
               const auto& favorites = data.favorite;
               for (const auto& fav : favorites.Row(uid)) {
                 if (fav.favorited) {
-                  favs.emplace_back(fav.ms, fav.cid);
+                  favs.emplace_back(fav.us, fav.cid);
                 }
               }
 
@@ -319,13 +319,12 @@ class CTFOServer final {
                       card_entry.is_my_card = (uid == author_uid);
                     }
                     card_entry.number_of_comments = comments.Row(card.cid).Size();
-                    const uint64_t now =
-                        std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now()).count();
+                    const uint64_t now = current::time::Now().count();
                     card_entry.text = card.text;
-                    card_entry.ms = std::chrono::milliseconds(card.ms);
+                    card_entry.us = card.us;
                     card_entry.color = card.color;
                     card_entry.relevance =
-                        0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+                        0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1000 * 1000 * 60 * 60 * 24)));
                     card_entry.ctfo_score = 50u;
                     card_entry.tfu_score = 50u;
                     card_entry.ctfo_count = card.ctfo_count;
@@ -354,7 +353,7 @@ class CTFOServer final {
                 }
               }
 
-              rfavs.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+              rfavs.us = current::time::Now();
               return Response(rfavs, "favs");
             }
           }
@@ -404,9 +403,9 @@ class CTFOServer final {
               const auto& favorites = data.favorite;
 
               // Get my cards.
-              std::vector<std::pair<std::chrono::milliseconds, CID>> my_cards;
+              std::vector<std::pair<std::chrono::microseconds, CID>> my_cards;
               for (const auto& my_card : data.author_card.Row(uid)) {
-                my_cards.emplace_back(my_card.ms, my_card.cid);
+                my_cards.emplace_back(my_card.us, my_card.cid);
               }
 
               // In reverse chronological order.
@@ -426,13 +425,12 @@ class CTFOServer final {
                       card_entry.is_my_card = (uid == author_uid);
                     }
                     card_entry.number_of_comments = comments.Row(card.cid).Size();
-                    const uint64_t now =
-                        std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now()).count();
+                    const uint64_t now = current::time::Now().count();
                     card_entry.text = card.text;
-                    card_entry.ms = std::chrono::milliseconds(card.ms);
+                    card_entry.us = card.us;
                     card_entry.color = card.color;
                     card_entry.relevance =
-                        0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+                        0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1000 * 1000 * 60 * 60 * 24)));
                     card_entry.ctfo_score = 50u;
                     card_entry.tfu_score = 50u;
                     card_entry.ctfo_count = card.ctfo_count;
@@ -465,7 +463,7 @@ class CTFOServer final {
                 }
               }
 
-              r_my_cards.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+              r_my_cards.us = current::time::Now();
               return Response(r_my_cards, "my_cards");
             }
           }
@@ -509,7 +507,7 @@ class CTFOServer final {
             }
             card_entry.number_of_comments = comments.Row(card.cid).Size();
             card_entry.text = card.text;
-            card_entry.ms = std::chrono::milliseconds(card.ms);
+            card_entry.us = card.us;
             card_entry.color = card.color;
             card_entry.relevance = 1.0;  // When `GET`-ting a card, make it 1.0.
             card_entry.ctfo_score = 50u;
@@ -576,7 +574,7 @@ class CTFOServer final {
                 } else {
                   DebugPrint(
                       Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
-                  const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+                  const auto now = current::time::Now();
 
                   auto& cards_mutator = data.card;
                   auto& authors_mutator = data.author_card;
@@ -593,7 +591,7 @@ class CTFOServer final {
                   authors_mutator.Add(author);
 
                   AddCardResponse response;
-                  response.ms = now;
+                  response.us = now;
                   response.cid = CIDToString(cid);
                   return Response(response, "created");
                 }
@@ -650,7 +648,7 @@ class CTFOServer final {
                   comments_mutator.Erase(cid, o);
                 }
                 DeleteCardResponse response;
-                response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+                response.us = current::time::Now();
                 return Response(response, "deleted");
               }
             } else {
@@ -724,16 +722,13 @@ class CTFOServer final {
                   } else if (Exists(data.banned_user[comment.author_uid])) {
                     comment_hidden_due_to_block_or_ban = true;
                   } else if (comment.parent_oid != OID::INVALID_COMMENT) {
-                    const auto top_level_comments = comments_accessor.Cols()[comment.parent_oid];
-                    if (Exists(top_level_comments)) {
-                      const auto v = Value(top_level_comments);
-                      if (v.Size() == 1u) {
-                        const Comment& parent_comment = *v.begin();
-                        if (Exists(data.user_blocked_user.Get(uid, parent_comment.author_uid))) {
-                          comment_hidden_due_to_block_or_ban = true;
-                        } else if (Exists(data.banned_user[parent_comment.author_uid])) {
-                          comment_hidden_due_to_block_or_ban = true;
-                        }
+                    const auto top_level_comment = comments_accessor.GetEntryFromCol(comment.parent_oid);
+                    if (Exists(top_level_comment)) {
+                      const Comment& parent_comment = Value(top_level_comment);
+                      if (Exists(data.user_blocked_user.Get(uid, parent_comment.author_uid))) {
+                        comment_hidden_due_to_block_or_ban = true;
+                      } else if (Exists(data.banned_user[parent_comment.author_uid])) {
+                        comment_hidden_due_to_block_or_ban = true;
                       }
                     }
                   }
@@ -747,16 +742,13 @@ class CTFOServer final {
                 uint64_t top_level_comment_timestamp = 0u;
                 if (c.parent_oid == OID::INVALID_COMMENT) {
                   // This comment is top-level.
-                  top_level_comment_timestamp = c.ms.count();
+                  top_level_comment_timestamp = c.us.count();
                 } else {
                   // This is a 2nd-level comment.
-                  comment_timestamp = c.ms.count();
-                  const auto top_level_comments = comments_accessor.Cols()[c.parent_oid];
-                  if (Exists(top_level_comments)) {
-                    const auto v = Value(top_level_comments);
-                    if (v.Size() == 1u) {
-                      top_level_comment_timestamp = (*v.begin()).ms.count();
-                    }
+                  comment_timestamp = c.us.count();
+                  const auto top_level_comment = comments_accessor.GetEntryFromCol(c.parent_oid);
+                  if (Exists(top_level_comment)) {
+                    top_level_comment_timestamp = Value(top_level_comment).us.count();
                   }
                 }
                 // Top-level comments reverse chronologically, 2nd level comments chronologically.
@@ -767,7 +759,7 @@ class CTFOServer final {
                   proto_comments.end(),
                   [&sortkey](const Comment& lhs, const Comment& rhs) { return sortkey(lhs) < sortkey(rhs); });
               ResponseComments response;
-              response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+              response.us = current::time::Now();
               std::vector<ResponseComment>& output_comments = response.comments;
               for (const auto& comment : proto_comments) {
                 // TODO(dkorolev): Need a function to convert `Comment` into `ResponseComment`.
@@ -791,7 +783,7 @@ class CTFOServer final {
                   c.liked = v.Has(uid);
                 }
                 c.flagged_inappropriate = flagged_comments.count(comment.oid);
-                c.ms = comment.ms;
+                c.us = comment.us;
                 output_comments.push_back(std::move(c));
               }
               return Response(response, "comments");
@@ -828,8 +820,7 @@ class CTFOServer final {
                 } else {
                   DebugPrint(
                       Printf("[/ctfo/comments] Token validated. Requested URL = '%s'", requested_url.c_str()));
-                  const uint64_t now =
-                      std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now()).count();
+                  const auto now = current::time::Now();
 
                   UID card_author_uid = UID::INVALID_USER;
                   OID parent_oid =
@@ -851,20 +842,13 @@ class CTFOServer final {
 
                   if (parent_oid != OID::INVALID_COMMENT) {
                     comment.parent_oid = parent_oid;
-                    const auto iterable = comments_mutator.Cols()[parent_oid];
-                    if (Exists(iterable)) {
-                      const auto v = Value(iterable);
-                      if (v.Size() != 1u) {
-                        // TODO(dkorolev): This error is oh so wrong. Fix it.
-                        return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
-                      } else {
-                        const Comment& parent_comment = *v.begin();
-                        if (parent_comment.parent_oid != OID::INVALID_COMMENT) {
-                          return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n",
-                                          HTTPResponseCode.BadRequest);
-                        }
-                        parent_comment_author_uid = parent_comment.author_uid;
+                    const auto v = comments_mutator.GetEntryFromCol(parent_oid);
+                    if (Exists(v)) {
+                      const Comment& parent_comment = Value(v);
+                      if (parent_comment.parent_oid != OID::INVALID_COMMENT) {
+                        return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n", HTTPResponseCode.BadRequest);
                       }
+                      parent_comment_author_uid = parent_comment.author_uid;
                     } else {
                       return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
                     }
@@ -899,7 +883,7 @@ class CTFOServer final {
                   }
 
                   AddCommentResponse response;
-                  response.ms = std::chrono::milliseconds(now);
+                  response.us = now;
                   response.oid = OIDToString(oid);
                   return Response(response, "created");
                 }
@@ -950,7 +934,7 @@ class CTFOServer final {
                     comments_mutator.Erase(cid, o);
                   }
                   DeleteCommentResponse response;
-                  response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+                  response.us = current::time::Now();
                   return Response(response, "deleted");
                 }
               },
@@ -1024,7 +1008,7 @@ class CTFOServer final {
     std::set<std::pair<double, CID>> recent_cards;
     const UID uid = StringToUID(response.user.uid);
 
-    const uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now()).count();
+    const uint64_t now = current::time::Now().count();
     for (const auto& card : cards) {
       if (!Exists(answers.Get(uid, card.cid)) && !Exists(flagged_cards.Get(card.cid, uid))) {
         const UID card_author_uid = [&data](CID cid) {
@@ -1038,7 +1022,8 @@ class CTFOServer final {
              !Exists(data.user_blocked_user.Get(uid, card_author_uid)))) {
           // For the recent feed, relevance is the function of the age of the card.
           // Added just now => 1.00. Added 24 hour ago => 0.99. Added 48 hours ago => 0.99^2. Etc.
-          double time_order_key = 0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+          double time_order_key =
+              0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1000 * 1000 * 60 * 60 * 24)));
           double hot_order_key = RandomDouble(0.2, 0.4);
           if (card.startup_index) {
             time_order_key = 1.0 - 1e-6 * card.startup_index;
@@ -1070,7 +1055,7 @@ class CTFOServer final {
           }
           card_entry.number_of_comments = comments.Row(card.cid).Size();
           card_entry.text = card.text;
-          card_entry.ms = std::chrono::milliseconds(card.ms);
+          card_entry.us = card.us;
           card_entry.color = card.color;
           card_entry.relevance = 0.0;  // Will be overridden later.
           card_entry.ctfo_score = 50u;
@@ -1131,7 +1116,7 @@ class CTFOServer final {
             }
             card_entry.number_of_comments = comments.Row(card.cid).Size();
             card_entry.text = card.text;
-            card_entry.ms = std::chrono::milliseconds(card.ms);
+            card_entry.us = card.us;
             card_entry.color = card.color;
             card_entry.relevance = 0.0;  // Will be overridden later.
             card_entry.ctfo_score = 50u;
@@ -1161,7 +1146,7 @@ class CTFOServer final {
       // TODO(dkorolev): `upper_bound`, not go through all notifications for this user.
       std::map<CID, ResponseCardEntry> cards_used;
       for (const Notification& notification : data.notification.Row(uid)) {
-        if (notification.timestamp > notifications_since) {
+        if (static_cast<uint64_t>(notification.timestamp.count()) > notifications_since) {
           const CID cid = notification.GetCID();
           if (cid != CID::INVALID_CARD && !cards_used.count(cid)) {
             const auto card = data.card[cid];
@@ -1185,7 +1170,7 @@ class CTFOServer final {
       std::reverse(response.notifications.begin(), response.notifications.end());
     }
 
-    response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+    response.us = current::time::Now();
     DebugPrint(Printf("[RespondWithFeed] Generated response for UID '%s' with %u 'hot' and %u 'recent' cards",
                       response.user.uid.c_str(),
                       response.feed_hot.size(),
@@ -1325,10 +1310,7 @@ class CTFOServer final {
                             const UID author_uid = Value(author).uid;
                             if (author_uid != UID::INVALID_USER && author_uid != uid) {
                               data.notification.Add(Notification(
-                                  author_uid,
-                                  std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now())
-                                      .count(),
-                                  NotificationNewVotesOnMyCard(uid, cid)));
+                                  author_uid, current::time::Now(), NotificationNewVotesOnMyCard(uid, cid)));
                             }
                           }
                         }
@@ -1368,10 +1350,7 @@ class CTFOServer final {
                           const UID author_uid = Value(author).uid;
                           if (author_uid != UID::INVALID_USER && author_uid != uid) {
                             data.notification.Add(Notification(
-                                author_uid,
-                                std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now())
-                                    .count(),
-                                NotificationMyCardStarred(uid, cid)));
+                                author_uid, current::time::Now(), NotificationMyCardStarred(uid, cid)));
                           }
                         }
                       }
@@ -1396,19 +1375,14 @@ class CTFOServer final {
                       data.comment_like.Add(like);
 
                       // Emit the "my comment liked" notification.
-                      const auto comments_iterator = data.comment.Cols()[oid];
-                      if (Exists(comments_iterator)) {
-                        const auto comments = Value(comments_iterator);
-                        if (comments.Size() == 1u) {
-                          const Comment& comment = *comments.begin();
-                          UID comment_author_uid = comment.author_uid;
-                          if (comment_author_uid != UID::INVALID_USER && comment_author_uid != like.uid) {
-                            data.notification.Add(Notification(
-                                comment_author_uid,
-                                std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now())
-                                    .count(),
-                                NotificationMyCommentLiked(like.uid, comment)));
-                          }
+                      const auto v = data.comment.GetEntryFromCol(oid);
+                      if (Exists(v)) {
+                        const Comment& comment = Value(v);
+                        UID comment_author_uid = comment.author_uid;
+                        if (comment_author_uid != UID::INVALID_USER && comment_author_uid != like.uid) {
+                          data.notification.Add(Notification(comment_author_uid,
+                                                             current::time::Now(),
+                                                             NotificationMyCommentLiked(like.uid, comment)));
                         }
                       }
 
