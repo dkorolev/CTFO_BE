@@ -218,8 +218,8 @@ int main(int argc, char** argv) {
 
   // Matrix updates.
   handlers["auth_token.add"] = GenericUpdate<new_ctfo::AuthKeyTokenPair, Persisted_AuthKeyTokenPairUpdated>;
-  handlers["auth_uid.add"] = GenericUpdate<new_ctfo::UIDAuthKeyPair, Persisted_AuthKeyUIDPairUpdated>;
-  handlers["card_authors.add"] = GenericUpdate<new_ctfo::AuthorCard, Persisted_CardAuthorUpdated>;
+  handlers["auth_uid.add"] = GenericUpdate<new_ctfo::UIDAuthKeyPair, Persisted_UIDAuthKeyPairUpdated>;
+  handlers["card_authors.add"] = GenericUpdate<new_ctfo::AuthorCard, Persisted_AuthorCardUpdated>;
   handlers["answers.add"] = GenericUpdate<new_ctfo::Answer, Persisted_AnswerUpdated>;
   handlers["favorites.add"] = GenericUpdate<new_ctfo::Favorite, Persisted_FavoriteUpdated>;
   handlers["comments.add"] = GenericUpdate<new_ctfo::Comment, Persisted_CommentUpdated>;
@@ -234,7 +234,7 @@ int main(int argc, char** argv) {
       GenericUpdate<new_ctfo::UserBlockedUser, Persisted_UserBlockedUserUpdated>;
 
   // Rare matrix deletes.
-  handlers["card_authors.delete"] = MatrixEraseSwapped<new_ctfo::AuthorCard, Persisted_CardAuthorDeleted>;
+  handlers["card_authors.delete"] = MatrixEraseSwapped<new_ctfo::AuthorCard, Persisted_AuthorCardDeleted>;
   handlers["comments.delete"] = MatrixErase<new_ctfo::Comment, Persisted_CommentDeleted>;
   handlers["comment_likes.delete"] = MatrixErase<new_ctfo::CommentLike, Persisted_CommentLikeDeleted>;
 
