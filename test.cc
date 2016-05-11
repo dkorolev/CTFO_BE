@@ -24,7 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *******************************************************************************/
 
-#define BRICKS_MOCK_TIME
+#define CURRENT_MOCK_TIME  // `SetNow()`.
 
 #include "server.h"
 
@@ -46,34 +46,34 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
 #ifdef CTFO_DEBUG
   const std::string db_file = "unittest-db-" + suffix + ".log";
   const std::string log_file = "unittest-log-" + suffix + ".log";
-  bricks::FileSystem::RmFile(db_file, bricks::FileSystem::RmFileParameters::Silent);
-  bricks::FileSystem::RmFile(log_file, bricks::FileSystem::RmFileParameters::Silent);
+  current::FileSystem::RmFile(db_file, current::FileSystem::RmFileParameters::Silent);
+  current::FileSystem::RmFile(log_file, current::FileSystem::RmFileParameters::Silent);
 #else
   static_cast<void>(suffix);
 
-  const std::string db_file = bricks::FileSystem::GenTmpFileName();
-  bricks::FileSystem::ScopedRmFile scoped_rm_db_file(db_file);
+  const std::string db_file = current::FileSystem::GenTmpFileName();
+  current::FileSystem::ScopedRmFile scoped_rm_db_file(db_file);
 
-  const std::string log_file = bricks::FileSystem::GenTmpFileName();
-  bricks::FileSystem::ScopedRmFile scoped_rm_log_file(log_file);
+  const std::string log_file = current::FileSystem::GenTmpFileName();
+  current::FileSystem::ScopedRmFile scoped_rm_log_file(log_file);
 #endif
 
-  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(1));
-  bricks::random::SetRandomSeed(42);
+  current::time::SetNow(std::chrono::microseconds(1000));
+  current::random::SetRandomSeed(42);
 
-  return make_unique<CTFOServer>(FLAGS_cards_file,
-                                 FLAGS_api_port,
-                                 db_file,
-                                 FLAGS_event_log_port,
-                                 log_file,
-                                 static_cast<bricks::time::MILLISECONDS_INTERVAL>(100)
+  return std::make_unique<CTFOServer>(FLAGS_cards_file,
+                                      FLAGS_api_port,
+                                      db_file,
+                                      FLAGS_event_log_port,
+                                      log_file,
+                                      std::chrono::milliseconds(100)
 #ifdef CTFO_DEBUG
-                                 // clang-format off
+                                      // clang-format off
                                  ,
                                  true  // Debug print.
 #endif
-                                 // clang-format on
-                                 );
+                                      // clang-format on
+                                      );
 }
 
 TEST(CTFO, IDsRangeTest) {
@@ -97,19 +97,19 @@ TEST(CTFO, SmokeTest) {
   const auto server_scope = SpawnTestServer("smoke");
 
   // Get authentication `uid` and `token`.
-  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(101));
+  current::time::SetNow(std::chrono::microseconds(101 * 1000));
   const char* const auth_id = "A_BUNCH_OF_DIGITS";
   const char* const auth_key = "1234567890abcdef";
   const auto auth_http_response = HTTP(
       POST(Printf("http://localhost:%d/ctfo/auth/ios?id=%s&key=%s", FLAGS_api_port, auth_id, auth_key), ""));
   EXPECT_EQ(200, static_cast<int>(auth_http_response.code));
-  const auto auth_response = CerealizeParseJSON<ResponseFeed>(auth_http_response.body);
-  EXPECT_EQ(101u, auth_response.ms);
+  const auto auth_response = ParseJSON<ResponseFeed>(auth_http_response.body);
+  EXPECT_EQ(101000u, auth_response.us);
   const std::string actual_uid = auth_response.user.uid;
   const std::string actual_token = auth_response.user.token;
 
   // Get authentication `uid` and `token` for another user.
-  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(201));
+  current::time::SetNow(std::chrono::microseconds(201 * 1000));
   const char* const another_auth_id = "ANOTHER_BUNCH_OF_DIGITS";
   const char* const another_auth_key = "abcdef1234567890";
   const auto another_auth_http_response = HTTP(POST(
@@ -117,15 +117,15 @@ TEST(CTFO, SmokeTest) {
           "http://localhost:%d/ctfo/auth/ios?id=%s&key=%s", FLAGS_api_port, another_auth_id, another_auth_key),
       ""));
   EXPECT_EQ(200, static_cast<int>(another_auth_http_response.code));
-  const auto another_auth_response = CerealizeParseJSON<ResponseFeed>(another_auth_http_response.body);
-  EXPECT_EQ(201u, another_auth_response.ms);
+  const auto another_auth_response = ParseJSON<ResponseFeed>(another_auth_http_response.body);
+  EXPECT_EQ(201000u, another_auth_response.us);
   const std::string another_actual_uid = another_auth_response.user.uid;
   const std::string another_actual_token = another_auth_response.user.token;
 
   EXPECT_NE(actual_uid, another_actual_uid);
   EXPECT_NE(actual_token, another_actual_token);
 
-  bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(1001));
+  current::time::SetNow(std::chrono::microseconds(1001 * 1000));
 
   // Get the feed.
   std::unordered_set<std::string> hot_cids;
@@ -139,8 +139,8 @@ TEST(CTFO, SmokeTest) {
                         actual_uid.c_str(),
                         actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(feed_http_response.code));
-    const auto feed_response = CerealizeParseJSON<ResponseFeed>(feed_http_response.body);
-    EXPECT_EQ(1001u, feed_response.ms);
+    const auto feed_response = ParseJSON<ResponseFeed>(feed_http_response.body);
+    EXPECT_EQ(1001000u, feed_response.us);
     EXPECT_EQ(actual_uid, feed_response.user.uid);
     EXPECT_EQ(actual_token, feed_response.user.token);
     EXPECT_EQ(0u, feed_response.user.level);
@@ -187,7 +187,7 @@ TEST(CTFO, SmokeTest) {
       const auto get_card_response =
           HTTP(GET(Printf("http://localhost:%d/ctfo/card?cid=%s", FLAGS_api_port, cid1.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = CerealizeParseJSON<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, cid1);
       EXPECT_FALSE(card_entry.favorited);
       EXPECT_FALSE(card_entry.is_my_card);
@@ -196,7 +196,7 @@ TEST(CTFO, SmokeTest) {
       const auto get_card_response = HTTP(GET(Printf(
           "http://localhost:%d/ctfo/card?uid=%s&cid=%s", FLAGS_api_port, actual_uid.c_str(), cid1.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = CerealizeParseJSON<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, cid1);
       EXPECT_FALSE(card_entry.favorited);
       EXPECT_FALSE(card_entry.is_my_card);
@@ -211,10 +211,10 @@ TEST(CTFO, SmokeTest) {
   }
 
   // Add two cards to favorites.
-  iOSGenericEvent favorite_event;
+  current::midichlorians::ios::iOSGenericEvent favorite_event;
 
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(10001));
+    current::time::SetNow(std::chrono::microseconds(10001 * 1000));
     favorite_event.event = "FAV";
     favorite_event.fields["uid"] = actual_uid;
     favorite_event.fields["cid"] = cid1;
@@ -225,7 +225,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(200, static_cast<int>(post_favorite_response_1.code));
     EXPECT_EQ("OK\n", post_favorite_response_1.body);
 
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(10002));
+    current::time::SetNow(std::chrono::microseconds(10002 * 1000));
     favorite_event.fields["cid"] = cid2;
     const auto post_favorite_response_2 =
         HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
@@ -236,12 +236,12 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm that GET /ctfo/card returns card favorite status given the `uid`.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(10003));
+    current::time::SetNow(std::chrono::microseconds(10003 * 1000));
     {
       const auto get_card_response = HTTP(GET(Printf(
           "http://localhost:%d/ctfo/card?uid=%s&cid=%s", FLAGS_api_port, actual_uid.c_str(), cid1.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = CerealizeParseJSON<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, cid1);
       EXPECT_TRUE(card_entry.favorited);
     }
@@ -251,7 +251,7 @@ TEST(CTFO, SmokeTest) {
                                                      another_actual_uid.c_str(),
                                                      cid1.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = CerealizeParseJSON<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, cid1);
       EXPECT_FALSE(card_entry.favorited);  // Since the `uid` of another user was passed in.
     }
@@ -259,7 +259,7 @@ TEST(CTFO, SmokeTest) {
       const auto get_card_response =
           HTTP(GET(Printf("http://localhost:%d/ctfo/card?cid=%s", FLAGS_api_port, cid1.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = CerealizeParseJSON<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, cid1);
       EXPECT_FALSE(card_entry.favorited);  // Since no `uid` was passed in.
     }
@@ -267,7 +267,7 @@ TEST(CTFO, SmokeTest) {
 
   // Attempt to add a non-existing card to favorites.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(10004));
+    current::time::SetNow(std::chrono::microseconds(10004 * 1000));
     favorite_event.fields["cid"] = CIDToString(static_cast<CID>(987654321));  // A non-existent ID.
     const auto post_favorite_response_3 =
         HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port),
@@ -278,14 +278,14 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm both are returned as favorites for this user.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(11001));
+    current::time::SetNow(std::chrono::microseconds(11001 * 1000));
     const auto feed_with_2_favs_response = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                                                            FLAGS_api_port,
                                                            actual_uid.c_str(),
                                                            actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(feed_with_2_favs_response.code));
-    const auto two_favs_response = CerealizeParseJSON<ResponseFavs>(feed_with_2_favs_response.body);
-    EXPECT_EQ(11001u, two_favs_response.ms);
+    const auto two_favs_response = ParseJSON<ResponseFavs>(feed_with_2_favs_response.body);
+    EXPECT_EQ(11001000u, two_favs_response.us);
     EXPECT_EQ(actual_uid, two_favs_response.user.uid);
     ASSERT_EQ(2u, two_favs_response.cards.size());
     EXPECT_EQ(cid2, two_favs_response.cards[0].cid);
@@ -294,7 +294,7 @@ TEST(CTFO, SmokeTest) {
 
   // Unfavorite one card.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(12001));
+    current::time::SetNow(std::chrono::microseconds(12001 * 1000));
     favorite_event.event = "UNFAV";
     favorite_event.fields["cid"] = cid1;
     const auto post_unfavorite_response =
@@ -306,14 +306,14 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the remaining one is returned as a favorite for this user.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(13001));
+    current::time::SetNow(std::chrono::microseconds(13001 * 1000));
     const auto feed_with_1_fav_response = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                                                           FLAGS_api_port,
                                                           actual_uid.c_str(),
                                                           actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(feed_with_1_fav_response.code));
-    const auto one_fav_response = CerealizeParseJSON<ResponseFavs>(feed_with_1_fav_response.body);
-    EXPECT_EQ(13001u, one_fav_response.ms);
+    const auto one_fav_response = ParseJSON<ResponseFavs>(feed_with_1_fav_response.body);
+    EXPECT_EQ(13001000u, one_fav_response.us);
     EXPECT_EQ(actual_uid, one_fav_response.user.uid);
     ASSERT_EQ(1u, one_fav_response.cards.size());
     EXPECT_EQ(cid2, one_fav_response.cards[0].cid);
@@ -325,8 +325,8 @@ TEST(CTFO, SmokeTest) {
 
   // First, skip this card. This test casting the "CTFO" vote is possible after the card was skipped.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(14001));
-    iOSGenericEvent ctfo_event;
+    current::time::SetNow(std::chrono::microseconds(14001 * 1000));
+    current::midichlorians::ios::iOSGenericEvent ctfo_event;
     ctfo_event.event = "SKIP";
     ctfo_event.fields["uid"] = actual_uid;
     ctfo_event.fields["cid"] = cid2;
@@ -339,14 +339,14 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the card has one "SKIP" counter.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(14002));
+    current::time::SetNow(std::chrono::microseconds(14002 * 1000));
     const auto feed_with_skip_made_on_fav = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                                                             FLAGS_api_port,
                                                             actual_uid.c_str(),
                                                             actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(feed_with_skip_made_on_fav.code));
-    const auto skip_made_response = CerealizeParseJSON<ResponseFavs>(feed_with_skip_made_on_fav.body);
-    EXPECT_EQ(14002u, skip_made_response.ms);
+    const auto skip_made_response = ParseJSON<ResponseFavs>(feed_with_skip_made_on_fav.body);
+    EXPECT_EQ(14002000u, skip_made_response.us);
     EXPECT_EQ(actual_uid, skip_made_response.user.uid);
     ASSERT_EQ(1u, skip_made_response.cards.size());
     EXPECT_EQ(cid2, skip_made_response.cards[0].cid);
@@ -358,8 +358,8 @@ TEST(CTFO, SmokeTest) {
 
   // Cast a vote on this card.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(14003));
-    iOSGenericEvent ctfo_event;
+    current::time::SetNow(std::chrono::microseconds(14003 * 1000));
+    current::midichlorians::ios::iOSGenericEvent ctfo_event;
     ctfo_event.event = "CTFO";
     ctfo_event.fields["uid"] = actual_uid;
     ctfo_event.fields["cid"] = cid2;
@@ -372,14 +372,14 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the card has one "CTFO" vote.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(15001));
+    current::time::SetNow(std::chrono::microseconds(15001 * 1000));
     const auto feed_with_ctfo_cast_on_fav = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                                                             FLAGS_api_port,
                                                             actual_uid.c_str(),
                                                             actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(feed_with_ctfo_cast_on_fav.code));
-    const auto ctfo_vote_cast_response = CerealizeParseJSON<ResponseFavs>(feed_with_ctfo_cast_on_fav.body);
-    EXPECT_EQ(15001u, ctfo_vote_cast_response.ms);
+    const auto ctfo_vote_cast_response = ParseJSON<ResponseFavs>(feed_with_ctfo_cast_on_fav.body);
+    EXPECT_EQ(15001000u, ctfo_vote_cast_response.us);
     EXPECT_EQ(actual_uid, ctfo_vote_cast_response.user.uid);
     ASSERT_EQ(1u, ctfo_vote_cast_response.cards.size());
     EXPECT_EQ(cid2, ctfo_vote_cast_response.cards[0].cid);
@@ -392,7 +392,7 @@ TEST(CTFO, SmokeTest) {
   // Add a card.
   std::string added_card_cid;
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(16001));
+    current::time::SetNow(std::chrono::microseconds(16001 * 1000));
     AddCardRequest add_card_request;
     add_card_request.text = "Foo.";
     add_card_request.color.red = 1;
@@ -404,8 +404,8 @@ TEST(CTFO, SmokeTest) {
                                                      actual_token.c_str()),
                                               add_card_request));
     EXPECT_EQ(200, static_cast<int>(post_card_response.code));
-    const auto add_card_response = CerealizeParseJSON<AddCardResponse>(post_card_response.body);
-    EXPECT_EQ(16001u, add_card_response.ms);
+    const auto add_card_response = ParseJSON<AddCardResponse>(post_card_response.body);
+    EXPECT_EQ(16001000u, add_card_response.us);
 
     added_card_cid = add_card_response.cid;
   }
@@ -418,7 +418,7 @@ TEST(CTFO, SmokeTest) {
                                                      actual_uid.c_str(),
                                                      added_card_cid.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = CerealizeParseJSON<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, added_card_cid);
       EXPECT_TRUE(card_entry.is_my_card);
     }
@@ -428,7 +428,7 @@ TEST(CTFO, SmokeTest) {
                                                      another_actual_uid.c_str(),
                                                      added_card_cid.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = CerealizeParseJSON<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, added_card_cid);
       EXPECT_FALSE(card_entry.is_my_card);  // Since `another_actual_uid` != `actual_uid`.
     }
@@ -436,7 +436,7 @@ TEST(CTFO, SmokeTest) {
       const auto get_card_response =
           HTTP(GET(Printf("http://localhost:%d/ctfo/card?cid=%s", FLAGS_api_port, added_card_cid.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = CerealizeParseJSON<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseJSON<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, added_card_cid);
       EXPECT_FALSE(card_entry.is_my_card);  // Since `uid` is not passed in.
     }
@@ -444,11 +444,11 @@ TEST(CTFO, SmokeTest) {
   // Confirm the freshly added card tops the "Recent" feed. And that its age matters.
   {
     {
-      const auto feed_recent = CerealizeParseJSON<ResponseFeed>(
-                                   HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
-                                                   FLAGS_api_port,
-                                                   actual_uid.c_str(),
-                                                   actual_token.c_str()))).body).feed_recent;
+      const auto feed_recent =
+          ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
+                                                  FLAGS_api_port,
+                                                  actual_uid.c_str(),
+                                                  actual_token.c_str()))).body).feed_recent;
       ASSERT_EQ(1u, feed_recent.size());
       EXPECT_EQ(added_card_cid, feed_recent[0].cid);
       EXPECT_EQ("Foo.", feed_recent[0].text);
@@ -459,13 +459,13 @@ TEST(CTFO, SmokeTest) {
 
     {
       // Request recent cards 24 hours later.
-      bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(16001 + 1000 * 60 * 60 * 24));
+      current::time::SetNow(std::chrono::microseconds((16001 + 1000 * 60 * 60 * 24) * 1000));
 
-      const auto feed_recent = CerealizeParseJSON<ResponseFeed>(
-                                   HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
-                                                   FLAGS_api_port,
-                                                   actual_uid.c_str(),
-                                                   actual_token.c_str()))).body).feed_recent;
+      const auto feed_recent =
+          ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
+                                                  FLAGS_api_port,
+                                                  actual_uid.c_str(),
+                                                  actual_token.c_str()))).body).feed_recent;
       EXPECT_EQ(1u, feed_recent.size());
       EXPECT_EQ(added_card_cid, feed_recent[0].cid);
       EXPECT_EQ("Foo.", feed_recent[0].text);
@@ -476,13 +476,13 @@ TEST(CTFO, SmokeTest) {
 
     {
       // Request recent cards 48 hours later.
-      bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(16001 + 1000 * 60 * 60 * 48));
+      current::time::SetNow(std::chrono::microseconds((16001 + 1000 * 60 * 60 * 48) * 1000));
 
-      const auto feed_recent = CerealizeParseJSON<ResponseFeed>(
-                                   HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
-                                                   FLAGS_api_port,
-                                                   actual_uid.c_str(),
-                                                   actual_token.c_str()))).body).feed_recent;
+      const auto feed_recent =
+          ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
+                                                  FLAGS_api_port,
+                                                  actual_uid.c_str(),
+                                                  actual_token.c_str()))).body).feed_recent;
       EXPECT_EQ(1u, feed_recent.size());
       EXPECT_EQ(added_card_cid, feed_recent[0].cid);
       EXPECT_EQ("Foo.", feed_recent[0].text);
@@ -492,20 +492,20 @@ TEST(CTFO, SmokeTest) {
     }
 
     // Restore the time back.
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(16001));
+    current::time::SetNow(std::chrono::microseconds(16001 * 1000));
   }
 
   // Confirm this new card is not favorited by default.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(17001));
+    current::time::SetNow(std::chrono::microseconds(17001 * 1000));
     const auto favs_including_my_card_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                         FLAGS_api_port,
                         actual_uid.c_str(),
                         actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(favs_including_my_card_response.code));
-    const auto my_card_fav_response = CerealizeParseJSON<ResponseFavs>(favs_including_my_card_response.body);
-    EXPECT_EQ(17001u, my_card_fav_response.ms);
+    const auto my_card_fav_response = ParseJSON<ResponseFavs>(favs_including_my_card_response.body);
+    EXPECT_EQ(17001000u, my_card_fav_response.us);
     EXPECT_EQ(actual_uid, my_card_fav_response.user.uid);
     ASSERT_EQ(1u, my_card_fav_response.cards.size());
     EXPECT_EQ(cid2, my_card_fav_response.cards[0].cid);
@@ -517,25 +517,25 @@ TEST(CTFO, SmokeTest) {
 
   // Get a list of my cards, should be only one.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(18001));
+    current::time::SetNow(std::chrono::microseconds(18001 * 1000));
     const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                           FLAGS_api_port,
                                           actual_uid.c_str(),
                                           actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(my_cards.code));
-    const auto my_cards_response = CerealizeParseJSON<ResponseMyCards>(my_cards.body);
+    const auto my_cards_response = ParseJSON<ResponseMyCards>(my_cards.body);
 
-    EXPECT_EQ(18001u, my_cards_response.ms);
+    EXPECT_EQ(18001000u, my_cards_response.us);
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
     ASSERT_EQ(1u, my_cards_response.cards.size());
     EXPECT_EQ("Foo.", my_cards_response.cards[0].text);
-    EXPECT_EQ(16001u, my_cards_response.cards[0].ms);
+    EXPECT_EQ(16001000u, my_cards_response.cards[0].us);
   }
 
   // Add a second card, with full JSON body, specifying the color explicitly.
   std::string added_card2_cid;
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(19001));
+    current::time::SetNow(std::chrono::microseconds(19001 * 1000));
     const auto post_card_response =
         HTTP(POST(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s",
                          FLAGS_api_port,
@@ -543,43 +543,43 @@ TEST(CTFO, SmokeTest) {
                          actual_token.c_str()),
                   "{\"card\":{\"text\":\"Bar.\",\"color\":{\"red\":100,\"green\":101,\"blue\":102}}}"));
     EXPECT_EQ(200, static_cast<int>(post_card_response.code));
-    const auto add_card_response = CerealizeParseJSON<AddCardResponse>(post_card_response.body);
-    EXPECT_EQ(19001u, add_card_response.ms);
+    const auto add_card_response = ParseJSON<AddCardResponse>(post_card_response.body);
+    EXPECT_EQ(19001000u, add_card_response.us);
 
     added_card2_cid = add_card_response.cid;
   }
 
   // Get a list of my cards, should be two.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(20001));
+    current::time::SetNow(std::chrono::microseconds(20001 * 1000));
     const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                           FLAGS_api_port,
                                           actual_uid.c_str(),
                                           actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(my_cards.code));
-    const auto my_cards_response = CerealizeParseJSON<ResponseMyCards>(my_cards.body);
+    const auto my_cards_response = ParseJSON<ResponseMyCards>(my_cards.body);
 
-    EXPECT_EQ(20001u, my_cards_response.ms);
+    EXPECT_EQ(20001000u, my_cards_response.us);
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
     ASSERT_EQ(2u, my_cards_response.cards.size());
     EXPECT_EQ("Bar.", my_cards_response.cards[0].text);
-    EXPECT_EQ(19001u, my_cards_response.cards[0].ms);
+    EXPECT_EQ(19001000u, my_cards_response.cards[0].us);
     EXPECT_EQ("Foo.", my_cards_response.cards[1].text);
-    EXPECT_EQ(16001u, my_cards_response.cards[1].ms);
+    EXPECT_EQ(16001000u, my_cards_response.cards[1].us);
   }
 
   // Add a third card, not specifying color.
   std::string added_card3_cid;
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(21001));
+    current::time::SetNow(std::chrono::microseconds(21001 * 1000));
     const auto post_card_response = HTTP(POST(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s",
                                                      FLAGS_api_port,
                                                      actual_uid.c_str(),
                                                      actual_token.c_str()),
                                               "{\"card\":{\"text\":\"Meh.\"}}"));
     EXPECT_EQ(200, static_cast<int>(post_card_response.code));
-    const auto add_card_response = CerealizeParseJSON<AddCardResponse>(post_card_response.body);
-    EXPECT_EQ(21001u, add_card_response.ms);
+    const auto add_card_response = ParseJSON<AddCardResponse>(post_card_response.body);
+    EXPECT_EQ(21001000u, add_card_response.us);
 
     added_card3_cid = add_card_response.cid;
   }
@@ -588,7 +588,7 @@ TEST(CTFO, SmokeTest) {
 #if 0
   {
     // TODO(dkorolev): Revisit as we migrate to the new type system.
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(22001));
+    current::time::SetNow(std::chrono::microseconds(22001*1000));
     const auto post_card_response = HTTP(POST(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s",
                                                      FLAGS_api_port,
                                                      actual_uid.c_str(),
@@ -601,32 +601,32 @@ TEST(CTFO, SmokeTest) {
 
   // Get a list of my cards, should be three.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(23001));
+    current::time::SetNow(std::chrono::microseconds(23001 * 1000));
     const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                           FLAGS_api_port,
                                           actual_uid.c_str(),
                                           actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(my_cards.code));
-    const auto my_cards_response = CerealizeParseJSON<ResponseMyCards>(my_cards.body);
+    const auto my_cards_response = ParseJSON<ResponseMyCards>(my_cards.body);
 
-    EXPECT_EQ(23001u, my_cards_response.ms);
+    EXPECT_EQ(23001000u, my_cards_response.us);
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
     ASSERT_EQ(3u, my_cards_response.cards.size());
     EXPECT_EQ("Meh.", my_cards_response.cards[0].text);
-    EXPECT_EQ(21001u, my_cards_response.cards[0].ms);
+    EXPECT_EQ(21001000u, my_cards_response.cards[0].us);
     EXPECT_EQ("Bar.", my_cards_response.cards[1].text);
-    EXPECT_EQ(19001u, my_cards_response.cards[1].ms);
+    EXPECT_EQ(19001000u, my_cards_response.cards[1].us);
     EXPECT_EQ("Foo.", my_cards_response.cards[2].text);
-    EXPECT_EQ(16001u, my_cards_response.cards[2].ms);
+    EXPECT_EQ(16001000u, my_cards_response.cards[2].us);
   }
 
   // Confirm that three recently added cards are on the top of the recent feed.
   {
-    const auto feed_recent = CerealizeParseJSON<ResponseFeed>(
-                                 HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=3",
-                                                 FLAGS_api_port,
-                                                 actual_uid.c_str(),
-                                                 actual_token.c_str()))).body).feed_recent;
+    const auto feed_recent =
+        ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=3",
+                                                FLAGS_api_port,
+                                                actual_uid.c_str(),
+                                                actual_token.c_str()))).body).feed_recent;
     ASSERT_EQ(3u, feed_recent.size());
     EXPECT_EQ("Meh.", feed_recent[0].text);
     EXPECT_TRUE(feed_recent[0].is_my_card);
@@ -641,7 +641,7 @@ TEST(CTFO, SmokeTest) {
 
   // Get comments for a non-exising card, expecting an error.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(100001));
+    current::time::SetNow(std::chrono::microseconds(100001 * 1000));
     const auto get_comments_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                         FLAGS_api_port,
@@ -654,7 +654,7 @@ TEST(CTFO, SmokeTest) {
 
   // Get comments for the actual card, expecting valid response with no comments.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(101001));
+    current::time::SetNow(std::chrono::microseconds(101001 * 1000));
     const auto get_comments_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                         FLAGS_api_port,
@@ -662,15 +662,15 @@ TEST(CTFO, SmokeTest) {
                         actual_token.c_str(),
                         added_card2_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
-    const auto response = CerealizeParseJSON<ResponseComments>(get_comments_response.body);
-    EXPECT_EQ(101001u, response.ms);
+    const auto response = ParseJSON<ResponseComments>(get_comments_response.body);
+    EXPECT_EQ(101001000u, response.us);
     EXPECT_EQ(0u, response.comments.size());
   }
 
   // Add a top-level comment.
   std::string added_comment_oid;
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(102001));
+    current::time::SetNow(std::chrono::microseconds(102001 * 1000));
     AddCommentRequest add_comment_request;
     add_comment_request.text = "Meh.";
     const auto post_comment_response =
@@ -681,43 +681,43 @@ TEST(CTFO, SmokeTest) {
                          added_card_cid.c_str()),
                   add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-    const auto add_comment_response = CerealizeParseJSON<AddCommentResponse>(post_comment_response.body);
-    EXPECT_EQ(102001u, add_comment_response.ms);
+    const auto add_comment_response = ParseJSON<AddCommentResponse>(post_comment_response.body);
+    EXPECT_EQ(102001000u, add_comment_response.us);
 
     added_comment_oid = add_comment_response.oid;
   }
 
   // Confirm the card payload lists the number of comments as "1" now.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(102501));
+    current::time::SetNow(std::chrono::microseconds(102501 * 1000));
     const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                           FLAGS_api_port,
                                           actual_uid.c_str(),
                                           actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(my_cards.code));
-    const auto my_cards_response = CerealizeParseJSON<ResponseMyCards>(my_cards.body);
+    const auto my_cards_response = ParseJSON<ResponseMyCards>(my_cards.body);
 
-    EXPECT_EQ(102501u, my_cards_response.ms);
+    EXPECT_EQ(102501000u, my_cards_response.us);
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
     ASSERT_EQ(3u, my_cards_response.cards.size());
     EXPECT_EQ("Meh.", my_cards_response.cards[0].text);
-    EXPECT_EQ(21001u, my_cards_response.cards[0].ms);
+    EXPECT_EQ(21001000u, my_cards_response.cards[0].us);
     EXPECT_EQ(0u, my_cards_response.cards[0].number_of_comments);
     EXPECT_EQ("Bar.", my_cards_response.cards[1].text);
-    EXPECT_EQ(19001u, my_cards_response.cards[1].ms);
+    EXPECT_EQ(19001000u, my_cards_response.cards[1].us);
     EXPECT_EQ(0u, my_cards_response.cards[1].number_of_comments);
     EXPECT_EQ("Foo.", my_cards_response.cards[2].text);
-    EXPECT_EQ(16001u, my_cards_response.cards[2].ms);
+    EXPECT_EQ(16001000u, my_cards_response.cards[2].us);
     EXPECT_EQ(1u, my_cards_response.cards[2].number_of_comments);
   }
 
   // Confirm that the recent feed also mentions that this card has one comment.
   {
-    const auto feed_recent = CerealizeParseJSON<ResponseFeed>(
-                                 HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=3",
-                                                 FLAGS_api_port,
-                                                 actual_uid.c_str(),
-                                                 actual_token.c_str()))).body).feed_recent;
+    const auto feed_recent =
+        ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=3",
+                                                FLAGS_api_port,
+                                                actual_uid.c_str(),
+                                                actual_token.c_str()))).body).feed_recent;
     ASSERT_EQ(3u, feed_recent.size());
     EXPECT_EQ("Meh.", feed_recent[0].text);
     EXPECT_TRUE(feed_recent[0].is_my_card);
@@ -732,7 +732,7 @@ TEST(CTFO, SmokeTest) {
 
   // Get comments for the card where the comment was added, expecting one.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(103001));
+    current::time::SetNow(std::chrono::microseconds(103001 * 1000));
     const auto get_comments_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                         FLAGS_api_port,
@@ -740,19 +740,19 @@ TEST(CTFO, SmokeTest) {
                         actual_token.c_str(),
                         added_card_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
-    const auto response = CerealizeParseJSON<ResponseComments>(get_comments_response.body);
-    EXPECT_EQ(103001u, response.ms);
+    const auto response = ParseJSON<ResponseComments>(get_comments_response.body);
+    EXPECT_EQ(103001000u, response.us);
     ASSERT_EQ(1u, response.comments.size());
     EXPECT_EQ(added_comment_oid, response.comments[0].oid);
     EXPECT_EQ("", response.comments[0].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[0].author_uid);
     EXPECT_EQ("Meh.", response.comments[0].text);
-    EXPECT_EQ(102001u, response.comments[0].ms);
+    EXPECT_EQ(102001000u, response.comments[0].us);
   }
 
   // Get comments for the card where the comment was not added, expecting none.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(104001));
+    current::time::SetNow(std::chrono::microseconds(104001 * 1000));
     const auto get_comments_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                         FLAGS_api_port,
@@ -760,15 +760,15 @@ TEST(CTFO, SmokeTest) {
                         actual_token.c_str(),
                         added_card2_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
-    const auto response = CerealizeParseJSON<ResponseComments>(get_comments_response.body);
-    EXPECT_EQ(104001u, response.ms);
+    const auto response = ParseJSON<ResponseComments>(get_comments_response.body);
+    EXPECT_EQ(104001000u, response.us);
     EXPECT_EQ(0u, response.comments.size());
   }
 
   // Add another top-level comment.
   std::string added_second_comment_oid;
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(105001));
+    current::time::SetNow(std::chrono::microseconds(105001 * 1000));
     AddCommentShortRequest add_comment_request;
     add_comment_request.text = "Bla.";
     const auto post_comment_response =
@@ -779,15 +779,15 @@ TEST(CTFO, SmokeTest) {
                          added_card_cid.c_str()),
                   add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-    const auto add_comment_response = CerealizeParseJSON<AddCommentResponse>(post_comment_response.body);
-    EXPECT_EQ(105001u, add_comment_response.ms);
+    const auto add_comment_response = ParseJSON<AddCommentResponse>(post_comment_response.body);
+    EXPECT_EQ(105001000u, add_comment_response.us);
 
     added_second_comment_oid = add_comment_response.oid;
   }
 
   // Get comments, expecting two top-level comments.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(106001));
+    current::time::SetNow(std::chrono::microseconds(106001 * 1000));
     const auto get_comments_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                         FLAGS_api_port,
@@ -795,25 +795,25 @@ TEST(CTFO, SmokeTest) {
                         actual_token.c_str(),
                         added_card_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
-    const auto response = CerealizeParseJSON<ResponseComments>(get_comments_response.body);
-    EXPECT_EQ(106001u, response.ms);
+    const auto response = ParseJSON<ResponseComments>(get_comments_response.body);
+    EXPECT_EQ(106001000u, response.us);
     ASSERT_EQ(2u, response.comments.size());
     EXPECT_EQ(added_second_comment_oid, response.comments[0].oid);
     EXPECT_EQ("", response.comments[0].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[0].author_uid);
     EXPECT_EQ("Bla.", response.comments[0].text);
-    EXPECT_EQ(105001u, response.comments[0].ms);
+    EXPECT_EQ(105001000u, response.comments[0].us);
     EXPECT_EQ(added_comment_oid, response.comments[1].oid);
     EXPECT_EQ("", response.comments[1].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[1].author_uid);
     EXPECT_EQ("Meh.", response.comments[1].text);
-    EXPECT_EQ(102001u, response.comments[1].ms);
+    EXPECT_EQ(102001000u, response.comments[1].us);
   }
 
   // Add 2nd level comment 1/2.
   std::string added_nested_comment_1_oid;
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(107001));
+    current::time::SetNow(std::chrono::microseconds(107001 * 1000));
     AddCommentRequest add_comment_request;
     add_comment_request.text = "for";
     add_comment_request.parent_oid = added_second_comment_oid;
@@ -825,8 +825,8 @@ TEST(CTFO, SmokeTest) {
                          added_card_cid.c_str()),
                   add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-    const auto add_comment_response = CerealizeParseJSON<AddCommentResponse>(post_comment_response.body);
-    EXPECT_EQ(107001u, add_comment_response.ms);
+    const auto add_comment_response = ParseJSON<AddCommentResponse>(post_comment_response.body);
+    EXPECT_EQ(107001000u, add_comment_response.us);
 
     added_nested_comment_1_oid = add_comment_response.oid;
   }
@@ -834,7 +834,7 @@ TEST(CTFO, SmokeTest) {
   // Add 2nd level comment 2/2, to confirm the final sort order of the GET is right.
   std::string added_nested_comment_2_oid;
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(108001));
+    current::time::SetNow(std::chrono::microseconds(108001 * 1000));
     AddCommentRequest add_comment_request;
     add_comment_request.text = "real?";
     add_comment_request.parent_oid = added_second_comment_oid;
@@ -846,15 +846,15 @@ TEST(CTFO, SmokeTest) {
                          added_card_cid.c_str()),
                   add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-    const auto add_comment_response = CerealizeParseJSON<AddCommentResponse>(post_comment_response.body);
-    EXPECT_EQ(108001u, add_comment_response.ms);
+    const auto add_comment_response = ParseJSON<AddCommentResponse>(post_comment_response.body);
+    EXPECT_EQ(108001000u, add_comment_response.us);
 
     added_nested_comment_2_oid = add_comment_response.oid;
   }
 
   // Get comments, expecting two top-level ones, and two 2nd level ones, in the right order.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(109001));
+    current::time::SetNow(std::chrono::microseconds(109001 * 1000));
     const auto get_comments_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                         FLAGS_api_port,
@@ -862,8 +862,8 @@ TEST(CTFO, SmokeTest) {
                         actual_token.c_str(),
                         added_card_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
-    const auto response = CerealizeParseJSON<ResponseComments>(get_comments_response.body);
-    EXPECT_EQ(109001u, response.ms);
+    const auto response = ParseJSON<ResponseComments>(get_comments_response.body);
+    EXPECT_EQ(109001000u, response.us);
 
     ASSERT_EQ(4u, response.comments.size());
 
@@ -871,7 +871,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("", response.comments[0].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[0].author_uid);
     EXPECT_EQ("Bla.", response.comments[0].text);
-    EXPECT_EQ(105001u, response.comments[0].ms);
+    EXPECT_EQ(105001000u, response.comments[0].us);
     EXPECT_EQ(actual_uid, response.comments[0].author_uid);
     EXPECT_EQ(0u, response.comments[0].author_level);
     EXPECT_EQ(0u, response.comments[0].number_of_likes);
@@ -881,7 +881,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(added_second_comment_oid, response.comments[1].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[1].author_uid);
     EXPECT_EQ("for", response.comments[1].text);
-    EXPECT_EQ(107001u, response.comments[1].ms);
+    EXPECT_EQ(107001000u, response.comments[1].us);
     EXPECT_EQ(actual_uid, response.comments[1].author_uid);
     EXPECT_EQ(0u, response.comments[1].author_level);
     EXPECT_EQ(0u, response.comments[1].number_of_likes);
@@ -891,7 +891,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(added_second_comment_oid, response.comments[2].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[2].author_uid);
     EXPECT_EQ("real?", response.comments[2].text);
-    EXPECT_EQ(108001u, response.comments[2].ms);
+    EXPECT_EQ(108001000u, response.comments[2].us);
     EXPECT_EQ(actual_uid, response.comments[2].author_uid);
     EXPECT_EQ(0u, response.comments[2].author_level);
     EXPECT_EQ(0u, response.comments[2].number_of_likes);
@@ -901,7 +901,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ("", response.comments[3].parent_oid);
     EXPECT_EQ(actual_uid, response.comments[3].author_uid);
     EXPECT_EQ("Meh.", response.comments[3].text);
-    EXPECT_EQ(102001u, response.comments[3].ms);
+    EXPECT_EQ(102001000u, response.comments[3].us);
     EXPECT_EQ(actual_uid, response.comments[3].author_uid);
     EXPECT_EQ(0u, response.comments[3].author_level);
     EXPECT_EQ(0u, response.comments[3].number_of_likes);
@@ -910,31 +910,31 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the card payload lists the number of comments as "4" now.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(109501));
+    current::time::SetNow(std::chrono::microseconds(109501 * 1000));
     const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                           FLAGS_api_port,
                                           actual_uid.c_str(),
                                           actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(my_cards.code));
-    const auto my_cards_response = CerealizeParseJSON<ResponseMyCards>(my_cards.body);
+    const auto my_cards_response = ParseJSON<ResponseMyCards>(my_cards.body);
 
-    EXPECT_EQ(109501u, my_cards_response.ms);
+    EXPECT_EQ(109501000u, my_cards_response.us);
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
     ASSERT_EQ(3u, my_cards_response.cards.size());
     EXPECT_EQ("Meh.", my_cards_response.cards[0].text);
-    EXPECT_EQ(21001u, my_cards_response.cards[0].ms);
+    EXPECT_EQ(21001000u, my_cards_response.cards[0].us);
     EXPECT_EQ(0u, my_cards_response.cards[0].number_of_comments);
     EXPECT_EQ("Bar.", my_cards_response.cards[1].text);
-    EXPECT_EQ(19001u, my_cards_response.cards[1].ms);
+    EXPECT_EQ(19001000u, my_cards_response.cards[1].us);
     EXPECT_EQ(0u, my_cards_response.cards[1].number_of_comments);
     EXPECT_EQ("Foo.", my_cards_response.cards[2].text);
-    EXPECT_EQ(16001u, my_cards_response.cards[2].ms);
+    EXPECT_EQ(16001000u, my_cards_response.cards[2].us);
     EXPECT_EQ(4u, my_cards_response.cards[2].number_of_comments);
   }
 
   // Attempt to add a 3rd level comment, expecting an error.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(110001));
+    current::time::SetNow(std::chrono::microseconds(110001 * 1000));
     AddCommentRequest add_comment_request;
     add_comment_request.text = "Nah.";
     add_comment_request.parent_oid = added_nested_comment_2_oid;
@@ -951,7 +951,7 @@ TEST(CTFO, SmokeTest) {
 
   // Attempt to add a 2nd level comment to a non-existing 1st level comment.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(110001));
+    current::time::SetNow(std::chrono::microseconds(110001 * 1000));
     AddCommentRequest add_comment_request;
     add_comment_request.text = "Still nah.";
     add_comment_request.parent_oid = OIDToString(RandomOID());
@@ -968,7 +968,7 @@ TEST(CTFO, SmokeTest) {
 
   // Like the comment.
   {
-    iOSGenericEvent like_comment_event;
+    current::midichlorians::ios::iOSGenericEvent like_comment_event;
     like_comment_event.event = "LIKE_COMMENT";
     like_comment_event.fields["uid"] = actual_uid;
     like_comment_event.fields["token"] = actual_token;
@@ -981,12 +981,12 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the comment got liked.
   {
-    const auto comments = CerealizeParseJSON<ResponseComments>(
-                              HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
-                                              FLAGS_api_port,
-                                              actual_uid.c_str(),
-                                              actual_token.c_str(),
-                                              added_card_cid.c_str()))).body).comments;
+    const auto comments =
+        ParseJSON<ResponseComments>(HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                                                    FLAGS_api_port,
+                                                    actual_uid.c_str(),
+                                                    actual_token.c_str(),
+                                                    added_card_cid.c_str()))).body).comments;
     ASSERT_EQ(4u, comments.size());
 
     EXPECT_EQ(added_second_comment_oid, comments[0].oid);
@@ -1016,7 +1016,7 @@ TEST(CTFO, SmokeTest) {
 
   // Unlike the comment.
   {
-    iOSGenericEvent unlike_comment_event;
+    current::midichlorians::ios::iOSGenericEvent unlike_comment_event;
     unlike_comment_event.event = "UNLIKE_COMMENT";
     unlike_comment_event.fields["uid"] = actual_uid;
     unlike_comment_event.fields["token"] = actual_token;
@@ -1029,12 +1029,12 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the comment got unliked.
   {
-    const auto comments = CerealizeParseJSON<ResponseComments>(
-                              HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
-                                              FLAGS_api_port,
-                                              actual_uid.c_str(),
-                                              actual_token.c_str(),
-                                              added_card_cid.c_str()))).body).comments;
+    const auto comments =
+        ParseJSON<ResponseComments>(HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                                                    FLAGS_api_port,
+                                                    actual_uid.c_str(),
+                                                    actual_token.c_str(),
+                                                    added_card_cid.c_str()))).body).comments;
     ASSERT_EQ(4u, comments.size());
 
     EXPECT_EQ(added_second_comment_oid, comments[0].oid);
@@ -1064,7 +1064,7 @@ TEST(CTFO, SmokeTest) {
 
   // Flag the comment.
   {
-    iOSGenericEvent flag_comment_event;
+    current::midichlorians::ios::iOSGenericEvent flag_comment_event;
     flag_comment_event.event = "FLAG_COMMENT";
     flag_comment_event.fields["uid"] = actual_uid;
     flag_comment_event.fields["token"] = actual_token;
@@ -1077,12 +1077,12 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the flagged comment has the corresponding flag in the response.
   {
-    const auto comments = CerealizeParseJSON<ResponseComments>(
-                              HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
-                                              FLAGS_api_port,
-                                              actual_uid.c_str(),
-                                              actual_token.c_str(),
-                                              added_card_cid.c_str()))).body).comments;
+    const auto comments =
+        ParseJSON<ResponseComments>(HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
+                                                    FLAGS_api_port,
+                                                    actual_uid.c_str(),
+                                                    actual_token.c_str(),
+                                                    added_card_cid.c_str()))).body).comments;
     ASSERT_EQ(4u, comments.size());
 
     EXPECT_EQ(added_second_comment_oid, comments[0].oid);
@@ -1110,7 +1110,7 @@ TEST(CTFO, SmokeTest) {
   // Delete the top-level comment with no second level comments,
   // and confirm that the number of comments goes down from 4 to 3.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(600001));
+    current::time::SetNow(std::chrono::microseconds(600001 * 1000));
     const auto delete_comment_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
                            FLAGS_api_port,
@@ -1119,17 +1119,16 @@ TEST(CTFO, SmokeTest) {
                            added_card_cid.c_str(),
                            added_comment_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
-    const auto payload = CerealizeParseJSON<DeleteCommentResponse>(delete_comment_response.body);
-    EXPECT_EQ(600001u, payload.ms);
+    const auto payload = ParseJSON<DeleteCommentResponse>(delete_comment_response.body);
+    EXPECT_EQ(600001000u, payload.us);
 
-    EXPECT_EQ(
-        3u,
-        CerealizeParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
-                                                            FLAGS_api_port,
-                                                            actual_uid.c_str(),
-                                                            actual_token.c_str()))).body)
-            .cards[2]
-            .number_of_comments);
+    EXPECT_EQ(3u,
+              ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str()))).body)
+                  .cards[2]
+                  .number_of_comments);
   }
 
   // Try to delete a comment w/o specifying card ID.
@@ -1159,7 +1158,7 @@ TEST(CTFO, SmokeTest) {
   // Delete one of two second-level comments, and confirm that
   // the number of comments goes down from 3 to 2.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(112001));
+    current::time::SetNow(std::chrono::microseconds(112001 * 1000));
     const auto delete_comment_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
                            FLAGS_api_port,
@@ -1168,17 +1167,16 @@ TEST(CTFO, SmokeTest) {
                            added_card_cid.c_str(),
                            added_nested_comment_2_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
-    const auto payload = CerealizeParseJSON<DeleteCommentResponse>(delete_comment_response.body);
-    EXPECT_EQ(112001u, payload.ms);
+    const auto payload = ParseJSON<DeleteCommentResponse>(delete_comment_response.body);
+    EXPECT_EQ(112001000u, payload.us);
 
-    EXPECT_EQ(
-        2u,
-        CerealizeParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
-                                                            FLAGS_api_port,
-                                                            actual_uid.c_str(),
-                                                            actual_token.c_str()))).body)
-            .cards[2]
-            .number_of_comments);
+    EXPECT_EQ(2u,
+              ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str()))).body)
+                  .cards[2]
+                  .number_of_comments);
   }
 
   // Confirm that another user adding a comment results in the user who added a card being notified.
@@ -1191,13 +1189,13 @@ TEST(CTFO, SmokeTest) {
                           actual_uid.c_str(),
                           actual_token.c_str())));
       EXPECT_EQ(200, static_cast<int>(feed_http_response.code));
-      const auto feed_response = CerealizeParseJSON<ResponseFeed>(feed_http_response.body);
+      const auto feed_response = ParseJSON<ResponseFeed>(feed_http_response.body);
       EXPECT_EQ(0u, feed_response.notifications.size());
     }
     // Add a comment to generate a notification.
     std::string comment_to_be_notified_about_oid;
     {
-      bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(112002));
+      current::time::SetNow(std::chrono::microseconds(112002 * 1000));
       AddCommentRequest add_comment_request;
       add_comment_request.text = "Ding!";
       const auto post_comment_response =
@@ -1208,20 +1206,20 @@ TEST(CTFO, SmokeTest) {
                            added_card_cid.c_str()),
                     add_comment_request));
       EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-      const auto add_comment_response = CerealizeParseJSON<AddCommentResponse>(post_comment_response.body);
+      const auto add_comment_response = ParseJSON<AddCommentResponse>(post_comment_response.body);
 
       comment_to_be_notified_about_oid = add_comment_response.oid;
     }
     // Should be one notification.
     {
-      bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(112003));
+      current::time::SetNow(std::chrono::microseconds(112003 * 1000));
       const auto feed_http_response =
           HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&notifications_since=0",
                           FLAGS_api_port,
                           actual_uid.c_str(),
                           actual_token.c_str())));
       EXPECT_EQ(200, static_cast<int>(feed_http_response.code));
-      const auto feed_response = CerealizeParseJSON<ResponseFeed>(feed_http_response.body);
+      const auto feed_response = ParseJSON<ResponseFeed>(feed_http_response.body);
       ASSERT_EQ(1u, feed_response.notifications.size());
       EXPECT_EQ("MyCardNewComment", feed_response.notifications[0].type);
       EXPECT_EQ(another_actual_uid, feed_response.notifications[0].uid);
@@ -1231,7 +1229,7 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ("Ding!", feed_response.notifications[0].text);
       EXPECT_EQ(1u, feed_response.notifications[0].n);
       EXPECT_EQ("n05000000000112002000", feed_response.notifications[0].nid);
-      EXPECT_EQ(112002u, feed_response.notifications[0].ms);
+      EXPECT_EQ(112002000u, feed_response.notifications[0].us);
     }
     // Delete that comment.
     {
@@ -1243,14 +1241,14 @@ TEST(CTFO, SmokeTest) {
                              added_card_cid.c_str(),
                              comment_to_be_notified_about_oid.c_str())));
       EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
-      CerealizeParseJSON<DeleteCommentResponse>(delete_comment_response.body);
+      ParseJSON<DeleteCommentResponse>(delete_comment_response.body);
     }
   }
 
   // Delete the remaining top-level comment, and confirm that the number of comments
   // goes down from 2 to 0, since deleting the top-level comments deletes its children.
   {
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(601001));
+    current::time::SetNow(std::chrono::microseconds(601001 * 1000));
     const auto delete_comment_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
                            FLAGS_api_port,
@@ -1259,31 +1257,29 @@ TEST(CTFO, SmokeTest) {
                            added_card_cid.c_str(),
                            added_second_comment_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
-    const auto payload = CerealizeParseJSON<DeleteCommentResponse>(delete_comment_response.body);
-    EXPECT_EQ(601001u, payload.ms);
+    const auto payload = ParseJSON<DeleteCommentResponse>(delete_comment_response.body);
+    EXPECT_EQ(601001000u, payload.us);
 
-    EXPECT_EQ(
-        0u,
-        CerealizeParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
-                                                            FLAGS_api_port,
-                                                            actual_uid.c_str(),
-                                                            actual_token.c_str()))).body)
-            .cards[2]
-            .number_of_comments);
+    EXPECT_EQ(0u,
+              ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str()))).body)
+                  .cards[2]
+                  .number_of_comments);
   }
 
   // TODO(dkorolev): Test that I can only delete my own comments.
 
   // Test that deleting one card of mine reduces the number of my cards from three to two.
   {
-    EXPECT_EQ(
-        3u,
-        CerealizeParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
-                                                            FLAGS_api_port,
-                                                            actual_uid.c_str(),
-                                                            actual_token.c_str()))).body).cards.size());
+    EXPECT_EQ(3u,
+              ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str()))).body).cards.size());
 
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(601501));
+    current::time::SetNow(std::chrono::microseconds(601501 * 1000));
     const auto unauthorized_delete_card_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
                            FLAGS_api_port,
@@ -1293,24 +1289,23 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(401, static_cast<int>(unauthorized_delete_card_response.code));
     EXPECT_EQ("NOT YOUR CARD BRO\n", unauthorized_delete_card_response.body);
 
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(602001));
+    current::time::SetNow(std::chrono::microseconds(602001 * 1000));
     const auto delete_card_response = HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
                                                          FLAGS_api_port,
                                                          actual_uid.c_str(),
                                                          actual_token.c_str(),
                                                          added_card_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_card_response.code));
-    const auto payload = CerealizeParseJSON<DeleteCardResponse>(delete_card_response.body);
-    EXPECT_EQ(602001u, payload.ms);
+    const auto payload = ParseJSON<DeleteCardResponse>(delete_card_response.body);
+    EXPECT_EQ(602001000u, payload.us);
 
-    EXPECT_EQ(
-        2u,
-        CerealizeParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
-                                                            FLAGS_api_port,
-                                                            actual_uid.c_str(),
-                                                            actual_token.c_str()))).body).cards.size());
+    EXPECT_EQ(2u,
+              ParseJSON<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+                                                         FLAGS_api_port,
+                                                         actual_uid.c_str(),
+                                                         actual_token.c_str()))).body).cards.size());
 
-    bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(602501));
+    current::time::SetNow(std::chrono::microseconds(602501 * 1000));
     const auto nonexistent_card_delete_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
                            FLAGS_api_port,
@@ -1325,11 +1320,11 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm that the recent feed still contains two of my cards as the most recently added ones.
   {
-    const auto feed_recent = CerealizeParseJSON<ResponseFeed>(
-                                 HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=2",
-                                                 FLAGS_api_port,
-                                                 actual_uid.c_str(),
-                                                 actual_token.c_str()))).body).feed_recent;
+    const auto feed_recent =
+        ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=2",
+                                                FLAGS_api_port,
+                                                actual_uid.c_str(),
+                                                actual_token.c_str()))).body).feed_recent;
     ASSERT_EQ(2u, feed_recent.size());
     EXPECT_EQ("Meh.", feed_recent[0].text);
     EXPECT_EQ("Bar.", feed_recent[1].text);
@@ -1337,7 +1332,7 @@ TEST(CTFO, SmokeTest) {
 
   // Flag one of the cards.
   {
-    iOSGenericEvent flag_card_event;
+    current::midichlorians::ios::iOSGenericEvent flag_card_event;
     flag_card_event.event = "FLAG_CARD";
     flag_card_event.fields["uid"] = actual_uid;
     flag_card_event.fields["token"] = actual_token;
@@ -1350,11 +1345,11 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm that the flagged card is not returned as part of the feed.
   {
-    const auto feed_recent = CerealizeParseJSON<ResponseFeed>(
-                                 HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
-                                                 FLAGS_api_port,
-                                                 actual_uid.c_str(),
-                                                 actual_token.c_str()))).body).feed_recent;
+    const auto feed_recent =
+        ParseJSON<ResponseFeed>(HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
+                                                FLAGS_api_port,
+                                                actual_uid.c_str(),
+                                                actual_token.c_str()))).body).feed_recent;
     ASSERT_EQ(1u, feed_recent.size());
     EXPECT_EQ("Bar.", feed_recent[0].text);
   }
@@ -1385,8 +1380,8 @@ TEST(CTFO, StrictAuth) {
   const auto auth_http_response = HTTP(
       POST(Printf("http://localhost:%d/ctfo/auth/ios?id=%s&key=%s", FLAGS_api_port, auth_id, auth_key), ""));
   EXPECT_EQ(200, static_cast<int>(auth_http_response.code));
-  const auto auth_response = CerealizeParseJSON<ResponseFeed>(auth_http_response.body);
-  EXPECT_EQ(1u, auth_response.ms);
+  const auto auth_response = ParseJSON<ResponseFeed>(auth_http_response.body);
+  EXPECT_EQ(1u, auth_response.us);
 }
 
 TEST(CTFO, UseRightHTTPVerbs) {
@@ -1404,7 +1399,7 @@ TEST(CTFO, NotificationsSerializeWell) {
   const OID oid = static_cast<OID>(3);
   const Notification notification(
       me, 12345ull, std::make_shared<NotificationMyCardNewComment>(uid, cid, oid, "foo"));
-  const std::string user_facing_json = CerealizeJSON(notification.BuildResponseNotification());
+  const std::string user_facing_json = JSON(notification.BuildResponseNotification());
   EXPECT_EQ(
       "{\"data\":{\"nid\":\"n05000000000012345000\",\"type\":\"MyCardNewComment\",\"ms\":12345,\"uid\":"
       "\"u00000000000000000001\",\"cid\":\"c00000000000000000002\",\"oid\":\"o00000000000000000003\",\"text\":"
@@ -1413,13 +1408,13 @@ TEST(CTFO, NotificationsSerializeWell) {
       "count\":0,\"tfu_count\":0,\"skip_count\":0,\"vote\":\"\",\"favorited\":false,\"is_my_card\":false,"
       "\"number_of_comments\":0},\"n\":1}}",
       user_facing_json);
-  const std::string stream_stored_json = CerealizeJSON(notification);
+  const std::string stream_stored_json = JSON(notification);
   EXPECT_EQ(
       "{\"data\":{\"uid\":42,\"timestamp\":{\"ms\":12345},\"notification\":{\"polymorphic_id\":2147483649,"
       "\"polymorphic_name\":\"NotificationMyCardNewComment\",\"ptr_wrapper\":{\"id\":2147483649,\"data\":{"
       "\"uid\":1,\"cid\":2,\"oid\":3,\"text\":\"foo\"}}}}}",
       stream_stored_json);
-  EXPECT_EQ(stream_stored_json, CerealizeJSON(CerealizeParseJSON<Notification>(stream_stored_json)));
+  EXPECT_EQ(stream_stored_json, JSON(ParseJSON<Notification>(stream_stored_json)));
 }
 
 // TODO(dkorolev): Test the remaining notification types.
