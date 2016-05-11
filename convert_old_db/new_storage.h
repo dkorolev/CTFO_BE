@@ -39,7 +39,7 @@ CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::Card, Persisted_Card)
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, new_ctfo::AuthorCard, Persisted_AuthorCard);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::Answer, Persisted_Answer);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::Favorite, Persisted_Favorite);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::Comment, Persisted_Comment);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, new_ctfo::Comment, Persisted_Comment);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::CommentLike, Persisted_CommentLike);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany,
                             new_ctfo::CardFlagAsInappropriate,
