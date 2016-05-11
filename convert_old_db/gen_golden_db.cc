@@ -72,9 +72,7 @@ int main(int argc, char** argv) {
       new_ctfo::Notification notification;
       new_ctfo::NotificationMyCardNewComment new_comment;
       notification.uid = static_cast<UID>(42);
-      // Just to have REST build, wrt `{To/From}String`. -- D.K.
-      // notification.timestamp = std::chrono::milliseconds(100);
-      notification.timestamp = 100ull;
+      notification.timestamp = std::chrono::microseconds(100000ull);
       notification.notification = new_comment;
       fields.notification.Add(notification);
     }).Go();

@@ -43,9 +43,9 @@ int main(int argc, char** argv) {
 #define REPORT_SIZE(x) std::cerr << #x ": " << fields.x.Size() << " records.\n";
     REPORT_SIZE(user);
     REPORT_SIZE(auth_token);
-    REPORT_SIZE(auth_uid);
+    REPORT_SIZE(uid_auth);
     REPORT_SIZE(card);
-    REPORT_SIZE(card_author);
+    REPORT_SIZE(author_card);
     REPORT_SIZE(answer);
     REPORT_SIZE(favorite);
     REPORT_SIZE(comment);
