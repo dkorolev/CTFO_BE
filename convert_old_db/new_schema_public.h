@@ -42,7 +42,7 @@ CURRENT_STRUCT(ResponseCardEntry) {
   CURRENT_FIELD(cid, std::string, "cINVALID");         // Card id, format 'c02XXX...'.
   CURRENT_FIELD(author_uid, std::string, "uINVALID");  // The author of this comment.
   CURRENT_FIELD(text, std::string, "");                // Card text.
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);     // Card timestamp, microseconds from epoch.
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);     // Card timestamp, milliseconds from epoch.
   CURRENT_FIELD(color, Color);                         // Card color.
   CURRENT_FIELD(relevance, double, 0.0);               // Card relevance for particular user, [0.0, 1.0].
   CURRENT_FIELD(ctfo_score, uint32_t, 0u);             // Number of points, which user gets for "CTFO" answer.
@@ -58,14 +58,14 @@ CURRENT_STRUCT(ResponseCardEntry) {
 
 // Favorites response schema.
 CURRENT_STRUCT(ResponseFavs) {
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);       // Server timestamp, microseconds from epoch.
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);       // Server timestamp, milliseconds from epoch.
   CURRENT_FIELD(user, ResponseUserEntry);                // User information.
   CURRENT_FIELD(cards, std::vector<ResponseCardEntry>);  // Favorited cards.
 };
 
 // "My cards" response schema. Yes, it's the same as favorites. -- D.K.
 CURRENT_STRUCT(ResponseMyCards) {
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);       // Server timestamp, microseconds from epoch.
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);       // Server timestamp, milliseconds from epoch.
   CURRENT_FIELD(user, ResponseUserEntry);                // User information.
   CURRENT_FIELD(cards, std::vector<ResponseCardEntry>);  // Cards created by this user.
 };
@@ -83,12 +83,12 @@ CURRENT_STRUCT(AddCardShortRequest) {
 
 // Schema for the response of the POST request to add a new card.
 CURRENT_STRUCT(AddCardResponse) {
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
   CURRENT_FIELD(cid, std::string, "");
 };
 
 // Schema for the response of the DELETE request for a card.
-CURRENT_STRUCT(DeleteCardResponse) { CURRENT_FIELD(us, std::chrono::microseconds, 0); };
+CURRENT_STRUCT(DeleteCardResponse) { CURRENT_FIELD(ms, std::chrono::milliseconds, 0); };
 
 // Schema for the POST request to add a new comment.
 CURRENT_STRUCT(AddCommentRequest) {
@@ -103,12 +103,12 @@ CURRENT_STRUCT(AddCommentShortRequest) {
 
 // Schema for the response of the POST request to add a new comment.
 CURRENT_STRUCT(AddCommentResponse) {
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
   CURRENT_FIELD(oid, std::string);
 };
 
 // Schema for the response of the DELETE request for a comment.
-CURRENT_STRUCT(DeleteCommentResponse) { CURRENT_FIELD(us, std::chrono::microseconds, 0); };
+CURRENT_STRUCT(DeleteCommentResponse) { CURRENT_FIELD(ms, std::chrono::milliseconds, 0); };
 
 // Comments response schema.
 CURRENT_STRUCT(ResponseComment) {
@@ -123,13 +123,13 @@ CURRENT_STRUCT(ResponseComment) {
   CURRENT_FIELD(flagged_inappropriate,
                 bool,
                 false);  // Whether the current user has flagged this comment as inappropriate.
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);  // Comment timestamp, microseconds from epoch.
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);  // Comment timestamp, milliseconds from epoch.
   // TODO(dkorolev): User name? Tier status?
   // TODO(dkorolev): Color?
 };
 
 CURRENT_STRUCT(ResponseComments) {
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);        // Server timestamp, microseconds from epoch.
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);        // Server timestamp, milliseconds from epoch.
   CURRENT_FIELD(comments, std::vector<ResponseComment>);  // Comments.
 };
 
@@ -138,7 +138,7 @@ CURRENT_STRUCT(ResponseComments) {
 CURRENT_STRUCT(ResponseNotification) {
   CURRENT_FIELD(nid, std::string, "");
   CURRENT_FIELD(type, std::string, "");
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
   CURRENT_FIELD(uid, std::string, "");
   CURRENT_FIELD(cid, std::string, "");
   CURRENT_FIELD(oid, std::string, "");
@@ -149,7 +149,7 @@ CURRENT_STRUCT(ResponseNotification) {
 
 // Universal response structure, combining user info & cards payload.
 CURRENT_STRUCT(ResponseFeed) {
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);             // Server timestamp, microseconds from epoch.
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);             // Server timestamp, milliseconds from epoch.
   CURRENT_FIELD(user, ResponseUserEntry);                      // User information.
   CURRENT_FIELD(feed_hot, std::vector<ResponseCardEntry>);     // "Hot" cards feeds.
   CURRENT_FIELD(feed_recent, std::vector<ResponseCardEntry>);  // "Recent" cards feeds.

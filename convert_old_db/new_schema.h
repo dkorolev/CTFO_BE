@@ -253,14 +253,15 @@ CURRENT_STRUCT(BannedUser) {
   void InitializeOwnKey() {}
 };
 
+// clang-format off
 // Notifications.
-CURRENT_STRUCT(AbstractNotification){// Sadly, can't be pure virtual with `g++`. -- @dkorolev, @mzhurovich.
-                                     virtual void PopulateResponseNotification(ResponseNotification&)const {}
-                                     // To return full card bodies in the payload; can be CID::INVALID_CARD.
-                                     virtual CID GetCID() const {return CID::INVALID_CARD;
-}
-}
-;
+CURRENT_STRUCT(AbstractNotification) {
+  // Sadly, can't be pure virtual with `g++`. -- @dkorolev, @mzhurovich.
+  virtual void PopulateResponseNotification(ResponseNotification&) const {}
+  // To return full card bodies in the payload; can be CID::INVALID_CARD.
+  virtual CID GetCID() const { return CID::INVALID_CARD; }
+};
+// clang-format on
 
 CURRENT_STRUCT(NotificationMyCardNewComment, AbstractNotification) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that comment.
