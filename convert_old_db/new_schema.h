@@ -54,7 +54,7 @@ namespace new_ctfo {
 CURRENT_STRUCT(User) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
   CURRENT_USE_FIELD_AS_KEY(uid);
-  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
+  CURRENT_FIELD(us, std::chrono::microseconds, 0);
   CURRENT_FIELD(level, uint8_t, 0u);   // User level [0, 9].
   CURRENT_FIELD(score, uint64_t, 0u);  // User score.
 
@@ -80,9 +80,7 @@ CURRENT_STRUCT(AuthKey) {
   size_t Hash() const { return std::hash<std::string>()(key); }
   bool operator==(const AuthKey& rhs) const { return key == rhs.key && type == rhs.type; }
 
-  const std::string& ToString() const {
-    return key;
-  }
+  const std::string& ToString() const { return key; }
 
   void FromString(const std::string& s) {
     key = s;
@@ -104,21 +102,20 @@ CURRENT_STRUCT(AuthKeyTokenPair) {
       : auth_key(auth_key), token(token), valid(valid) {}
 };
 
-CURRENT_STRUCT(AuthKeyUIDPair) {
-  CURRENT_FIELD(auth_key, AuthKey);
-  CURRENT_USE_FIELD_AS_ROW(auth_key);
+CURRENT_STRUCT(UIDAuthKeyPair) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
-  CURRENT_USE_FIELD_AS_COL(uid);
+  CURRENT_USE_FIELD_AS_ROW(uid);
+  CURRENT_FIELD(auth_key, AuthKey);
+  CURRENT_USE_FIELD_AS_COL(auth_key);
 
-  CURRENT_DEFAULT_CONSTRUCTOR(AuthKeyUIDPair) {}
-  CURRENT_CONSTRUCTOR(AuthKeyUIDPair)(const AuthKey& auth_key, const UID uid) : auth_key(auth_key), uid(uid) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(UIDAuthKeyPair) {}
+  CURRENT_CONSTRUCTOR(UIDAuthKeyPair)(const UID uid, const AuthKey& auth_key) : uid(uid), auth_key(auth_key) {}
 };
 
 CURRENT_STRUCT(Card) {
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_KEY(cid);
-  // CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
-  CURRENT_FIELD(ms, uint64_t, 0);  // To have REST compile, `{To/From}String`. -- D.K.
+  CURRENT_FIELD(us, std::chrono::microseconds, 0);
   CURRENT_FIELD(text, std::string);
   CURRENT_FIELD(color, Color);
   CURRENT_FIELD(ctfo_count, uint32_t, 0u);    // Number of users, who said "CTFO" on this card.
@@ -127,18 +124,21 @@ CURRENT_STRUCT(Card) {
   CURRENT_FIELD(startup_index, double, 0.0);  // Cards with `startup_index != 0` will be on the top.
 
   CURRENT_DEFAULT_CONSTRUCTOR(Card) {}
+  CURRENT_CONSTRUCTOR(Card)(CID cid, const std::string& text, const Color& color)
+      : cid(cid), text(text), color(color) {}
 
   void InitializeOwnKey() {}
 };
 
-CURRENT_STRUCT(CardAuthor) {
-  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
-  CURRENT_USE_FIELD_AS_ROW(cid);
+CURRENT_STRUCT(AuthorCard) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
-  CURRENT_USE_FIELD_AS_COL(uid);
+  CURRENT_USE_FIELD_AS_ROW(uid);
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
+  CURRENT_USE_FIELD_AS_COL(cid);
+  CURRENT_FIELD(us, std::chrono::microseconds, 0);
 
-  CURRENT_DEFAULT_CONSTRUCTOR(CardAuthor) {}
-  CURRENT_CONSTRUCTOR(CardAuthor)(CID cid, UID uid) : cid(cid), uid(uid) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(AuthorCard) {}
+  CURRENT_CONSTRUCTOR(AuthorCard)(UID uid, CID cid) : uid(uid), cid(cid) {}
 };
 
 CURRENT_STRUCT(Answer) {
@@ -157,6 +157,7 @@ CURRENT_STRUCT(Favorite) {
   CURRENT_USE_FIELD_AS_ROW(uid);
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_COL(cid);
+  CURRENT_FIELD(us, std::chrono::microseconds, 0);
   CURRENT_FIELD(favorited, bool, false);
 
   CURRENT_DEFAULT_CONSTRUCTOR(Favorite) {}
@@ -169,6 +170,7 @@ CURRENT_STRUCT(Comment) {
   CURRENT_USE_FIELD_AS_ROW(cid);
   CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);
   CURRENT_USE_FIELD_AS_COL(oid);
+  CURRENT_FIELD(us, std::chrono::microseconds, 0);
   CURRENT_FIELD(parent_oid,
                 OID,
                 OID::INVALID_COMMENT);  // `INVALID_COMMENT` for a top-level comment, parent OID otherwise.
@@ -251,6 +253,7 @@ CURRENT_STRUCT(BannedUser) {
   void InitializeOwnKey() {}
 };
 
+// clang-format off
 // Notifications.
 CURRENT_STRUCT(AbstractNotification) {
   // Sadly, can't be pure virtual with `g++`. -- @dkorolev, @mzhurovich.
@@ -258,6 +261,7 @@ CURRENT_STRUCT(AbstractNotification) {
   // To return full card bodies in the payload; can be CID::INVALID_CARD.
   virtual CID GetCID() const { return CID::INVALID_CARD; }
 };
+// clang-format on
 
 CURRENT_STRUCT(NotificationMyCardNewComment, AbstractNotification) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that comment.
@@ -384,8 +388,7 @@ using T_NOTIFICATIONS_VARIANT = Variant<NotificationMyCardNewComment,
 CURRENT_STRUCT(Notification) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
   CURRENT_USE_FIELD_AS_ROW(uid);
-  // CURRENT_FIELD(timestamp, std::chrono::milliseconds);
-  CURRENT_FIELD(timestamp, uint64_t, 0);  // To have REST compile, `{To/From}String`. -- D.K.
+  CURRENT_FIELD(timestamp, std::chrono::microseconds, 0);
   CURRENT_USE_FIELD_AS_COL(timestamp);
   CURRENT_FIELD(notification, T_NOTIFICATIONS_VARIANT);
 };

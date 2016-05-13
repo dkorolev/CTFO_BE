@@ -39,7 +39,7 @@ SOFTWARE.
 DEFINE_string(input, "db.json", "The name of the input data to convert.");
 DEFINE_string(output, "new_db.json", "The name of the input data to convert.");
 
-using T_PERSISTED_VARIANT = typename NewCTFO<SherlockStreamPersister>::T_TRANSACTION::T_VARIANT;
+using T_PERSISTED_VARIANT = typename NewCTFO<SherlockStreamPersister>::transaction_t::variant_t;
 
 template <typename T_RECORD, typename T_PERSISTED_RECORD>
 std::string GenericUpdate(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
@@ -55,7 +55,18 @@ std::string GenericUpdate(const std::chrono::microseconds timestamp, const std::
   const size_t offset = json.find(subjson);
   assert(offset != std::string::npos);
 
-  return json.substr(0u, offset) + tsv[2] + json.substr(offset + subjson.length());
+  std::string converted_json = json.substr(0u, offset) + tsv[2] + json.substr(offset + subjson.length());
+  const std::string sub_ms = "\"ms\":";
+  const size_t offset_ms = converted_json.find(sub_ms, offset);
+  if (offset != std::string::npos) {
+    const size_t offset_ms_start = offset_ms + sub_ms.length();
+    const size_t offset_ms_end = converted_json.find(',', offset_ms);
+    assert(offset_ms_end != std::string::npos);
+    std::string ms_value = converted_json.substr(offset_ms_start, offset_ms_end - offset_ms_start);
+    std::string sub_us = "\"us\":" + ms_value + "000";  // convert `ms` to `us` by adding 000 to the end
+    converted_json = converted_json.replace(offset_ms, offset_ms_end - offset_ms, sub_us);
+  }
+  return converted_json;
 }
 
 // Special case to convert `UIDAndCID` into `std::pair<UID, CID>`.
@@ -100,21 +111,33 @@ std::string DictionaryErase(const std::chrono::microseconds timestamp, const std
 }
 
 template <typename T_RECORD, typename T_PERSISTED_RECORD>
-std::string MatrixErase(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
+std::string GenericMatrixErase(const std::chrono::microseconds timestamp,
+                               const std::vector<std::string>& tsv,
+                               bool swap) {
   assert(tsv.size() == 4u);
 
   current::storage::Transaction<T_PERSISTED_VARIANT> transaction;
 
   transaction.meta.timestamp = timestamp;
-  using T_ROW = current::storage::sfinae::ENTRY_ROW_TYPE<T_RECORD>;
-  using T_COL = current::storage::sfinae::ENTRY_COL_TYPE<T_RECORD>;
-  const T_ROW row = static_cast<T_ROW>(ParseJSON<OldDictionarySimpleKeyEntry>(tsv[2]).data);
-  const T_COL col = static_cast<T_COL>(ParseJSON<OldDictionarySimpleKeyEntry>(tsv[3]).data);
+  using T_ROW = current::storage::sfinae::entry_row_t<T_RECORD>;
+  using T_COL = current::storage::sfinae::entry_col_t<T_RECORD>;
+  const T_ROW row = static_cast<T_ROW>(ParseJSON<OldDictionarySimpleKeyEntry>(tsv[swap ? 3 : 2]).data);
+  const T_COL col = static_cast<T_COL>(ParseJSON<OldDictionarySimpleKeyEntry>(tsv[swap ? 2 : 3]).data);
   auto delete_event = T_PERSISTED_RECORD();
   delete_event.key = std::make_pair(row, col);
   transaction.mutations.emplace_back(delete_event);
 
   return JSON(transaction);
+}
+
+template <typename T_RECORD, typename T_PERSISTED_RECORD>
+std::string MatrixErase(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
+  return GenericMatrixErase<T_RECORD, T_PERSISTED_RECORD>(timestamp, tsv, false /*swap*/);
+}
+
+template <typename T_RECORD, typename T_PERSISTED_RECORD>
+std::string MatrixEraseSwapped(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
+  return GenericMatrixErase<T_RECORD, T_PERSISTED_RECORD>(timestamp, tsv, true /*swap*/);
 }
 
 // Special case to convert notifications.
@@ -127,9 +150,7 @@ std::string NotificationsUpdate(const std::chrono::microseconds timestamp,
   transaction.meta.timestamp = timestamp;
 
   new_ctfo::Notification notification;
-  // Just to make REST compile wrt `{To/From}String()` -- D.K.
-  // notification.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(timestamp);
-  notification.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(timestamp).count();
+  notification.timestamp = timestamp;
 
   std::regex mega_regex(
       ".*\"uid\":([0-9]+).*\"polymorphic_name\":\"([a-zA-Z]+)\".*\"data\":(\\{[^\\}]+\\})[\\}]+");
@@ -206,8 +227,8 @@ int main(int argc, char** argv) {
 
   // Matrix updates.
   handlers["auth_token.add"] = GenericUpdate<new_ctfo::AuthKeyTokenPair, Persisted_AuthKeyTokenPairUpdated>;
-  handlers["auth_uid.add"] = GenericUpdate<new_ctfo::AuthKeyUIDPair, Persisted_AuthKeyUIDPairUpdated>;
-  handlers["card_authors.add"] = GenericUpdate<new_ctfo::CardAuthor, Persisted_CardAuthorUpdated>;
+  handlers["auth_uid.add"] = GenericUpdate<new_ctfo::UIDAuthKeyPair, Persisted_UIDAuthKeyPairUpdated>;
+  handlers["card_authors.add"] = GenericUpdate<new_ctfo::AuthorCard, Persisted_AuthorCardUpdated>;
   handlers["answers.add"] = GenericUpdate<new_ctfo::Answer, Persisted_AnswerUpdated>;
   handlers["favorites.add"] = GenericUpdate<new_ctfo::Favorite, Persisted_FavoriteUpdated>;
   handlers["comments.add"] = GenericUpdate<new_ctfo::Comment, Persisted_CommentUpdated>;
@@ -222,7 +243,7 @@ int main(int argc, char** argv) {
       GenericUpdate<new_ctfo::UserBlockedUser, Persisted_UserBlockedUserUpdated>;
 
   // Rare matrix deletes.
-  handlers["card_authors.delete"] = MatrixErase<new_ctfo::CardAuthor, Persisted_CardAuthorDeleted>;
+  handlers["card_authors.delete"] = MatrixEraseSwapped<new_ctfo::AuthorCard, Persisted_AuthorCardDeleted>;
   handlers["comments.delete"] = MatrixErase<new_ctfo::Comment, Persisted_CommentDeleted>;
   handlers["comment_likes.delete"] = MatrixErase<new_ctfo::CommentLike, Persisted_CommentLikeDeleted>;
 

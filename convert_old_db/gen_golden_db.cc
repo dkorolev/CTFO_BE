@@ -40,17 +40,18 @@ int main(int argc, char** argv) {
   using DB = NewCTFO<SherlockStreamPersister>;
   DB db(FLAGS_output);
 
-  current::storage::TransactionResult<bool> result = db.Transaction([](MutableFields<DB> fields) -> bool {
-    if (fields.user.Size() || fields.card.Size()) {
-      std::cerr << "Storage loaded from `" << FLAGS_output << "` is not empty. Not adding anything.\n";
-      return false;
-    } else {
-      return true;
-    }
-  }).Go();
+  current::storage::TransactionResult<bool> result =
+      db.ReadOnlyTransaction([](ImmutableFields<DB> fields) -> bool {
+        if (fields.user.Size() || fields.card.Size()) {
+          std::cerr << "Storage loaded from `" << FLAGS_output << "` is not empty. Not adding anything.\n";
+          return false;
+        } else {
+          return true;
+        }
+      }).Go();
 
   if (Value(result)) {
-    db.Transaction([](MutableFields<DB> fields) {
+    db.ReadWriteTransaction([](MutableFields<DB> fields) {
       new_ctfo::User user;
       user.uid = static_cast<UID>(42);
       user.level = 1;
@@ -58,7 +59,7 @@ int main(int argc, char** argv) {
       fields.user.Add(user);
     }).Go();
 
-    db.Transaction([](MutableFields<DB> fields) {
+    db.ReadWriteTransaction([](MutableFields<DB> fields) {
       new_ctfo::Card card;
       card.cid = static_cast<CID>(42);
       card.text = "В лесу родилась ёлочка";
@@ -67,13 +68,11 @@ int main(int argc, char** argv) {
       fields.card.Add(card);
     }).Go();
 
-    db.Transaction([](MutableFields<DB> fields) {
+    db.ReadWriteTransaction([](MutableFields<DB> fields) {
       new_ctfo::Notification notification;
       new_ctfo::NotificationMyCardNewComment new_comment;
       notification.uid = static_cast<UID>(42);
-      // Just to have REST build, wrt `{To/From}String`. -- D.K.
-      // notification.timestamp = std::chrono::milliseconds(100);
-      notification.timestamp = 100ull;
+      notification.timestamp = std::chrono::microseconds(100000ull);
       notification.notification = new_comment;
       fields.notification.Add(notification);
     }).Go();

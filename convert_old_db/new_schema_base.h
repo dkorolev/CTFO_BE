@@ -28,9 +28,9 @@ SOFTWARE.
 
 #include <functional>
 
+#include "../../Current/Bricks/util/comparators.h"  // For `CurrentHashFunction`.
 #include "../../Current/TypeSystem/struct.h"
 #include "../../Current/TypeSystem/enum.h"
-#include "../../Current/Storage/container/matrix.h"  // For `PairHash`.
 
 CURRENT_ENUM(UID, uint64_t){INVALID_USER = 0u};
 CURRENT_ENUM(CID, uint64_t){INVALID_CARD = 0u};
@@ -39,7 +39,7 @@ using UIDAndCID = std::pair<UID, CID>;
 namespace std {
 template <>
 struct hash<UIDAndCID> {
-  size_t operator()(const UIDAndCID& s) const { return current::storage::container::PairHash()(s); }
+  size_t operator()(const UIDAndCID& s) const { return current::CurrentHashFunction<UIDAndCID>()(s); }
 };
 }
 
