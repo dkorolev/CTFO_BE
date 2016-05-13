@@ -327,7 +327,7 @@ class CTFOServer final {
                     card_entry.number_of_comments = comments.Row(card.cid).Size();
                     const uint64_t now = current::time::Now().count();
                     card_entry.text = card.text;
-                    card_entry.us = card.us;
+                    card_entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(card.us);
                     card_entry.color = card.color;
                     card_entry.relevance =
                         0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1000 * 1000 * 60 * 60 * 24)));
@@ -359,7 +359,7 @@ class CTFOServer final {
                 }
               }
 
-              rfavs.us = current::time::Now();
+              rfavs.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
               return Response(rfavs, "favs");
             }
           }
@@ -433,7 +433,7 @@ class CTFOServer final {
                     card_entry.number_of_comments = comments.Row(card.cid).Size();
                     const uint64_t now = current::time::Now().count();
                     card_entry.text = card.text;
-                    card_entry.us = card.us;
+                    card_entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(card.us);
                     card_entry.color = card.color;
                     card_entry.relevance =
                         0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1000 * 1000 * 60 * 60 * 24)));
@@ -469,7 +469,7 @@ class CTFOServer final {
                 }
               }
 
-              r_my_cards.us = current::time::Now();
+              r_my_cards.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
               return Response(r_my_cards, "my_cards");
             }
           }
@@ -513,7 +513,7 @@ class CTFOServer final {
             }
             card_entry.number_of_comments = comments.Row(card.cid).Size();
             card_entry.text = card.text;
-            card_entry.us = card.us;
+            card_entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(card.us);
             card_entry.color = card.color;
             card_entry.relevance = 1.0;  // When `GET`-ting a card, make it 1.0.
             card_entry.ctfo_score = 50u;
@@ -598,7 +598,7 @@ class CTFOServer final {
                            authors_mutator.Add(author);
 
                            AddCardResponse response;
-                           response.us = now;
+                           response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
                            response.cid = CIDToString(cid);
                            return Response(response, "created");
                          }
@@ -655,7 +655,7 @@ class CTFOServer final {
                   comments_mutator.Erase(cid, o);
                 }
                 DeleteCardResponse response;
-                response.us = current::time::Now();
+                response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
                 return Response(response, "deleted");
               }
             } else {
@@ -766,7 +766,7 @@ class CTFOServer final {
                   proto_comments.end(),
                   [&sortkey](const Comment& lhs, const Comment& rhs) { return sortkey(lhs) < sortkey(rhs); });
               ResponseComments response;
-              response.us = current::time::Now();
+              response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
               std::vector<ResponseComment>& output_comments = response.comments;
               for (const auto& comment : proto_comments) {
                 // TODO(dkorolev): Need a function to convert `Comment` into `ResponseComment`.
@@ -790,7 +790,7 @@ class CTFOServer final {
                   c.liked = v.Has(uid);
                 }
                 c.flagged_inappropriate = flagged_comments.count(comment.oid);
-                c.us = comment.us;
+                c.ms = std::chrono::duration_cast<std::chrono::milliseconds>(comment.us);
                 output_comments.push_back(std::move(c));
               }
               return Response(response, "comments");
@@ -892,7 +892,7 @@ class CTFOServer final {
                            }
 
                            AddCommentResponse response;
-                           response.us = now;
+                           response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
                            response.oid = OIDToString(oid);
                            return Response(response, "created");
                          }
@@ -943,7 +943,7 @@ class CTFOServer final {
                              comments_mutator.Erase(cid, o);
                            }
                            DeleteCommentResponse response;
-                           response.us = current::time::Now();
+                           response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
                            return Response(response, "deleted");
                          }
                        },
@@ -1064,7 +1064,7 @@ class CTFOServer final {
           }
           card_entry.number_of_comments = comments.Row(card.cid).Size();
           card_entry.text = card.text;
-          card_entry.us = card.us;
+          card_entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(card.us);
           card_entry.color = card.color;
           card_entry.relevance = 0.0;  // Will be overridden later.
           card_entry.ctfo_score = 50u;
@@ -1125,7 +1125,7 @@ class CTFOServer final {
             }
             card_entry.number_of_comments = comments.Row(card.cid).Size();
             card_entry.text = card.text;
-            card_entry.us = card.us;
+            card_entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(card.us);
             card_entry.color = card.color;
             card_entry.relevance = 0.0;  // Will be overridden later.
             card_entry.ctfo_score = 50u;
@@ -1179,7 +1179,7 @@ class CTFOServer final {
       std::reverse(response.notifications.begin(), response.notifications.end());
     }
 
-    response.us = current::time::Now();
+    response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
     DebugPrint(Printf("[RespondWithFeed] Generated response for UID '%s' with %u 'hot' and %u 'recent' cards",
                       response.user.uid.c_str(),
                       response.feed_hot.size(),
