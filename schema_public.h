@@ -58,65 +58,30 @@ CURRENT_STRUCT(ResponseCardEntry) {
   CURRENT_FIELD(number_of_comments, uint32_t, 0u);     // The total number of comments left for this card.
 };
 
-// Favorites response schema.
-CURRENT_STRUCT(ResponseFavs) {
-  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);       // Server timestamp, milliseconds from epoch.
-  CURRENT_FIELD(user, ResponseUserEntry);                // User information.
-  CURRENT_FIELD(cards, std::vector<ResponseCardEntry>);  // Favorited cards.
-};
-
+namespace card_response {
 // "My cards" response schema. Yes, it's the same as favorites. -- D.K.
-CURRENT_STRUCT(ResponseMyCards) {
+CURRENT_STRUCT(my_cards) {
   CURRENT_FIELD(ms, std::chrono::milliseconds, 0);       // Server timestamp, milliseconds from epoch.
   CURRENT_FIELD(user, ResponseUserEntry);                // User information.
   CURRENT_FIELD(cards, std::vector<ResponseCardEntry>);  // Cards created by this user.
 };
 
-// Schema for the POST request to add a new card.
-CURRENT_STRUCT(AddCardRequest) {
-  CURRENT_FIELD(text, std::string, "");  // Plain text.
-  CURRENT_FIELD(color, Color);           // Color.
-};
-
-// A shortened version of `AddCardRequest`.
-CURRENT_STRUCT(AddCardShortRequest) {
-  CURRENT_FIELD(text, std::string, "");  // Plain text.
-};
-
 // Schema for the response of the POST request to add a new card.
-CURRENT_STRUCT(AddCardResponse) {
+CURRENT_STRUCT(created) {
   CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
   CURRENT_FIELD(cid, std::string, "");
 };
 
 // Schema for the response of the DELETE request for a card.
-CURRENT_STRUCT(DeleteCardResponse) { CURRENT_FIELD(ms, std::chrono::milliseconds, 0); };
+CURRENT_STRUCT(deleted) { CURRENT_FIELD(ms, std::chrono::milliseconds, 0); };
 
-// Schema for the POST request to add a new comment.
-CURRENT_STRUCT(AddCommentRequest) {
-  CURRENT_FIELD(text, std::string, "");  // Plain text.
-  CURRENT_FIELD(parent_oid, std::string, "");
-};
-
-// A shortened version of `AddCommentRequest`.
-CURRENT_STRUCT(AddCommentShortRequest) {
-  CURRENT_FIELD(text, std::string, "");  // Plain text.
-};
-
-// Schema for the response of the POST request to add a new comment.
-CURRENT_STRUCT(AddCommentResponse) {
-  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
-  CURRENT_FIELD(oid, std::string);
-};
-
-// Schema for the response of the DELETE request for a comment.
-CURRENT_STRUCT(DeleteCommentResponse) { CURRENT_FIELD(ms, std::chrono::milliseconds, 0); };
+} // namespace card_response
 
 // Comments response schema.
 CURRENT_STRUCT(ResponseComment) {
   CURRENT_FIELD(oid, std::string, "oINVALID");  // Comment id, format 'o05XXX...'.
   CURRENT_FIELD(
-      parent_oid, std::string, "");  // Empty string or parent comment id. NOTE: Two levels of comments only.
+                parent_oid, std::string, "");  // Empty string or parent comment id. NOTE: Two levels of comments only.
   CURRENT_FIELD(author_uid, std::string, "uINVALID");  // User id, format 'u01XXX...'.
   CURRENT_FIELD(author_level, uint8_t, 0u);            // Author user level, [0, 9].
   CURRENT_FIELD(text, std::string);                    // Comment text.
@@ -130,10 +95,53 @@ CURRENT_STRUCT(ResponseComment) {
   // TODO(dkorolev): Color?
 };
 
-CURRENT_STRUCT(ResponseComments) {
+namespace comment_response {
+
+CURRENT_STRUCT(comments) {
   CURRENT_FIELD(ms, std::chrono::milliseconds, 0);        // Server timestamp, milliseconds from epoch.
   CURRENT_FIELD(comments, std::vector<ResponseComment>);  // Comments.
 };
+
+// Schema for the response of the POST request to add a new comment.
+CURRENT_STRUCT(created) {
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
+  CURRENT_FIELD(oid, std::string);
+};
+
+// Schema for the response of the DELETE request for a comment.
+CURRENT_STRUCT(deleted) { CURRENT_FIELD(ms, std::chrono::milliseconds, 0); };
+
+} // namespace comment_response
+
+namespace full_request {
+
+// Schema for the POST request to add a new card.
+CURRENT_STRUCT(card) {
+  CURRENT_FIELD(text, std::string, "");  // Plain text.
+  CURRENT_FIELD(color, Color);           // Color.
+};
+
+// Schema for the POST request to add a new comment.
+CURRENT_STRUCT(comment) {
+  CURRENT_FIELD(text, std::string, "");  // Plain text.
+  CURRENT_FIELD(parent_oid, std::string, "");
+};
+
+} // namespace full_request
+
+namespace short_request {
+
+// A shortened version of `AddCardRequest`.
+CURRENT_STRUCT(card) {
+  CURRENT_FIELD(text, std::string, "");  // Plain text.
+};
+
+// A shortened version of `AddCommentRequest`.
+CURRENT_STRUCT(comment) {
+  CURRENT_FIELD(text, std::string, "");  // Plain text.
+};
+
+} // namespace short_request
 
 // TODO(dkorolev): Constraints on comment length when adding them?
 
@@ -149,8 +157,17 @@ CURRENT_STRUCT(ResponseNotification) {
   CURRENT_FIELD(n, uint32_t, 1u);
 };
 
+namespace complex_response {
+
+// Favorites response schema.
+CURRENT_STRUCT(favs) {
+  CURRENT_FIELD(ms, std::chrono::milliseconds, 0);       // Server timestamp, milliseconds from epoch.
+  CURRENT_FIELD(user, ResponseUserEntry);                // User information.
+  CURRENT_FIELD(cards, std::vector<ResponseCardEntry>);  // Favorited cards.
+};
+
 // Universal response structure, combining user info & cards payload.
-CURRENT_STRUCT(ResponseFeed) {
+CURRENT_STRUCT(feed) {
   CURRENT_FIELD(ms, std::chrono::milliseconds, 0);             // Server timestamp, milliseconds from epoch.
   CURRENT_FIELD(user, ResponseUserEntry);                      // User information.
   CURRENT_FIELD(feed_hot, std::vector<ResponseCardEntry>);     // "Hot" cards feeds.
@@ -158,82 +175,20 @@ CURRENT_STRUCT(ResponseFeed) {
   CURRENT_FIELD(notifications, std::vector<ResponseNotification>);  // Notifications.
 };
 
-template <typename T>
-constexpr const char* FieldName() {
-  return "";
-}
+} // namespace complex_response
 
-template <>
-constexpr const char* FieldName<ResponseCardEntry>() {
-  return "card";
-}
-template <>
-constexpr const char* FieldName<ResponseFavs>() {
-  return "favs";
-}
-template <>
-constexpr const char* FieldName<ResponseMyCards>() {
-  return "my_cards";
-}
-template <>
-constexpr const char* FieldName<AddCardResponse>() {
-  return "created";
-}
-template <>
-constexpr const char* FieldName<DeleteCardResponse>() {
-  return "deleted";
-}
-template <>
-constexpr const char* FieldName<AddCommentResponse>() {
-  return "created";
-}
-template <>
-constexpr const char* FieldName<DeleteCommentResponse>() {
-  return "deleted";
-}
-template <>
-constexpr const char* FieldName<ResponseComments>() {
-  return "comments";
-}
-template <>
-constexpr const char* FieldName<ResponseFeed>() {
-  return "feed";
-}
-
-template<>
-constexpr const char* FieldName<AddCardRequest>() {
-  return "card";
-}
-
-template<>
-constexpr const char* FieldName<AddCardShortRequest>() {
-  return "card";
-}
-
-template<>
-constexpr const char* FieldName<AddCommentRequest>() {
-  return "comment";
-}
-
-template<>
-constexpr const char* FieldName<AddCommentShortRequest>() {
-  return "comment";
-}
-
-template <typename T>
-constexpr const char* FieldName(const T&) {
-  return FieldName<T>();
-}
-
-template <typename T>
-inline T ParseValue(const std::string& source) {
-  return ParseJSON<T>(source, FieldName<T>());
-}
-
-template <typename T>
-inline void ParseValue(const std::string& source, T& destination) {
-  return ParseJSON(source, destination, FieldName(destination));
-}
+using ResponseFavs = complex_response::favs;
+using ResponseMyCards = card_response::my_cards;
+using AddCardResponse = card_response::created;
+using DeleteCardResponse = card_response::deleted;
+using AddCommentResponse = comment_response::created;
+using DeleteCommentResponse = comment_response::deleted;
+using ResponseComments = comment_response::comments;
+using ResponseFeed = complex_response::feed;
+using AddCardRequest = full_request::card;
+using AddCardShortRequest = short_request::card;
+using AddCommentRequest = full_request::comment;
+using AddCommentShortRequest = short_request::comment;
 
 }  // namespace CTFO
 

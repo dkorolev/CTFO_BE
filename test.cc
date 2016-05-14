@@ -78,6 +78,11 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
                                       );
 }
 
+template <typename T_RESPONSE>
+T_RESPONSE ParseResponse(const std::string &source) {
+  return Value<T_RESPONSE>(ParseJSON<Variant<T_RESPONSE>>(source));
+}
+
 TEST(CTFO, IDsRangeTest) {
   EXPECT_EQ("c00000000000000000042", CIDToString(static_cast<CID>(42)));
   EXPECT_TRUE(static_cast<int>(42) == static_cast<int>(StringToCID(CIDToString(static_cast<CID>(42)))));
@@ -105,7 +110,8 @@ TEST(CTFO, SmokeTest) {
   const auto auth_http_response = HTTP(
       POST(Printf("http://localhost:%d/ctfo/auth/ios?id=%s&key=%s", FLAGS_api_port, auth_id, auth_key), ""));
   EXPECT_EQ(200, static_cast<int>(auth_http_response.code));
-  const auto auth_response = ParseValue<ResponseFeed>(auth_http_response.body);
+  const auto auth_response = ParseResponse<ResponseFeed>(auth_http_response.body);
+  
   EXPECT_EQ(101u, auth_response.ms.count());
   const std::string actual_uid = auth_response.user.uid;
   const std::string actual_token = auth_response.user.token;
@@ -119,7 +125,7 @@ TEST(CTFO, SmokeTest) {
           "http://localhost:%d/ctfo/auth/ios?id=%s&key=%s", FLAGS_api_port, another_auth_id, another_auth_key),
       ""));
   EXPECT_EQ(200, static_cast<int>(another_auth_http_response.code));
-  const auto another_auth_response = ParseValue<ResponseFeed>(another_auth_http_response.body);
+  const auto another_auth_response = ParseResponse<ResponseFeed>(another_auth_http_response.body);
   EXPECT_EQ(201u, another_auth_response.ms.count());
   const std::string another_actual_uid = another_auth_response.user.uid;
   const std::string another_actual_token = another_auth_response.user.token;
@@ -141,7 +147,7 @@ TEST(CTFO, SmokeTest) {
                         actual_uid.c_str(),
                         actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(feed_http_response.code));
-    const auto feed_response = ParseValue<ResponseFeed>(feed_http_response.body);
+    const auto feed_response = ParseResponse<ResponseFeed>(feed_http_response.body);
     EXPECT_EQ(1001u, feed_response.ms.count());
     EXPECT_EQ(actual_uid, feed_response.user.uid);
     EXPECT_EQ(actual_token, feed_response.user.token);
@@ -189,7 +195,7 @@ TEST(CTFO, SmokeTest) {
       const auto get_card_response =
           HTTP(GET(Printf("http://localhost:%d/ctfo/card?cid=%s", FLAGS_api_port, cid1.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = ParseValue<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseResponse<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, cid1);
       EXPECT_FALSE(card_entry.favorited);
       EXPECT_FALSE(card_entry.is_my_card);
@@ -198,7 +204,7 @@ TEST(CTFO, SmokeTest) {
       const auto get_card_response = HTTP(GET(Printf(
           "http://localhost:%d/ctfo/card?uid=%s&cid=%s", FLAGS_api_port, actual_uid.c_str(), cid1.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = ParseValue<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseResponse<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, cid1);
       EXPECT_FALSE(card_entry.favorited);
       EXPECT_FALSE(card_entry.is_my_card);
@@ -241,7 +247,7 @@ TEST(CTFO, SmokeTest) {
       const auto get_card_response = HTTP(GET(Printf(
           "http://localhost:%d/ctfo/card?uid=%s&cid=%s", FLAGS_api_port, actual_uid.c_str(), cid1.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = ParseValue<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseResponse<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, cid1);
       EXPECT_TRUE(card_entry.favorited);
     }
@@ -251,7 +257,7 @@ TEST(CTFO, SmokeTest) {
                                                      another_actual_uid.c_str(),
                                                      cid1.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = ParseValue<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseResponse<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, cid1);
       EXPECT_FALSE(card_entry.favorited);  // Since the `uid` of another user was passed in.
     }
@@ -259,7 +265,7 @@ TEST(CTFO, SmokeTest) {
       const auto get_card_response =
           HTTP(GET(Printf("http://localhost:%d/ctfo/card?cid=%s", FLAGS_api_port, cid1.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = ParseValue<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseResponse<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, cid1);
       EXPECT_FALSE(card_entry.favorited);  // Since no `uid` was passed in.
     }
@@ -283,7 +289,7 @@ TEST(CTFO, SmokeTest) {
                                                            actual_uid.c_str(),
                                                            actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(feed_with_2_favs_response.code));
-    const auto two_favs_response = ParseValue<ResponseFavs>(feed_with_2_favs_response.body);
+    const auto two_favs_response = ParseResponse<ResponseFavs>(feed_with_2_favs_response.body);
     EXPECT_EQ(11001u, two_favs_response.ms.count());
     EXPECT_EQ(actual_uid, two_favs_response.user.uid);
     ASSERT_EQ(2u, two_favs_response.cards.size());
@@ -310,7 +316,7 @@ TEST(CTFO, SmokeTest) {
                                                           actual_uid.c_str(),
                                                           actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(feed_with_1_fav_response.code));
-    const auto one_fav_response = ParseValue<ResponseFavs>(feed_with_1_fav_response.body);
+    const auto one_fav_response = ParseResponse<ResponseFavs>(feed_with_1_fav_response.body);
     EXPECT_EQ(13001u, one_fav_response.ms.count());
     EXPECT_EQ(actual_uid, one_fav_response.user.uid);
     ASSERT_EQ(1u, one_fav_response.cards.size());
@@ -343,7 +349,7 @@ TEST(CTFO, SmokeTest) {
                                                             actual_uid.c_str(),
                                                             actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(feed_with_skip_made_on_fav.code));
-    const auto skip_made_response = ParseValue<ResponseFavs>(feed_with_skip_made_on_fav.body);
+    const auto skip_made_response = ParseResponse<ResponseFavs>(feed_with_skip_made_on_fav.body);
     EXPECT_EQ(14002u, skip_made_response.ms.count());
     EXPECT_EQ(actual_uid, skip_made_response.user.uid);
     ASSERT_EQ(1u, skip_made_response.cards.size());
@@ -376,7 +382,7 @@ TEST(CTFO, SmokeTest) {
                                                             actual_uid.c_str(),
                                                             actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(feed_with_ctfo_cast_on_fav.code));
-    const auto ctfo_vote_cast_response = ParseValue<ResponseFavs>(feed_with_ctfo_cast_on_fav.body);
+    const auto ctfo_vote_cast_response = ParseResponse<ResponseFavs>(feed_with_ctfo_cast_on_fav.body);
     EXPECT_EQ(15001u, ctfo_vote_cast_response.ms.count());
     EXPECT_EQ(actual_uid, ctfo_vote_cast_response.user.uid);
     ASSERT_EQ(1u, ctfo_vote_cast_response.cards.size());
@@ -402,7 +408,7 @@ TEST(CTFO, SmokeTest) {
                                                      actual_token.c_str()),
                                               add_card_request));
     EXPECT_EQ(200, static_cast<int>(post_card_response.code));
-    const auto add_card_response = ParseValue<AddCardResponse>(post_card_response.body);
+    const auto add_card_response = ParseResponse<AddCardResponse>(post_card_response.body);
     EXPECT_EQ(16001u, add_card_response.ms.count());
 
     added_card_cid = add_card_response.cid;
@@ -416,7 +422,7 @@ TEST(CTFO, SmokeTest) {
                                                      actual_uid.c_str(),
                                                      added_card_cid.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = ParseValue<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseResponse<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, added_card_cid);
       EXPECT_TRUE(card_entry.is_my_card);
     }
@@ -426,7 +432,7 @@ TEST(CTFO, SmokeTest) {
                                                      another_actual_uid.c_str(),
                                                      added_card_cid.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = ParseValue<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseResponse<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, added_card_cid);
       EXPECT_FALSE(card_entry.is_my_card);  // Since `another_actual_uid` != `actual_uid`.
     }
@@ -434,7 +440,7 @@ TEST(CTFO, SmokeTest) {
       const auto get_card_response =
           HTTP(GET(Printf("http://localhost:%d/ctfo/card?cid=%s", FLAGS_api_port, added_card_cid.c_str())));
       EXPECT_EQ(200, static_cast<int>(get_card_response.code));
-      const auto card_entry = ParseValue<ResponseCardEntry>(get_card_response.body);
+      const auto card_entry = ParseResponse<ResponseCardEntry>(get_card_response.body);
       EXPECT_EQ(card_entry.cid, added_card_cid);
       EXPECT_FALSE(card_entry.is_my_card);  // Since `uid` is not passed in.
     }
@@ -443,7 +449,7 @@ TEST(CTFO, SmokeTest) {
   // Confirm the freshly added card tops the "Recent" feed. And that its age matters.
   {
     {
-      const auto feed_recent = ParseValue<ResponseFeed>(
+      const auto feed_recent = ParseResponse<ResponseFeed>(
                                    HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
                                                    FLAGS_api_port,
                                                    actual_uid.c_str(),
@@ -460,7 +466,7 @@ TEST(CTFO, SmokeTest) {
       // Request recent cards 24 hours later.
       current::time::SetNow(std::chrono::microseconds((16001 + 1000 * 60 * 60 * 24) * 1000));
 
-      const auto feed_recent = ParseValue<ResponseFeed>(
+      const auto feed_recent = ParseResponse<ResponseFeed>(
                                    HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
                                                    FLAGS_api_port,
                                                    actual_uid.c_str(),
@@ -477,7 +483,7 @@ TEST(CTFO, SmokeTest) {
       // Request recent cards 48 hours later.
       current::time::SetNow(std::chrono::microseconds((16001 + 1000 * 60 * 60 * 48) * 1000));
 
-      const auto feed_recent = ParseValue<ResponseFeed>(
+      const auto feed_recent = ParseResponse<ResponseFeed>(
                                    HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
                                                    FLAGS_api_port,
                                                    actual_uid.c_str(),
@@ -503,7 +509,7 @@ TEST(CTFO, SmokeTest) {
                         actual_uid.c_str(),
                         actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(favs_including_my_card_response.code));
-    const auto my_card_fav_response = ParseValue<ResponseFavs>(favs_including_my_card_response.body);
+    const auto my_card_fav_response = ParseResponse<ResponseFavs>(favs_including_my_card_response.body);
     EXPECT_EQ(17001u, my_card_fav_response.ms.count());
     EXPECT_EQ(actual_uid, my_card_fav_response.user.uid);
     ASSERT_EQ(1u, my_card_fav_response.cards.size());
@@ -522,7 +528,7 @@ TEST(CTFO, SmokeTest) {
                                           actual_uid.c_str(),
                                           actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(my_cards.code));
-    const auto my_cards_response = ParseValue<ResponseMyCards>(my_cards.body);
+    const auto my_cards_response = ParseResponse<ResponseMyCards>(my_cards.body);
 
     EXPECT_EQ(18001u, my_cards_response.ms.count());
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
@@ -542,7 +548,7 @@ TEST(CTFO, SmokeTest) {
                          actual_token.c_str()),
                   "{\"card\":{\"text\":\"Bar.\",\"color\":{\"red\":100,\"green\":101,\"blue\":102}}}"));
     EXPECT_EQ(200, static_cast<int>(post_card_response.code));
-    const auto add_card_response = ParseValue<AddCardResponse>(post_card_response.body);
+    const auto add_card_response = ParseResponse<AddCardResponse>(post_card_response.body);
     EXPECT_EQ(19001u, add_card_response.ms.count());
 
     added_card2_cid = add_card_response.cid;
@@ -556,7 +562,7 @@ TEST(CTFO, SmokeTest) {
                                           actual_uid.c_str(),
                                           actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(my_cards.code));
-    const auto my_cards_response = ParseValue<ResponseMyCards>(my_cards.body);
+    const auto my_cards_response = ParseResponse<ResponseMyCards>(my_cards.body);
 
     EXPECT_EQ(20001u, my_cards_response.ms.count());
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
@@ -577,7 +583,7 @@ TEST(CTFO, SmokeTest) {
                                                      actual_token.c_str()),
                                               "{\"card\":{\"text\":\"Meh.\"}}"));
     EXPECT_EQ(200, static_cast<int>(post_card_response.code));
-    const auto add_card_response = ParseValue<AddCardResponse>(post_card_response.body);
+    const auto add_card_response = ParseResponse<AddCardResponse>(post_card_response.body);
     EXPECT_EQ(21001u, add_card_response.ms.count());
 
     added_card3_cid = add_card_response.cid;
@@ -606,7 +612,7 @@ TEST(CTFO, SmokeTest) {
                                           actual_uid.c_str(),
                                           actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(my_cards.code));
-    const auto my_cards_response = ParseValue<ResponseMyCards>(my_cards.body);
+    const auto my_cards_response = ParseResponse<ResponseMyCards>(my_cards.body);
 
     EXPECT_EQ(23001u, my_cards_response.ms.count());
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
@@ -621,7 +627,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm that three recently added cards are on the top of the recent feed.
   {
-    const auto feed_recent = ParseValue<ResponseFeed>(
+    const auto feed_recent = ParseResponse<ResponseFeed>(
                                  HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=3",
                                                  FLAGS_api_port,
                                                  actual_uid.c_str(),
@@ -661,7 +667,7 @@ TEST(CTFO, SmokeTest) {
                         actual_token.c_str(),
                         added_card2_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
-    const auto response = ParseValue<ResponseComments>(get_comments_response.body);
+    const auto response = ParseResponse<ResponseComments>(get_comments_response.body);
     EXPECT_EQ(101001u, response.ms.count());
     EXPECT_EQ(0u, response.comments.size());
   }
@@ -680,7 +686,7 @@ TEST(CTFO, SmokeTest) {
                          added_card_cid.c_str()),
                   add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-    const auto add_comment_response = ParseValue<AddCommentResponse>(post_comment_response.body);
+    const auto add_comment_response = ParseResponse<AddCommentResponse>(post_comment_response.body);
     EXPECT_EQ(102001u, add_comment_response.ms.count());
 
     added_comment_oid = add_comment_response.oid;
@@ -694,7 +700,7 @@ TEST(CTFO, SmokeTest) {
                                           actual_uid.c_str(),
                                           actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(my_cards.code));
-    const auto my_cards_response = ParseValue<ResponseMyCards>(my_cards.body);
+    const auto my_cards_response = ParseResponse<ResponseMyCards>(my_cards.body);
 
     EXPECT_EQ(102501u, my_cards_response.ms.count());
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
@@ -712,7 +718,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm that the recent feed also mentions that this card has one comment.
   {
-    const auto feed_recent = ParseValue<ResponseFeed>(
+    const auto feed_recent = ParseResponse<ResponseFeed>(
                                  HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=3",
                                                  FLAGS_api_port,
                                                  actual_uid.c_str(),
@@ -739,7 +745,7 @@ TEST(CTFO, SmokeTest) {
                         actual_token.c_str(),
                         added_card_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
-    const auto response = ParseValue<ResponseComments>(get_comments_response.body);
+    const auto response = ParseResponse<ResponseComments>(get_comments_response.body);
     EXPECT_EQ(103001u, response.ms.count());
     ASSERT_EQ(1u, response.comments.size());
     EXPECT_EQ(added_comment_oid, response.comments[0].oid);
@@ -759,7 +765,7 @@ TEST(CTFO, SmokeTest) {
                         actual_token.c_str(),
                         added_card2_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
-    const auto response = ParseValue<ResponseComments>(get_comments_response.body);
+    const auto response = ParseResponse<ResponseComments>(get_comments_response.body);
     EXPECT_EQ(104001u, response.ms.count());
     EXPECT_EQ(0u, response.comments.size());
   }
@@ -778,7 +784,7 @@ TEST(CTFO, SmokeTest) {
                          added_card_cid.c_str()),
                   add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-    const auto add_comment_response = ParseValue<AddCommentResponse>(post_comment_response.body);
+    const auto add_comment_response = ParseResponse<AddCommentResponse>(post_comment_response.body);
     EXPECT_EQ(105001u, add_comment_response.ms.count());
 
     added_second_comment_oid = add_comment_response.oid;
@@ -794,7 +800,7 @@ TEST(CTFO, SmokeTest) {
                         actual_token.c_str(),
                         added_card_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
-    const auto response = ParseValue<ResponseComments>(get_comments_response.body);
+    const auto response = ParseResponse<ResponseComments>(get_comments_response.body);
     EXPECT_EQ(106001u, response.ms.count());
     ASSERT_EQ(2u, response.comments.size());
     EXPECT_EQ(added_second_comment_oid, response.comments[0].oid);
@@ -824,7 +830,7 @@ TEST(CTFO, SmokeTest) {
                          added_card_cid.c_str()),
                   add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-    const auto add_comment_response = ParseValue<AddCommentResponse>(post_comment_response.body);
+    const auto add_comment_response = ParseResponse<AddCommentResponse>(post_comment_response.body);
     EXPECT_EQ(107001u, add_comment_response.ms.count());
 
     added_nested_comment_1_oid = add_comment_response.oid;
@@ -845,7 +851,7 @@ TEST(CTFO, SmokeTest) {
                          added_card_cid.c_str()),
                   add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-    const auto add_comment_response = ParseValue<AddCommentResponse>(post_comment_response.body);
+    const auto add_comment_response = ParseResponse<AddCommentResponse>(post_comment_response.body);
     EXPECT_EQ(108001u, add_comment_response.ms.count());
 
     added_nested_comment_2_oid = add_comment_response.oid;
@@ -861,7 +867,7 @@ TEST(CTFO, SmokeTest) {
                         actual_token.c_str(),
                         added_card_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(get_comments_response.code));
-    const auto response = ParseValue<ResponseComments>(get_comments_response.body);
+    const auto response = ParseResponse<ResponseComments>(get_comments_response.body);
     EXPECT_EQ(109001u, response.ms.count());
 
     ASSERT_EQ(4u, response.comments.size());
@@ -915,7 +921,7 @@ TEST(CTFO, SmokeTest) {
                                           actual_uid.c_str(),
                                           actual_token.c_str())));
     EXPECT_EQ(200, static_cast<int>(my_cards.code));
-    const auto my_cards_response = ParseValue<ResponseMyCards>(my_cards.body);
+    const auto my_cards_response = ParseResponse<ResponseMyCards>(my_cards.body);
 
     EXPECT_EQ(109501u, my_cards_response.ms.count());
     EXPECT_EQ(actual_uid, my_cards_response.user.uid);
@@ -980,7 +986,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the comment got liked.
   {
-    const auto comments = ParseValue<ResponseComments>(
+    const auto comments = ParseResponse<ResponseComments>(
                               HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                                               FLAGS_api_port,
                                               actual_uid.c_str(),
@@ -1028,7 +1034,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the comment got unliked.
   {
-    const auto comments = ParseValue<ResponseComments>(
+    const auto comments = ParseResponse<ResponseComments>(
                               HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                                               FLAGS_api_port,
                                               actual_uid.c_str(),
@@ -1076,7 +1082,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the flagged comment has the corresponding flag in the response.
   {
-    const auto comments = ParseValue<ResponseComments>(
+    const auto comments = ParseResponse<ResponseComments>(
                               HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                                               FLAGS_api_port,
                                               actual_uid.c_str(),
@@ -1118,12 +1124,12 @@ TEST(CTFO, SmokeTest) {
                            added_card_cid.c_str(),
                            added_comment_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
-    const auto payload = ParseValue<DeleteCommentResponse>(delete_comment_response.body);
+    const auto payload = ParseResponse<DeleteCommentResponse>(delete_comment_response.body);
     EXPECT_EQ(600001u, payload.ms.count());
 
     EXPECT_EQ(
         3u,
-        ParseValue<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+        ParseResponse<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                                        FLAGS_api_port,
                                                        actual_uid.c_str(),
                                                        actual_token.c_str()))).body)
@@ -1167,12 +1173,12 @@ TEST(CTFO, SmokeTest) {
                            added_card_cid.c_str(),
                            added_nested_comment_2_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
-    const auto payload = ParseValue<DeleteCommentResponse>(delete_comment_response.body);
+    const auto payload = ParseResponse<DeleteCommentResponse>(delete_comment_response.body);
     EXPECT_EQ(112001u, payload.ms.count());
 
     EXPECT_EQ(
         2u,
-        ParseValue<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+        ParseResponse<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                                        FLAGS_api_port,
                                                        actual_uid.c_str(),
                                                        actual_token.c_str()))).body)
@@ -1190,7 +1196,7 @@ TEST(CTFO, SmokeTest) {
                           actual_uid.c_str(),
                           actual_token.c_str())));
       EXPECT_EQ(200, static_cast<int>(feed_http_response.code));
-      const auto feed_response = ParseValue<ResponseFeed>(feed_http_response.body);
+      const auto feed_response = ParseResponse<ResponseFeed>(feed_http_response.body);
       EXPECT_EQ(0u, feed_response.notifications.size());
     }
     // Add a comment to generate a notification.
@@ -1207,7 +1213,7 @@ TEST(CTFO, SmokeTest) {
                            added_card_cid.c_str()),
                     add_comment_request));
       EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-      const auto add_comment_response = ParseValue<AddCommentResponse>(post_comment_response.body);
+      const auto add_comment_response = ParseResponse<AddCommentResponse>(post_comment_response.body);
 
       comment_to_be_notified_about_oid = add_comment_response.oid;
     }
@@ -1220,7 +1226,7 @@ TEST(CTFO, SmokeTest) {
                           actual_uid.c_str(),
                           actual_token.c_str())));
       EXPECT_EQ(200, static_cast<int>(feed_http_response.code));
-      const auto feed_response = ParseValue<ResponseFeed>(feed_http_response.body);
+      const auto feed_response = ParseResponse<ResponseFeed>(feed_http_response.body);
       ASSERT_EQ(1u, feed_response.notifications.size());
       EXPECT_EQ("MyCardNewComment", feed_response.notifications[0].type);
       EXPECT_EQ(another_actual_uid, feed_response.notifications[0].uid);
@@ -1242,7 +1248,7 @@ TEST(CTFO, SmokeTest) {
                              added_card_cid.c_str(),
                              comment_to_be_notified_about_oid.c_str())));
       EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
-      ParseValue<DeleteCommentResponse>(delete_comment_response.body);
+      ParseResponse<DeleteCommentResponse>(delete_comment_response.body);
     }
   }
 
@@ -1258,12 +1264,12 @@ TEST(CTFO, SmokeTest) {
                            added_card_cid.c_str(),
                            added_second_comment_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
-    const auto payload = ParseValue<DeleteCommentResponse>(delete_comment_response.body);
+    const auto payload = ParseResponse<DeleteCommentResponse>(delete_comment_response.body);
     EXPECT_EQ(601001u, payload.ms.count());
 
     EXPECT_EQ(
         0u,
-        ParseValue<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+        ParseResponse<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                                        FLAGS_api_port,
                                                        actual_uid.c_str(),
                                                        actual_token.c_str()))).body)
@@ -1277,7 +1283,7 @@ TEST(CTFO, SmokeTest) {
   {
     EXPECT_EQ(
         3u,
-        ParseValue<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+        ParseResponse<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                                        FLAGS_api_port,
                                                        actual_uid.c_str(),
                                                        actual_token.c_str()))).body).cards.size());
@@ -1299,12 +1305,12 @@ TEST(CTFO, SmokeTest) {
                                                          actual_token.c_str(),
                                                          added_card_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_card_response.code));
-    const auto payload = ParseValue<DeleteCardResponse>(delete_card_response.body);
+    const auto payload = ParseResponse<DeleteCardResponse>(delete_card_response.body);
     EXPECT_EQ(602001u, payload.ms.count());
 
     EXPECT_EQ(
         2u,
-        ParseValue<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
+        ParseResponse<ResponseMyCards>(HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                                        FLAGS_api_port,
                                                        actual_uid.c_str(),
                                                        actual_token.c_str()))).body).cards.size());
@@ -1324,7 +1330,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm that the recent feed still contains two of my cards as the most recently added ones.
   {
-    const auto feed_recent = ParseValue<ResponseFeed>(
+    const auto feed_recent = ParseResponse<ResponseFeed>(
                                  HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=2",
                                                  FLAGS_api_port,
                                                  actual_uid.c_str(),
@@ -1349,7 +1355,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm that the flagged card is not returned as part of the feed.
   {
-    const auto feed_recent = ParseValue<ResponseFeed>(
+    const auto feed_recent = ParseResponse<ResponseFeed>(
                                  HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
                                                  FLAGS_api_port,
                                                  actual_uid.c_str(),
@@ -1384,7 +1390,7 @@ TEST(CTFO, StrictAuth) {
   const auto auth_http_response = HTTP(
       POST(Printf("http://localhost:%d/ctfo/auth/ios?id=%s&key=%s", FLAGS_api_port, auth_id, auth_key), ""));
   EXPECT_EQ(200, static_cast<int>(auth_http_response.code));
-  const auto auth_response = ParseValue<ResponseFeed>(auth_http_response.body);
+  const auto auth_response = ParseResponse<ResponseFeed>(auth_http_response.body);
   EXPECT_EQ(1u, auth_response.ms.count());
 }
 

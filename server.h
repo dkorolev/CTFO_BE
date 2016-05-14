@@ -79,7 +79,6 @@ class CTFOServer final {
         storage_(storage_file) {
     event_log_stream_.open(event_log_file_, std::ofstream::out | std::ofstream::app);
 
-    // bricks::cerealize::CerealFileParser<Card, bricks::cerealize::CerealFormat::JSON> cf(cards_file);
     std::ifstream cf(cards_file);
     assert(cf.good());
     storage_.ReadWriteTransaction([&cf](MutableFields<Storage> data) {
@@ -200,7 +199,7 @@ class CTFOServer final {
               user_entry.token = token;
 
               ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
-              return Response(rfeed, FieldName(rfeed));
+              return Response(Variant<ResponseFeed>(rfeed));
             }, std::move(r)).Go();  // clang-format on
       }
     }
@@ -248,7 +247,7 @@ class CTFOServer final {
                 user_entry.token = token;
                 ResponseFeed rfeed =
                     GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
-                return Response(rfeed, FieldName(rfeed));
+                return Response(Variant<ResponseFeed>(rfeed));
               }
             }, std::move(r)).Go();  // clang-format on
       }
@@ -355,7 +354,7 @@ class CTFOServer final {
               }
 
               rfavs.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-              return Response(rfavs, FieldName(rfavs));
+              return Response(Variant<ResponseFavs>(rfavs));
             }
           }
         }, std::move(r)).Go();
@@ -465,7 +464,7 @@ class CTFOServer final {
               }
 
               r_my_cards.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-              return Response(r_my_cards, FieldName(r_my_cards));
+              return Response(Variant<ResponseMyCards>(r_my_cards));
             }
           }
         }, std::move(r)).Go();
@@ -535,7 +534,7 @@ class CTFOServer final {
               }
             }
 
-            return Response(card_entry, FieldName(card_entry));
+            return Response(Variant<ResponseCardEntry>(card_entry));
           }
         }, std::move(r)).Go();
       }
@@ -551,9 +550,9 @@ class CTFOServer final {
         try {
           AddCardRequest request;
           try {
-            ParseValue(r.body, request);
+            request = Value<AddCardRequest>(ParseJSON<Variant<AddCardRequest>, JSONFormat::Minimalistic>(r.body));
           } catch (const current::TypeSystemParseJSONException&) {
-            const auto short_request = ParseValue<AddCardShortRequest>(r.body);
+            const auto short_request = Value<AddCardShortRequest>(ParseJSON<Variant<AddCardShortRequest>, JSONFormat::Minimalistic>(r.body));
             request.text = short_request.text;
             request.color = CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()];
           }
@@ -595,12 +594,12 @@ class CTFOServer final {
                   AddCardResponse response;
                   response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
                   response.cid = CIDToString(cid);
-                  return Response(response, FieldName(response));
+                  return Response(Variant<AddCardResponse>(response));
                 }
               }, std::move(r)).Go();  // clang-format on
-        } catch (const current::TypeSystemParseJSONException&) {
-          DebugPrint(Printf("[/ctfo/card] Could not parse POST body. Requested URL = '%s'",
-                            r.url.ComposeURL().c_str()));
+        } catch (const current::TypeSystemParseJSONException& e) {
+          DebugPrint(Printf("[/ctfo/card] Could not parse POST body. Requested URL = '%s', body = '%s', e = '%s'",
+                            r.url.ComposeURL().c_str(), r.body.c_str(), e.what()));
           r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
         }
       }
@@ -650,7 +649,7 @@ class CTFOServer final {
                 }
                 DeleteCardResponse response;
                 response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-                return Response(response, FieldName(response));
+                return Response(Variant<DeleteCardResponse>(response));
               }
             } else {
               return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
@@ -787,7 +786,7 @@ class CTFOServer final {
                 c.ms = std::chrono::duration_cast<std::chrono::milliseconds>(comment.us);
                 output_comments.push_back(std::move(c));
               }
-              return Response(response, FieldName(response));
+              return Response(Variant<ResponseComments>(response));
             }
           }
         }, std::move(r)).Go();
@@ -797,9 +796,9 @@ class CTFOServer final {
         try {
           AddCommentRequest request;
           try {
-            ParseValue(r.body, request);
+            request = Value<AddCommentRequest>(ParseJSON<Variant<AddCommentRequest>, JSONFormat::Minimalistic>(r.body));
           } catch (const current::TypeSystemParseJSONException&) {
-            const auto short_request = ParseValue<AddCommentShortRequest>(r.body);
+            const auto short_request = Value<AddCommentShortRequest>(ParseJSON<Variant<AddCommentShortRequest>, JSONFormat::Minimalistic>(r.body));
             request.text = short_request.text;
           }
           storage_.ReadWriteTransaction(  // clang-format off
@@ -888,7 +887,7 @@ class CTFOServer final {
                   AddCommentResponse response;
                   response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
                   response.oid = OIDToString(oid);
-                  return Response(response, FieldName(response));
+                  return Response(Variant<AddCommentResponse>(response));
                 }
               }, std::move(r)).Go();  // clang-format on
         } catch (const current::TypeSystemParseJSONException&) {
@@ -938,7 +937,7 @@ class CTFOServer final {
                   DeleteCommentResponse response;
                   response.ms =
                       std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-                  return Response(response, FieldName(response));
+                  return Response(Variant<DeleteCommentResponse>(response));
                 }
               }, std::move(r)).Go();  // clang-format on
         }
