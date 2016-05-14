@@ -158,61 +158,81 @@ CURRENT_STRUCT(ResponseFeed) {
   CURRENT_FIELD(notifications, std::vector<ResponseNotification>);  // Notifications.
 };
 
-template <typename T_RESPONSE>
-constexpr const char* ResponseField() {
+template <typename T>
+constexpr const char* FieldName() {
   return "";
 }
 
 template <>
-constexpr const char* ResponseField<ResponseCardEntry>() {
+constexpr const char* FieldName<ResponseCardEntry>() {
   return "card";
 }
 template <>
-constexpr const char* ResponseField<ResponseFavs>() {
+constexpr const char* FieldName<ResponseFavs>() {
   return "favs";
 }
 template <>
-constexpr const char* ResponseField<ResponseMyCards>() {
+constexpr const char* FieldName<ResponseMyCards>() {
   return "my_cards";
 }
 template <>
-constexpr const char* ResponseField<AddCardResponse>() {
+constexpr const char* FieldName<AddCardResponse>() {
   return "created";
 }
 template <>
-constexpr const char* ResponseField<DeleteCardResponse>() {
+constexpr const char* FieldName<DeleteCardResponse>() {
   return "deleted";
 }
 template <>
-constexpr const char* ResponseField<AddCommentResponse>() {
+constexpr const char* FieldName<AddCommentResponse>() {
   return "created";
 }
 template <>
-constexpr const char* ResponseField<DeleteCommentResponse>() {
+constexpr const char* FieldName<DeleteCommentResponse>() {
   return "deleted";
 }
 template <>
-constexpr const char* ResponseField<ResponseComments>() {
+constexpr const char* FieldName<ResponseComments>() {
   return "comments";
 }
 template <>
-constexpr const char* ResponseField<ResponseFeed>() {
+constexpr const char* FieldName<ResponseFeed>() {
   return "feed";
 }
 
-template <typename T_RESPONSE>
-constexpr const char* ResponseField(const T_RESPONSE&) {
-  return ResponseField<T_RESPONSE>();
+template<>
+constexpr const char* FieldName<AddCardRequest>() {
+  return "card";
 }
 
-template <typename T_RESPONSE>
-inline T_RESPONSE ParseResponse(const std::string& source) {
-  return ParseJSON<T_RESPONSE>(source, ResponseField<T_RESPONSE>());
+template<>
+constexpr const char* FieldName<AddCardShortRequest>() {
+  return "card";
 }
 
-template <typename T_RESPONSE>
-inline void ParseResponse(const std::string& source, T_RESPONSE& destination) {
-  return ParseJSON(source, destination, ResponseField<T_RESPONSE>());
+template<>
+constexpr const char* FieldName<AddCommentRequest>() {
+  return "comment";
+}
+
+template<>
+constexpr const char* FieldName<AddCommentShortRequest>() {
+  return "comment";
+}
+
+template <typename T>
+constexpr const char* FieldName(const T&) {
+  return FieldName<T>();
+}
+
+template <typename T>
+inline T ParseValue(const std::string& source) {
+  return ParseJSON<T>(source, FieldName<T>());
+}
+
+template <typename T>
+inline void ParseValue(const std::string& source, T& destination) {
+  return ParseJSON(source, destination, FieldName(destination));
 }
 
 }  // namespace CTFO
