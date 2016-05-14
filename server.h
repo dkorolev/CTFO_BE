@@ -201,7 +201,7 @@ class CTFOServer final {
 
                        ResponseFeed rfeed =
                            GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
-                       return Response(rfeed, "feed");
+                       return Response(rfeed, ResponseField(rfeed));
                      },
                      std::move(r)).Go();
       }
@@ -252,7 +252,7 @@ class CTFOServer final {
                          user_entry.token = token;
                          ResponseFeed rfeed =
                              GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
-                         return Response(rfeed, "feed");
+                         return Response(rfeed, ResponseField(rfeed));
                        }
                      },
                      std::move(r)).Go();
@@ -360,7 +360,7 @@ class CTFOServer final {
               }
 
               rfavs.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-              return Response(rfavs, "favs");
+              return Response(rfavs, ResponseField(rfavs));
             }
           }
         }, std::move(r)).Go();
@@ -470,7 +470,7 @@ class CTFOServer final {
               }
 
               r_my_cards.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-              return Response(r_my_cards, "my_cards");
+              return Response(r_my_cards, ResponseField(r_my_cards));
             }
           }
         }, std::move(r)).Go();
@@ -540,7 +540,7 @@ class CTFOServer final {
               }
             }
 
-            return Response(card_entry, "card");
+            return Response(card_entry, ResponseField(card_entry));
           }
         }, std::move(r)).Go();
       }
@@ -600,7 +600,7 @@ class CTFOServer final {
                            AddCardResponse response;
                            response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
                            response.cid = CIDToString(cid);
-                           return Response(response, "created");
+                           return Response(response, ResponseField(response));
                          }
                        },
                        std::move(r)).Go();
@@ -656,7 +656,7 @@ class CTFOServer final {
                 }
                 DeleteCardResponse response;
                 response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-                return Response(response, "deleted");
+                return Response(response, ResponseField(response));
               }
             } else {
               return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
@@ -793,7 +793,7 @@ class CTFOServer final {
                 c.ms = std::chrono::duration_cast<std::chrono::milliseconds>(comment.us);
                 output_comments.push_back(std::move(c));
               }
-              return Response(response, "comments");
+              return Response(response, ResponseField(response));
             }
           }
         }, std::move(r)).Go();
@@ -894,7 +894,7 @@ class CTFOServer final {
                            AddCommentResponse response;
                            response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
                            response.oid = OIDToString(oid);
-                           return Response(response, "created");
+                           return Response(response, ResponseField(response));
                          }
                        },
                        std::move(r)).Go();
@@ -943,8 +943,9 @@ class CTFOServer final {
                              comments_mutator.Erase(cid, o);
                            }
                            DeleteCommentResponse response;
-                           response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-                           return Response(response, "deleted");
+                           response.ms =
+                               std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+                           return Response(response, ResponseField(response));
                          }
                        },
                        std::move(r)).Go();

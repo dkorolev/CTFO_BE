@@ -158,6 +158,63 @@ CURRENT_STRUCT(ResponseFeed) {
   CURRENT_FIELD(notifications, std::vector<ResponseNotification>);  // Notifications.
 };
 
+template <typename T_RESPONSE>
+constexpr const char* ResponseField() {
+  return "";
+}
+
+template <>
+constexpr const char* ResponseField<ResponseCardEntry>() {
+  return "card";
+}
+template <>
+constexpr const char* ResponseField<ResponseFavs>() {
+  return "favs";
+}
+template <>
+constexpr const char* ResponseField<ResponseMyCards>() {
+  return "my_cards";
+}
+template <>
+constexpr const char* ResponseField<AddCardResponse>() {
+  return "created";
+}
+template <>
+constexpr const char* ResponseField<DeleteCardResponse>() {
+  return "deleted";
+}
+template <>
+constexpr const char* ResponseField<AddCommentResponse>() {
+  return "created";
+}
+template <>
+constexpr const char* ResponseField<DeleteCommentResponse>() {
+  return "deleted";
+}
+template <>
+constexpr const char* ResponseField<ResponseComments>() {
+  return "comments";
+}
+template <>
+constexpr const char* ResponseField<ResponseFeed>() {
+  return "feed";
+}
+
+template <typename T_RESPONSE>
+constexpr const char* ResponseField(const T_RESPONSE&) {
+  return ResponseField<T_RESPONSE>();
+}
+
+template <typename T_RESPONSE>
+inline T_RESPONSE ParseResponse(const std::string& source) {
+  return ParseJSON<T_RESPONSE>(source, ResponseField<T_RESPONSE>());
+}
+
+template <typename T_RESPONSE>
+inline void ParseResponse(const std::string& source, T_RESPONSE& destination) {
+  return ParseJSON(source, destination, ResponseField<T_RESPONSE>());
+}
+
 }  // namespace CTFO
 
 #endif  // SCHEMA_PUBLIC_H
