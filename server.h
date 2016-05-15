@@ -125,6 +125,16 @@ class CTFOServer final {
   std::function<void(Request)> BindToThis(CTFOServerMemberFunctionServingRequest handler) {
     return std::bind(handler, this, std::placeholders::_1);
   };
+  
+  template <typename T_REQUEST>
+  T_REQUEST ParseRequest(const std::string &source) {
+    return Value<T_REQUEST>(ParseJSON<Variant<T_REQUEST>, JSONFormat::Minimalistic>(source));
+  }
+
+  template<typename T_RESPONSE>
+  Response MakeResponse(T_RESPONSE& r) {
+    return Response(Variant<T_RESPONSE>(std::move(r)));
+  }
 
   void RouteAuthiOS(Request r) {
     if (r.method != "POST") {
@@ -199,7 +209,7 @@ class CTFOServer final {
               user_entry.token = token;
 
               ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
-              return Response(Variant<ResponseFeed>(rfeed));
+              return MakeResponse(rfeed);
             }, std::move(r)).Go();  // clang-format on
       }
     }
@@ -247,7 +257,7 @@ class CTFOServer final {
                 user_entry.token = token;
                 ResponseFeed rfeed =
                     GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
-                return Response(Variant<ResponseFeed>(rfeed));
+                return MakeResponse(rfeed);
               }
             }, std::move(r)).Go();  // clang-format on
       }
@@ -354,7 +364,7 @@ class CTFOServer final {
               }
 
               rfavs.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-              return Response(Variant<ResponseFavs>(rfavs));
+              return MakeResponse(rfavs);
             }
           }
         }, std::move(r)).Go();
@@ -464,7 +474,7 @@ class CTFOServer final {
               }
 
               r_my_cards.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-              return Response(Variant<ResponseMyCards>(r_my_cards));
+              return MakeResponse(r_my_cards);
             }
           }
         }, std::move(r)).Go();
@@ -534,7 +544,7 @@ class CTFOServer final {
               }
             }
 
-            return Response(Variant<ResponseCardEntry>(card_entry));
+            return MakeResponse(card_entry);
           }
         }, std::move(r)).Go();
       }
@@ -550,9 +560,9 @@ class CTFOServer final {
         try {
           AddCardRequest request;
           try {
-            request = Value<AddCardRequest>(ParseJSON<Variant<AddCardRequest>, JSONFormat::Minimalistic>(r.body));
+            request = ParseRequest<AddCardRequest>(r.body);
           } catch (const current::TypeSystemParseJSONException&) {
-            const auto short_request = Value<AddCardShortRequest>(ParseJSON<Variant<AddCardShortRequest>, JSONFormat::Minimalistic>(r.body));
+            const auto short_request = ParseRequest<AddCardShortRequest>(r.body);
             request.text = short_request.text;
             request.color = CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()];
           }
@@ -594,7 +604,7 @@ class CTFOServer final {
                   AddCardResponse response;
                   response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
                   response.cid = CIDToString(cid);
-                  return Response(Variant<AddCardResponse>(response));
+                  return MakeResponse(response);
                 }
               }, std::move(r)).Go();  // clang-format on
         } catch (const current::TypeSystemParseJSONException& e) {
@@ -649,7 +659,7 @@ class CTFOServer final {
                 }
                 DeleteCardResponse response;
                 response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-                return Response(Variant<DeleteCardResponse>(response));
+                return MakeResponse(response);
               }
             } else {
               return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
@@ -786,7 +796,7 @@ class CTFOServer final {
                 c.ms = std::chrono::duration_cast<std::chrono::milliseconds>(comment.us);
                 output_comments.push_back(std::move(c));
               }
-              return Response(Variant<ResponseComments>(response));
+              return MakeResponse(response);
             }
           }
         }, std::move(r)).Go();
@@ -796,9 +806,9 @@ class CTFOServer final {
         try {
           AddCommentRequest request;
           try {
-            request = Value<AddCommentRequest>(ParseJSON<Variant<AddCommentRequest>, JSONFormat::Minimalistic>(r.body));
+            request = ParseRequest<AddCommentRequest>(r.body);
           } catch (const current::TypeSystemParseJSONException&) {
-            const auto short_request = Value<AddCommentShortRequest>(ParseJSON<Variant<AddCommentShortRequest>, JSONFormat::Minimalistic>(r.body));
+            const auto short_request = ParseRequest<AddCommentShortRequest>(r.body);
             request.text = short_request.text;
           }
           storage_.ReadWriteTransaction(  // clang-format off
@@ -887,7 +897,7 @@ class CTFOServer final {
                   AddCommentResponse response;
                   response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
                   response.oid = OIDToString(oid);
-                  return Response(Variant<AddCommentResponse>(response));
+                  return MakeResponse(response);
                 }
               }, std::move(r)).Go();  // clang-format on
         } catch (const current::TypeSystemParseJSONException&) {
@@ -937,7 +947,7 @@ class CTFOServer final {
                   DeleteCommentResponse response;
                   response.ms =
                       std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-                  return Response(Variant<DeleteCommentResponse>(response));
+                  return MakeResponse(response);
                 }
               }, std::move(r)).Go();  // clang-format on
         }

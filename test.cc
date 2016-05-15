@@ -79,8 +79,8 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
 }
 
 template <typename T_RESPONSE>
-T_RESPONSE ParseResponse(const std::string &source) {
-  return Value<T_RESPONSE>(ParseJSON<Variant<T_RESPONSE>>(source));
+inline T_RESPONSE ParseResponse(const std::string &source) {
+  return Value<T_RESPONSE>(ParseJSON<Variant<T_RESPONSE>, JSONFormat::Minimalistic>(source));
 }
 
 TEST(CTFO, IDsRangeTest) {
