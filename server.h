@@ -125,15 +125,15 @@ class CTFOServer final {
   std::function<void(Request)> BindToThis(CTFOServerMemberFunctionServingRequest handler) {
     return std::bind(handler, this, std::placeholders::_1);
   };
-  
+
   template <typename T_REQUEST>
-  T_REQUEST ParseRequest(const std::string &source) {
+  T_REQUEST ParseRequest(const std::string& source) {
     return Value<T_REQUEST>(ParseJSON<Variant<T_REQUEST>, JSONFormat::Minimalistic>(source));
   }
 
-  template<typename T_RESPONSE>
-  Response MakeResponse(T_RESPONSE& r) {
-    return Response(Variant<T_RESPONSE>(std::move(r)));
+  template <typename T_RESPONSE>
+  Response MakeResponse(T_RESPONSE&& r) {
+    return Response(Variant<T_RESPONSE>(std::forward<T_RESPONSE>(r)));
   }
 
   void RouteAuthiOS(Request r) {
@@ -208,8 +208,7 @@ class CTFOServer final {
               CopyUserInfoToResponseEntry(user, Exists(data.banned_user[uid]), user_entry);
               user_entry.token = token;
 
-              ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
-              return MakeResponse(rfeed);
+              return MakeResponse(GenerateResponseFeed(data, user_entry, feed_count, notifications_since));
             }, std::move(r)).Go();  // clang-format on
       }
     }
@@ -255,9 +254,7 @@ class CTFOServer final {
                 ResponseUserEntry user_entry;
                 CopyUserInfoToResponseEntry(user, Exists(data.banned_user[uid]), user_entry);
                 user_entry.token = token;
-                ResponseFeed rfeed =
-                    GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
-                return MakeResponse(rfeed);
+                return MakeResponse(GenerateResponseFeed(data, user_entry, feed_count, notifications_since));
               }
             }, std::move(r)).Go();  // clang-format on
       }
@@ -364,7 +361,7 @@ class CTFOServer final {
               }
 
               rfavs.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-              return MakeResponse(rfavs);
+              return MakeResponse(std::move(rfavs));
             }
           }
         }, std::move(r)).Go();
@@ -474,7 +471,7 @@ class CTFOServer final {
               }
 
               r_my_cards.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-              return MakeResponse(r_my_cards);
+              return MakeResponse(std::move(r_my_cards));
             }
           }
         }, std::move(r)).Go();
@@ -544,7 +541,7 @@ class CTFOServer final {
               }
             }
 
-            return MakeResponse(card_entry);
+            return MakeResponse(std::move(card_entry));
           }
         }, std::move(r)).Go();
       }
@@ -558,11 +555,11 @@ class CTFOServer final {
         const std::string requested_url = r.url.ComposeURL();
         const CID cid = RandomCID();
         try {
-          AddCardRequest request;
+          RequestAddCard request;
           try {
-            request = ParseRequest<AddCardRequest>(r.body);
+            request = ParseRequest<RequestAddCard>(r.body);
           } catch (const current::TypeSystemParseJSONException&) {
-            const auto short_request = ParseRequest<AddCardShortRequest>(r.body);
+            const auto short_request = ParseRequest<RequestAddCardShort>(r.body);
             request.text = short_request.text;
             request.color = CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()];
           }
@@ -601,15 +598,16 @@ class CTFOServer final {
                   author.cid = cid;
                   authors_mutator.Add(author);
 
-                  AddCardResponse response;
+                  ResponseAddCard response;
                   response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
                   response.cid = CIDToString(cid);
-                  return MakeResponse(response);
+                  return MakeResponse(std::move(response));
                 }
               }, std::move(r)).Go();  // clang-format on
         } catch (const current::TypeSystemParseJSONException& e) {
-          DebugPrint(Printf("[/ctfo/card] Could not parse POST body. Requested URL = '%s', body = '%s', e = '%s'",
-                            r.url.ComposeURL().c_str(), r.body.c_str(), e.what()));
+          DebugPrint(Printf("[/ctfo/card] Could not parse POST body. Requested URL = '%s', e = '%s'",
+                            r.url.ComposeURL().c_str(),
+                            e.what()));
           r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
         }
       }
@@ -657,9 +655,9 @@ class CTFOServer final {
                 for (const OID& o : oids_to_delete) {
                   comments_mutator.Erase(cid, o);
                 }
-                DeleteCardResponse response;
+                ResponseDeleteCard response;
                 response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-                return MakeResponse(response);
+                return MakeResponse(std::move(response));
               }
             } else {
               return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
@@ -796,7 +794,7 @@ class CTFOServer final {
                 c.ms = std::chrono::duration_cast<std::chrono::milliseconds>(comment.us);
                 output_comments.push_back(std::move(c));
               }
-              return MakeResponse(response);
+              return MakeResponse(std::move(response));
             }
           }
         }, std::move(r)).Go();
@@ -804,11 +802,11 @@ class CTFOServer final {
         const std::string requested_url = r.url.ComposeURL();
         const OID oid = RandomOID();
         try {
-          AddCommentRequest request;
+          RequestAddComment request;
           try {
-            request = ParseRequest<AddCommentRequest>(r.body);
+            request = ParseRequest<RequestAddComment>(r.body);
           } catch (const current::TypeSystemParseJSONException&) {
-            const auto short_request = ParseRequest<AddCommentShortRequest>(r.body);
+            const auto short_request = ParseRequest<RequestAddCommentShort>(r.body);
             request.text = short_request.text;
           }
           storage_.ReadWriteTransaction(  // clang-format off
@@ -894,10 +892,10 @@ class CTFOServer final {
                         parent_comment_author_uid, now, NotificationNewReplyToMyComment(comment)));
                   }
 
-                  AddCommentResponse response;
+                  ResponseAddComment response;
                   response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
                   response.oid = OIDToString(oid);
-                  return MakeResponse(response);
+                  return MakeResponse(std::move(response));
                 }
               }, std::move(r)).Go();  // clang-format on
         } catch (const current::TypeSystemParseJSONException&) {
@@ -944,10 +942,10 @@ class CTFOServer final {
                   for (const OID& o : oids_to_delete) {
                     comments_mutator.Erase(cid, o);
                   }
-                  DeleteCommentResponse response;
+                  ResponseDeleteComment response;
                   response.ms =
                       std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
-                  return MakeResponse(response);
+                  return MakeResponse(std::move(response));
                 }
               }, std::move(r)).Go();  // clang-format on
         }

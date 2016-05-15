@@ -58,7 +58,7 @@ CURRENT_STRUCT(ResponseCardEntry) {
   CURRENT_FIELD(number_of_comments, uint32_t, 0u);     // The total number of comments left for this card.
 };
 
-namespace card_response {
+namespace response_card {
 // "My cards" response schema. Yes, it's the same as favorites. -- D.K.
 CURRENT_STRUCT(my_cards) {
   CURRENT_FIELD(ms, std::chrono::milliseconds, 0);       // Server timestamp, milliseconds from epoch.
@@ -75,13 +75,13 @@ CURRENT_STRUCT(created) {
 // Schema for the response of the DELETE request for a card.
 CURRENT_STRUCT(deleted) { CURRENT_FIELD(ms, std::chrono::milliseconds, 0); };
 
-} // namespace card_response
+}  // namespace response_card
 
 // Comments response schema.
 CURRENT_STRUCT(ResponseComment) {
   CURRENT_FIELD(oid, std::string, "oINVALID");  // Comment id, format 'o05XXX...'.
   CURRENT_FIELD(
-                parent_oid, std::string, "");  // Empty string or parent comment id. NOTE: Two levels of comments only.
+      parent_oid, std::string, "");  // Empty string or parent comment id. NOTE: Two levels of comments only.
   CURRENT_FIELD(author_uid, std::string, "uINVALID");  // User id, format 'u01XXX...'.
   CURRENT_FIELD(author_level, uint8_t, 0u);            // Author user level, [0, 9].
   CURRENT_FIELD(text, std::string);                    // Comment text.
@@ -95,7 +95,7 @@ CURRENT_STRUCT(ResponseComment) {
   // TODO(dkorolev): Color?
 };
 
-namespace comment_response {
+namespace response_comment {
 
 CURRENT_STRUCT(comments) {
   CURRENT_FIELD(ms, std::chrono::milliseconds, 0);        // Server timestamp, milliseconds from epoch.
@@ -111,9 +111,9 @@ CURRENT_STRUCT(created) {
 // Schema for the response of the DELETE request for a comment.
 CURRENT_STRUCT(deleted) { CURRENT_FIELD(ms, std::chrono::milliseconds, 0); };
 
-} // namespace comment_response
+}  // namespace response_comment
 
-namespace full_request {
+namespace request_full {
 
 // Schema for the POST request to add a new card.
 CURRENT_STRUCT(card) {
@@ -127,9 +127,9 @@ CURRENT_STRUCT(comment) {
   CURRENT_FIELD(parent_oid, std::string, "");
 };
 
-} // namespace full_request
+}  // namespace request_full
 
-namespace short_request {
+namespace request_short {
 
 // A shortened version of `AddCardRequest`.
 CURRENT_STRUCT(card) {
@@ -141,7 +141,7 @@ CURRENT_STRUCT(comment) {
   CURRENT_FIELD(text, std::string, "");  // Plain text.
 };
 
-} // namespace short_request
+}  // namespace request_short
 
 // TODO(dkorolev): Constraints on comment length when adding them?
 
@@ -157,7 +157,7 @@ CURRENT_STRUCT(ResponseNotification) {
   CURRENT_FIELD(n, uint32_t, 1u);
 };
 
-namespace complex_response {
+namespace response_complex {
 
 // Favorites response schema.
 CURRENT_STRUCT(favs) {
@@ -175,20 +175,20 @@ CURRENT_STRUCT(feed) {
   CURRENT_FIELD(notifications, std::vector<ResponseNotification>);  // Notifications.
 };
 
-} // namespace complex_response
+}  // namespace response_complex
 
-using ResponseFavs = complex_response::favs;
-using ResponseMyCards = card_response::my_cards;
-using AddCardResponse = card_response::created;
-using DeleteCardResponse = card_response::deleted;
-using AddCommentResponse = comment_response::created;
-using DeleteCommentResponse = comment_response::deleted;
-using ResponseComments = comment_response::comments;
-using ResponseFeed = complex_response::feed;
-using AddCardRequest = full_request::card;
-using AddCardShortRequest = short_request::card;
-using AddCommentRequest = full_request::comment;
-using AddCommentShortRequest = short_request::comment;
+using ResponseFavs = response_complex::favs;
+using ResponseMyCards = response_card::my_cards;
+using ResponseAddCard = response_card::created;
+using ResponseDeleteCard = response_card::deleted;
+using ResponseAddComment = response_comment::created;
+using ResponseDeleteComment = response_comment::deleted;
+using ResponseComments = response_comment::comments;
+using ResponseFeed = response_complex::feed;
+using RequestAddCard = request_full::card;
+using RequestAddCardShort = request_short::card;
+using RequestAddComment = request_full::comment;
+using RequestAddCommentShort = request_short::comment;
 
 }  // namespace CTFO
 

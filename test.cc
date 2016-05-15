@@ -79,7 +79,7 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
 }
 
 template <typename T_RESPONSE>
-inline T_RESPONSE ParseResponse(const std::string &source) {
+inline T_RESPONSE ParseResponse(const std::string& source) {
   return Value<T_RESPONSE>(ParseJSON<Variant<T_RESPONSE>, JSONFormat::Minimalistic>(source));
 }
 
@@ -111,7 +111,7 @@ TEST(CTFO, SmokeTest) {
       POST(Printf("http://localhost:%d/ctfo/auth/ios?id=%s&key=%s", FLAGS_api_port, auth_id, auth_key), ""));
   EXPECT_EQ(200, static_cast<int>(auth_http_response.code));
   const auto auth_response = ParseResponse<ResponseFeed>(auth_http_response.body);
-  
+
   EXPECT_EQ(101u, auth_response.ms.count());
   const std::string actual_uid = auth_response.user.uid;
   const std::string actual_token = auth_response.user.token;
@@ -397,7 +397,7 @@ TEST(CTFO, SmokeTest) {
   std::string added_card_cid;
   {
     current::time::SetNow(std::chrono::microseconds(16001 * 1000));
-    AddCardRequest add_card_request;
+    RequestAddCard add_card_request;
     add_card_request.text = "Foo.";
     add_card_request.color.red = 1;
     add_card_request.color.green = 2;
@@ -408,7 +408,7 @@ TEST(CTFO, SmokeTest) {
                                                      actual_token.c_str()),
                                               add_card_request));
     EXPECT_EQ(200, static_cast<int>(post_card_response.code));
-    const auto add_card_response = ParseResponse<AddCardResponse>(post_card_response.body);
+    const auto add_card_response = ParseResponse<ResponseAddCard>(post_card_response.body);
     EXPECT_EQ(16001u, add_card_response.ms.count());
 
     added_card_cid = add_card_response.cid;
@@ -548,7 +548,7 @@ TEST(CTFO, SmokeTest) {
                          actual_token.c_str()),
                   "{\"card\":{\"text\":\"Bar.\",\"color\":{\"red\":100,\"green\":101,\"blue\":102}}}"));
     EXPECT_EQ(200, static_cast<int>(post_card_response.code));
-    const auto add_card_response = ParseResponse<AddCardResponse>(post_card_response.body);
+    const auto add_card_response = ParseResponse<ResponseAddCard>(post_card_response.body);
     EXPECT_EQ(19001u, add_card_response.ms.count());
 
     added_card2_cid = add_card_response.cid;
@@ -583,7 +583,7 @@ TEST(CTFO, SmokeTest) {
                                                      actual_token.c_str()),
                                               "{\"card\":{\"text\":\"Meh.\"}}"));
     EXPECT_EQ(200, static_cast<int>(post_card_response.code));
-    const auto add_card_response = ParseResponse<AddCardResponse>(post_card_response.body);
+    const auto add_card_response = ParseResponse<ResponseAddCard>(post_card_response.body);
     EXPECT_EQ(21001u, add_card_response.ms.count());
 
     added_card3_cid = add_card_response.cid;
@@ -676,7 +676,7 @@ TEST(CTFO, SmokeTest) {
   std::string added_comment_oid;
   {
     current::time::SetNow(std::chrono::microseconds(102001 * 1000));
-    AddCommentRequest add_comment_request;
+    RequestAddComment add_comment_request;
     add_comment_request.text = "Meh.";
     const auto post_comment_response =
         HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
@@ -686,7 +686,7 @@ TEST(CTFO, SmokeTest) {
                          added_card_cid.c_str()),
                   add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-    const auto add_comment_response = ParseResponse<AddCommentResponse>(post_comment_response.body);
+    const auto add_comment_response = ParseResponse<ResponseAddComment>(post_comment_response.body);
     EXPECT_EQ(102001u, add_comment_response.ms.count());
 
     added_comment_oid = add_comment_response.oid;
@@ -774,7 +774,7 @@ TEST(CTFO, SmokeTest) {
   std::string added_second_comment_oid;
   {
     current::time::SetNow(std::chrono::microseconds(105001 * 1000));
-    AddCommentShortRequest add_comment_request;
+    RequestAddCommentShort add_comment_request;
     add_comment_request.text = "Bla.";
     const auto post_comment_response =
         HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
@@ -784,7 +784,7 @@ TEST(CTFO, SmokeTest) {
                          added_card_cid.c_str()),
                   add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-    const auto add_comment_response = ParseResponse<AddCommentResponse>(post_comment_response.body);
+    const auto add_comment_response = ParseResponse<ResponseAddComment>(post_comment_response.body);
     EXPECT_EQ(105001u, add_comment_response.ms.count());
 
     added_second_comment_oid = add_comment_response.oid;
@@ -819,7 +819,7 @@ TEST(CTFO, SmokeTest) {
   std::string added_nested_comment_1_oid;
   {
     current::time::SetNow(std::chrono::microseconds(107001 * 1000));
-    AddCommentRequest add_comment_request;
+    RequestAddComment add_comment_request;
     add_comment_request.text = "for";
     add_comment_request.parent_oid = added_second_comment_oid;
     const auto post_comment_response =
@@ -830,7 +830,7 @@ TEST(CTFO, SmokeTest) {
                          added_card_cid.c_str()),
                   add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-    const auto add_comment_response = ParseResponse<AddCommentResponse>(post_comment_response.body);
+    const auto add_comment_response = ParseResponse<ResponseAddComment>(post_comment_response.body);
     EXPECT_EQ(107001u, add_comment_response.ms.count());
 
     added_nested_comment_1_oid = add_comment_response.oid;
@@ -840,7 +840,7 @@ TEST(CTFO, SmokeTest) {
   std::string added_nested_comment_2_oid;
   {
     current::time::SetNow(std::chrono::microseconds(108001 * 1000));
-    AddCommentRequest add_comment_request;
+    RequestAddComment add_comment_request;
     add_comment_request.text = "real?";
     add_comment_request.parent_oid = added_second_comment_oid;
     const auto post_comment_response =
@@ -851,7 +851,7 @@ TEST(CTFO, SmokeTest) {
                          added_card_cid.c_str()),
                   add_comment_request));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-    const auto add_comment_response = ParseResponse<AddCommentResponse>(post_comment_response.body);
+    const auto add_comment_response = ParseResponse<ResponseAddComment>(post_comment_response.body);
     EXPECT_EQ(108001u, add_comment_response.ms.count());
 
     added_nested_comment_2_oid = add_comment_response.oid;
@@ -940,7 +940,7 @@ TEST(CTFO, SmokeTest) {
   // Attempt to add a 3rd level comment, expecting an error.
   {
     current::time::SetNow(std::chrono::microseconds(110001 * 1000));
-    AddCommentRequest add_comment_request;
+    RequestAddComment add_comment_request;
     add_comment_request.text = "Nah.";
     add_comment_request.parent_oid = added_nested_comment_2_oid;
     const auto post_comment_response =
@@ -957,7 +957,7 @@ TEST(CTFO, SmokeTest) {
   // Attempt to add a 2nd level comment to a non-existing 1st level comment.
   {
     current::time::SetNow(std::chrono::microseconds(110001 * 1000));
-    AddCommentRequest add_comment_request;
+    RequestAddComment add_comment_request;
     add_comment_request.text = "Still nah.";
     add_comment_request.parent_oid = OIDToString(RandomOID());
     const auto post_comment_response =
@@ -1124,7 +1124,7 @@ TEST(CTFO, SmokeTest) {
                            added_card_cid.c_str(),
                            added_comment_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
-    const auto payload = ParseResponse<DeleteCommentResponse>(delete_comment_response.body);
+    const auto payload = ParseResponse<ResponseDeleteComment>(delete_comment_response.body);
     EXPECT_EQ(600001u, payload.ms.count());
 
     EXPECT_EQ(
@@ -1173,7 +1173,7 @@ TEST(CTFO, SmokeTest) {
                            added_card_cid.c_str(),
                            added_nested_comment_2_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
-    const auto payload = ParseResponse<DeleteCommentResponse>(delete_comment_response.body);
+    const auto payload = ParseResponse<ResponseDeleteComment>(delete_comment_response.body);
     EXPECT_EQ(112001u, payload.ms.count());
 
     EXPECT_EQ(
@@ -1203,7 +1203,7 @@ TEST(CTFO, SmokeTest) {
     std::string comment_to_be_notified_about_oid;
     {
       current::time::SetNow(std::chrono::microseconds(112002 * 1000));
-      AddCommentRequest add_comment_request;
+      RequestAddComment add_comment_request;
       add_comment_request.text = "Ding!";
       const auto post_comment_response =
           HTTP(POST(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s",
@@ -1213,7 +1213,7 @@ TEST(CTFO, SmokeTest) {
                            added_card_cid.c_str()),
                     add_comment_request));
       EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
-      const auto add_comment_response = ParseResponse<AddCommentResponse>(post_comment_response.body);
+      const auto add_comment_response = ParseResponse<ResponseAddComment>(post_comment_response.body);
 
       comment_to_be_notified_about_oid = add_comment_response.oid;
     }
@@ -1248,7 +1248,7 @@ TEST(CTFO, SmokeTest) {
                              added_card_cid.c_str(),
                              comment_to_be_notified_about_oid.c_str())));
       EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
-      ParseResponse<DeleteCommentResponse>(delete_comment_response.body);
+      ParseResponse<ResponseDeleteComment>(delete_comment_response.body);
     }
   }
 
@@ -1264,7 +1264,7 @@ TEST(CTFO, SmokeTest) {
                            added_card_cid.c_str(),
                            added_second_comment_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
-    const auto payload = ParseResponse<DeleteCommentResponse>(delete_comment_response.body);
+    const auto payload = ParseResponse<ResponseDeleteComment>(delete_comment_response.body);
     EXPECT_EQ(601001u, payload.ms.count());
 
     EXPECT_EQ(
@@ -1305,7 +1305,7 @@ TEST(CTFO, SmokeTest) {
                                                          actual_token.c_str(),
                                                          added_card_cid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_card_response.code));
-    const auto payload = ParseResponse<DeleteCardResponse>(delete_card_response.body);
+    const auto payload = ParseResponse<ResponseDeleteCard>(delete_card_response.body);
     EXPECT_EQ(602001u, payload.ms.count());
 
     EXPECT_EQ(
