@@ -60,22 +60,26 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
   current::FileSystem::ScopedRmFile scoped_rm_log_file(log_file);
 #endif
 
+  current::time::ResetToZero();
   current::time::SetNow(std::chrono::microseconds(1000));
   current::random::SetRandomSeed(42);
 
-  return std::make_unique<CTFOServer>(FLAGS_cards_file,
-                                      FLAGS_api_port,
-                                      db_file,
-                                      FLAGS_event_log_port,
-                                      log_file,
-                                      std::chrono::milliseconds(100)
+  auto server = std::make_unique<CTFOServer>(FLAGS_cards_file,
+                                             FLAGS_api_port,
+                                             db_file,
+                                             FLAGS_event_log_port,
+                                             log_file,
+                                             std::chrono::milliseconds(100)
 #ifdef CTFO_DEBUG
-                                      // clang-format off
-                                 ,
-                                 true  // Debug print.
+                                             // clang-format off
+                                             ,
+                                             true  // Debug print.
 #endif
-                                      // clang-format on
-                                      );
+                                             // clang-format on
+                                             );
+
+  current::time::SetNow(std::chrono::microseconds(1001));
+  return server;
 }
 
 template <typename T_RESPONSE>
