@@ -27,17 +27,17 @@ SOFTWARE.
 #include <cassert>
 #include <fstream>
 
-#include "new_schema.h"
-#include "new_storage.h"
+#include "../schema.h"
+#include "../storage.h"
 
 #include "../../Current/Bricks/dflags/dflags.h"
 
-DEFINE_string(output, "new_db.json", "The name of the output DB file to generate.");
+DEFINE_string(output, "db.json", "The name of the output DB file to generate.");
 
 int main(int argc, char** argv) {
   ParseDFlags(&argc, &argv);
 
-  using DB = NewCTFO<SherlockStreamPersister>;
+  using DB = CTFOStorage<SherlockStreamPersister>;
   DB db(FLAGS_output);
 
   current::storage::TransactionResult<bool> result =
@@ -52,16 +52,16 @@ int main(int argc, char** argv) {
 
   if (Value(result)) {
     db.ReadWriteTransaction([](MutableFields<DB> fields) {
-      new_ctfo::User user;
-      user.uid = static_cast<UID>(42);
+      CTFO::User user;
+      user.uid = static_cast<CTFO::UID>(42);
       user.level = 1;
       user.score = 9001;
       fields.user.Add(user);
     }).Go();
 
     db.ReadWriteTransaction([](MutableFields<DB> fields) {
-      new_ctfo::Card card;
-      card.cid = static_cast<CID>(42);
+      CTFO::Card card;
+      card.cid = static_cast<CTFO::CID>(42);
       card.text = "В лесу родилась ёлочка";
       card.color.green = 0xff;
       card.tfu_count = 987654321;
@@ -69,9 +69,9 @@ int main(int argc, char** argv) {
     }).Go();
 
     db.ReadWriteTransaction([](MutableFields<DB> fields) {
-      new_ctfo::Notification notification;
-      new_ctfo::NotificationMyCardNewComment new_comment;
-      notification.uid = static_cast<UID>(42);
+      CTFO::Notification notification;
+      CTFO::NotificationMyCardNewComment new_comment;
+      notification.uid = static_cast<CTFO::UID>(42);
       notification.timestamp = std::chrono::microseconds(100000ull);
       notification.notification = new_comment;
       fields.notification.Add(notification);

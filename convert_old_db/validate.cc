@@ -25,17 +25,17 @@ SOFTWARE.
 #include <cassert>
 #include <fstream>
 
-#include "new_storage.h"
+#include "../storage.h"
 
 #include "../../Current/Bricks/dflags/dflags.h"
 
-DEFINE_string(db, "new_db.json", "The name of the input DB to print the stats for.");
+DEFINE_string(db, "db.json", "The name of the input DB to print the stats for.");
 
 int main(int argc, char** argv) {
   ParseDFlags(&argc, &argv);
 
   std::cerr << "Replaying " << FLAGS_db << std::endl;
-  using DB = NewCTFO<SherlockStreamPersister>;
+  using DB = CTFOStorage<SherlockStreamPersister>;
   DB db(FLAGS_db);
   std::cerr << "Replay done." << std::endl;
 
