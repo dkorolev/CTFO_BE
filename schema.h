@@ -513,15 +513,16 @@ struct ResponseNotificationBuilder {
   }
 };
 
-CURRENT_STRUCT(Notification) {
+namespace notification {
+
+CURRENT_STRUCT(data) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
   CURRENT_USE_FIELD_AS_ROW(uid);
   CURRENT_FIELD(timestamp, std::chrono::microseconds, 0);
   CURRENT_USE_FIELD_AS_COL(timestamp);
   CURRENT_FIELD(notification, T_NOTIFICATIONS_VARIANT);
-  CURRENT_DEFAULT_CONSTRUCTOR(Notification) {}
-  CURRENT_CONSTRUCTOR(Notification)(
-      UID uid, std::chrono::microseconds ms, T_NOTIFICATIONS_VARIANT && notification)
+  CURRENT_DEFAULT_CONSTRUCTOR(data) {}
+  CURRENT_CONSTRUCTOR(data)(UID uid, std::chrono::microseconds ms, T_NOTIFICATIONS_VARIANT && notification)
       : uid(uid), timestamp(ms), notification(std::move(notification)) {}
 
   ResponseNotification BuildResponseNotification() const {
@@ -537,6 +538,10 @@ CURRENT_STRUCT(Notification) {
     return getter.cid;
   }
 };
+
+}  // namespace notification
+
+using Notification = notification::data;
 
 }  // namespace CTFO
 

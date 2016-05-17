@@ -1413,22 +1413,24 @@ TEST(CTFO, NotificationsSerializeWell) {
   const OID oid = static_cast<OID>(3);
   const Notification notification(
       me, std::chrono::microseconds(12345000ull), NotificationMyCardNewComment(uid, cid, oid, "foo"));
-  const std::string user_facing_json = JSON(notification.BuildResponseNotification());
+  const std::string user_facing_json =
+      JSON<JSONFormat::Minimalistic>(Variant<ResponseNotification>(notification.BuildResponseNotification()));
   EXPECT_EQ(
       "{\"data\":{\"nid\":\"n05000000000012345000\",\"type\":\"MyCardNewComment\",\"ms\":12345,\"uid\":"
       "\"u00000000000000000001\",\"cid\":\"c00000000000000000002\",\"oid\":\"o00000000000000000003\",\"text\":"
       "\"foo\",\"card\":{\"cid\":\"cINVALID\",\"author_uid\":\"uINVALID\",\"text\":\"\",\"ms\":0,"
-      "\"color\":{\"red\":0,\"green\":0,\"blue\":0},\"relevance\":0,\"ctfo_score\":0,\"tfu_score\":0,\"ctfo_"
+      "\"color\":{\"red\":0,\"green\":0,\"blue\":0},\"relevance\":0.0,\"ctfo_score\":0,\"tfu_score\":0,\"ctfo_"
       "count\":0,\"tfu_count\":0,\"skip_count\":0,\"vote\":\"\",\"favorited\":false,\"is_my_card\":false,"
       "\"number_of_comments\":0},\"n\":1}}",
       user_facing_json);
-  const std::string stream_stored_json = JSON(notification);
+  const std::string stream_stored_json = JSON<JSONFormat::Minimalistic>(Variant<Notification>(notification));
   EXPECT_EQ(
-      "{\"data\":{\"uid\":42,\"timestamp\":{\"ms\":12345},\"notification\":{\"polymorphic_id\":2147483649,"
-      "\"polymorphic_name\":\"NotificationMyCardNewComment\",\"ptr_wrapper\":{\"id\":2147483649,\"data\":{"
-      "\"uid\":1,\"cid\":2,\"oid\":3,\"text\":\"foo\"}}}}}",
+      "{\"data\":{\"uid\":42,\"timestamp\":12345000,\"notification\":{\"NotificationMyCardNewComment\":{"
+      "\"uid\":1,\"cid\":2,\"oid\":3,\"text\":\"foo\"}}}}",
       stream_stored_json);
-  EXPECT_EQ(stream_stored_json, JSON(ParseJSON<Notification>(stream_stored_json)));
+  EXPECT_EQ(
+      stream_stored_json,
+      JSON<JSONFormat::Minimalistic>(Variant<Notification>(ParseResponse<Notification>(stream_stored_json))));
 }
 
 // TODO(dkorolev): Test the remaining notification types.

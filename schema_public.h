@@ -145,7 +145,9 @@ CURRENT_STRUCT(comment) {
 
 // TODO(dkorolev): Constraints on comment length when adding them?
 
-CURRENT_STRUCT(ResponseNotification) {
+namespace response_notification {
+
+CURRENT_STRUCT(data) {
   CURRENT_FIELD(nid, std::string, "");
   CURRENT_FIELD(type, std::string, "");
   CURRENT_FIELD(ms, std::chrono::milliseconds, 0);
@@ -156,6 +158,8 @@ CURRENT_STRUCT(ResponseNotification) {
   CURRENT_FIELD(card, ResponseCardEntry);
   CURRENT_FIELD(n, uint32_t, 1u);
 };
+
+}  // namespace response_notification
 
 namespace response_complex {
 
@@ -172,7 +176,7 @@ CURRENT_STRUCT(feed) {
   CURRENT_FIELD(user, ResponseUserEntry);                      // User information.
   CURRENT_FIELD(feed_hot, std::vector<ResponseCardEntry>);     // "Hot" cards feeds.
   CURRENT_FIELD(feed_recent, std::vector<ResponseCardEntry>);  // "Recent" cards feeds.
-  CURRENT_FIELD(notifications, std::vector<ResponseNotification>);  // Notifications.
+  CURRENT_FIELD(notifications, std::vector<response_notification::data>);  // Notifications.
 };
 
 }  // namespace response_complex
@@ -184,6 +188,7 @@ using ResponseDeleteCard = response_card::deleted;
 using ResponseAddComment = response_comment::created;
 using ResponseDeleteComment = response_comment::deleted;
 using ResponseComments = response_comment::comments;
+using ResponseNotification = response_notification::data;
 using ResponseFeed = response_complex::feed;
 using RequestAddCard = request_full::card;
 using RequestAddCardShort = request_short::card;
