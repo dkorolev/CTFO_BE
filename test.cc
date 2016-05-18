@@ -32,14 +32,15 @@ SOFTWARE.
 
 #include "../Current/Bricks/dflags/dflags.h"
 #include "../Current/3rdparty/gtest/gtest-main-with-dflags.h"
+#include "../Current/Midichlorians/Server/schema.h"
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(api_port, 8383, "Port to spawn CTFO RESTful server on.");
-DEFINE_int32(event_log_port, 8384, "Port to spawn event collector on.");
+DEFINE_int32(midichlorians_port, 8384, "Port to spawn midichlorians server on.");
 
 using namespace CTFO;
 using namespace current::midichlorians::ios;
-using events_variant_t = Variant<ios_events_t>;
+using namespace current::midichlorians::server;
 
 // Uncomment the following line to have the unit test dump debug information to console.
 // #define CTFO_DEBUG
@@ -47,17 +48,12 @@ using events_variant_t = Variant<ios_events_t>;
 std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
 #ifdef CTFO_DEBUG
   const std::string db_file = "unittest-db-" + suffix + ".log";
-  const std::string log_file = "unittest-log-" + suffix + ".log";
   current::FileSystem::RmFile(db_file, current::FileSystem::RmFileParameters::Silent);
-  current::FileSystem::RmFile(log_file, current::FileSystem::RmFileParameters::Silent);
 #else
   static_cast<void>(suffix);
 
   const std::string db_file = current::FileSystem::GenTmpFileName();
   current::FileSystem::ScopedRmFile scoped_rm_db_file(db_file);
-
-  const std::string log_file = current::FileSystem::GenTmpFileName();
-  current::FileSystem::ScopedRmFile scoped_rm_log_file(log_file);
 #endif
 
   current::time::ResetToZero();
@@ -67,8 +63,7 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
   auto server = std::make_unique<CTFOServer>(FLAGS_cards_file,
                                              FLAGS_api_port,
                                              db_file,
-                                             FLAGS_event_log_port,
-                                             log_file,
+                                             FLAGS_midichlorians_port,
                                              std::chrono::milliseconds(100)
 #ifdef CTFO_DEBUG
                                              // clang-format off
@@ -231,15 +226,15 @@ TEST(CTFO, SmokeTest) {
     favorite_event.fields["uid"] = actual_uid;
     favorite_event.fields["cid"] = cid1;
     favorite_event.fields["token"] = actual_token;
-    const auto post_favorite_response_1 =
-        HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port), favorite_event));
+    const auto post_favorite_response_1 = HTTP(POST(
+        Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port), JSON(ios_variant_t(favorite_event))));
     EXPECT_EQ(200, static_cast<int>(post_favorite_response_1.code));
     EXPECT_EQ("OK\n", post_favorite_response_1.body);
 
     current::time::SetNow(std::chrono::microseconds(10002 * 1000));
     favorite_event.fields["cid"] = cid2;
-    const auto post_favorite_response_2 =
-        HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port), favorite_event));
+    const auto post_favorite_response_2 = HTTP(POST(
+        Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port), JSON(ios_variant_t(favorite_event))));
     EXPECT_EQ(200, static_cast<int>(post_favorite_response_2.code));
     EXPECT_EQ("OK\n", post_favorite_response_2.body);
   }
@@ -279,8 +274,8 @@ TEST(CTFO, SmokeTest) {
   {
     current::time::SetNow(std::chrono::microseconds(10004 * 1000));
     favorite_event.fields["cid"] = CIDToString(static_cast<CID>(987654321));  // A non-existent ID.
-    const auto post_favorite_response_3 =
-        HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port), favorite_event));
+    const auto post_favorite_response_3 = HTTP(POST(
+        Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port), JSON(ios_variant_t(favorite_event))));
     EXPECT_EQ(200, static_cast<int>(post_favorite_response_3.code));
     EXPECT_EQ("OK\n", post_favorite_response_3.body);
   }
@@ -306,8 +301,8 @@ TEST(CTFO, SmokeTest) {
     current::time::SetNow(std::chrono::microseconds(12001 * 1000));
     favorite_event.event = "UNFAV";
     favorite_event.fields["cid"] = cid1;
-    const auto post_unfavorite_response =
-        HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port), favorite_event));
+    const auto post_unfavorite_response = HTTP(POST(
+        Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port), JSON(ios_variant_t(favorite_event))));
     EXPECT_EQ(200, static_cast<int>(post_unfavorite_response.code));
     EXPECT_EQ("OK\n", post_unfavorite_response.body);
   }
@@ -339,8 +334,8 @@ TEST(CTFO, SmokeTest) {
     ctfo_event.fields["uid"] = actual_uid;
     ctfo_event.fields["cid"] = cid2;
     ctfo_event.fields["token"] = actual_token;
-    const auto post_ctfo_response =
-        HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port), ctfo_event));
+    const auto post_ctfo_response = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port),
+                                              JSON(ios_variant_t(std::move(ctfo_event)))));
     EXPECT_EQ(200, static_cast<int>(post_ctfo_response.code));
     EXPECT_EQ("OK\n", post_ctfo_response.body);
   }
@@ -372,8 +367,8 @@ TEST(CTFO, SmokeTest) {
     ctfo_event.fields["uid"] = actual_uid;
     ctfo_event.fields["cid"] = cid2;
     ctfo_event.fields["token"] = actual_token;
-    const auto post_ctfo_response =
-        HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port), ctfo_event));
+    const auto post_ctfo_response = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port),
+                                              JSON(ios_variant_t(std::move(ctfo_event)))));
     EXPECT_EQ(200, static_cast<int>(post_ctfo_response.code));
     EXPECT_EQ("OK\n", post_ctfo_response.body);
   }
@@ -982,8 +977,8 @@ TEST(CTFO, SmokeTest) {
     like_comment_event.fields["uid"] = actual_uid;
     like_comment_event.fields["token"] = actual_token;
     like_comment_event.fields["oid"] = added_nested_comment_1_oid;
-    const auto reponse =
-        HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port), like_comment_event));
+    const auto reponse = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port),
+                                   JSON(ios_variant_t(std::move(like_comment_event)))));
     EXPECT_EQ(200, static_cast<int>(reponse.code));
     EXPECT_EQ("OK\n", reponse.body);
   }
@@ -1030,8 +1025,8 @@ TEST(CTFO, SmokeTest) {
     unlike_comment_event.fields["uid"] = actual_uid;
     unlike_comment_event.fields["token"] = actual_token;
     unlike_comment_event.fields["oid"] = added_nested_comment_1_oid;
-    const auto reponse =
-        HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port), unlike_comment_event));
+    const auto reponse = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port),
+                                   JSON(ios_variant_t(std::move(unlike_comment_event)))));
     EXPECT_EQ(200, static_cast<int>(reponse.code));
     EXPECT_EQ("OK\n", reponse.body);
   }
@@ -1078,8 +1073,8 @@ TEST(CTFO, SmokeTest) {
     flag_comment_event.fields["uid"] = actual_uid;
     flag_comment_event.fields["token"] = actual_token;
     flag_comment_event.fields["oid"] = added_nested_comment_1_oid;
-    const auto reponse =
-        HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port), flag_comment_event));
+    const auto reponse = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port),
+                                   JSON(ios_variant_t(std::move(flag_comment_event)))));
     EXPECT_EQ(200, static_cast<int>(reponse.code));
     EXPECT_EQ("OK\n", reponse.body);
   }
@@ -1351,8 +1346,8 @@ TEST(CTFO, SmokeTest) {
     flag_card_event.fields["uid"] = actual_uid;
     flag_card_event.fields["token"] = actual_token;
     flag_card_event.fields["cid"] = added_card3_cid;
-    const auto reponse =
-        HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_event_log_port), flag_card_event));
+    const auto reponse = HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port),
+                                   JSON(ios_variant_t(std::move(flag_card_event)))));
     EXPECT_EQ(200, static_cast<int>(reponse.code));
     EXPECT_EQ("OK\n", reponse.body);
   }
