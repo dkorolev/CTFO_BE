@@ -496,6 +496,7 @@ TEST(CTFO, SmokeTest) {
     }
 
     // Restore the time back.
+    current::time::ResetToZero();
     current::time::SetNow(std::chrono::microseconds(16001 * 1000));
   }
 
@@ -972,6 +973,7 @@ TEST(CTFO, SmokeTest) {
 
   // Like the comment.
   {
+    current::time::SetNow(std::chrono::microseconds(110002 * 1000));
     iOSGenericEvent like_comment_event;
     like_comment_event.event = "LIKE_COMMENT";
     like_comment_event.fields["uid"] = actual_uid;
@@ -985,6 +987,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the comment got liked.
   {
+    current::time::SetNow(std::chrono::microseconds(110003 * 1000));
     const auto comments = ParseResponse<ResponseComments>(
                               HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                                               FLAGS_api_port,
@@ -1020,6 +1023,7 @@ TEST(CTFO, SmokeTest) {
 
   // Unlike the comment.
   {
+    current::time::SetNow(std::chrono::microseconds(110004 * 1000));
     iOSGenericEvent unlike_comment_event;
     unlike_comment_event.event = "UNLIKE_COMMENT";
     unlike_comment_event.fields["uid"] = actual_uid;
@@ -1033,6 +1037,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the comment got unliked.
   {
+    current::time::SetNow(std::chrono::microseconds(110005 * 1000));
     const auto comments = ParseResponse<ResponseComments>(
                               HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                                               FLAGS_api_port,
@@ -1068,6 +1073,7 @@ TEST(CTFO, SmokeTest) {
 
   // Flag the comment.
   {
+    current::time::SetNow(std::chrono::microseconds(110006 * 1000));
     iOSGenericEvent flag_comment_event;
     flag_comment_event.event = "FLAG_COMMENT";
     flag_comment_event.fields["uid"] = actual_uid;
@@ -1081,6 +1087,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the flagged comment has the corresponding flag in the response.
   {
+    current::time::SetNow(std::chrono::microseconds(110007 * 1000));
     const auto comments = ParseResponse<ResponseComments>(
                               HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                                               FLAGS_api_port,
@@ -1163,7 +1170,7 @@ TEST(CTFO, SmokeTest) {
   // Delete one of two second-level comments, and confirm that
   // the number of comments goes down from 3 to 2.
   {
-    current::time::SetNow(std::chrono::microseconds(112001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(600002 * 1000));
     const auto delete_comment_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
                            FLAGS_api_port,
@@ -1173,7 +1180,7 @@ TEST(CTFO, SmokeTest) {
                            added_nested_comment_2_oid.c_str())));
     EXPECT_EQ(200, static_cast<int>(delete_comment_response.code));
     const auto payload = ParseResponse<ResponseDeleteComment>(delete_comment_response.body);
-    EXPECT_EQ(112001u, payload.ms.count());
+    EXPECT_EQ(600002u, payload.ms.count());
 
     EXPECT_EQ(
         2u,
@@ -1201,7 +1208,7 @@ TEST(CTFO, SmokeTest) {
     // Add a comment to generate a notification.
     std::string comment_to_be_notified_about_oid;
     {
-      current::time::SetNow(std::chrono::microseconds(112002 * 1000));
+      current::time::SetNow(std::chrono::microseconds(600003 * 1000));
       RequestAddComment add_comment_request;
       add_comment_request.text = "Ding!";
       const auto post_comment_response =
@@ -1218,7 +1225,7 @@ TEST(CTFO, SmokeTest) {
     }
     // Should be one notification.
     {
-      current::time::SetNow(std::chrono::microseconds(112003 * 1000));
+      current::time::SetNow(std::chrono::microseconds(600004 * 1000));
       const auto feed_http_response =
           HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&notifications_since=0",
                           FLAGS_api_port,
@@ -1234,8 +1241,8 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ(comment_to_be_notified_about_oid, feed_response.notifications[0].oid);
       EXPECT_EQ("Ding!", feed_response.notifications[0].text);
       EXPECT_EQ(1u, feed_response.notifications[0].n);
-      EXPECT_EQ("n05000000000112002000", feed_response.notifications[0].nid);
-      EXPECT_EQ(112002u, feed_response.notifications[0].ms.count());
+      EXPECT_EQ("n05000000000600003000", feed_response.notifications[0].nid);
+      EXPECT_EQ(600003u, feed_response.notifications[0].ms.count());
     }
     // Delete that comment.
     {
