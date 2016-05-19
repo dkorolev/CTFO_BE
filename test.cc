@@ -405,7 +405,7 @@ TEST(CTFO, SmokeTest) {
                                                      FLAGS_api_port,
                                                      actual_uid.c_str(),
                                                      actual_token.c_str()),
-                                              add_card_request));
+                                              JSON(Variant<RequestAddCard>(std::move(add_card_request)))));
     EXPECT_EQ(200, static_cast<int>(post_card_response.code));
     const auto add_card_response = ParseResponse<ResponseAddCard>(post_card_response.body);
     EXPECT_EQ(16001u, add_card_response.ms.count());
@@ -684,7 +684,7 @@ TEST(CTFO, SmokeTest) {
                          actual_uid.c_str(),
                          actual_token.c_str(),
                          added_card_cid.c_str()),
-                  add_comment_request));
+                  JSON(Variant<RequestAddComment>(std::move(add_comment_request)))));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
     const auto add_comment_response = ParseResponse<ResponseAddComment>(post_comment_response.body);
     EXPECT_EQ(102001u, add_comment_response.ms.count());
@@ -782,7 +782,7 @@ TEST(CTFO, SmokeTest) {
                          actual_uid.c_str(),
                          actual_token.c_str(),
                          added_card_cid.c_str()),
-                  add_comment_request));
+                  JSON(Variant<RequestAddCommentShort>(std::move(add_comment_request)))));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
     const auto add_comment_response = ParseResponse<ResponseAddComment>(post_comment_response.body);
     EXPECT_EQ(105001u, add_comment_response.ms.count());
@@ -828,7 +828,7 @@ TEST(CTFO, SmokeTest) {
                          actual_uid.c_str(),
                          actual_token.c_str(),
                          added_card_cid.c_str()),
-                  add_comment_request));
+                  JSON(Variant<RequestAddComment>(std::move(add_comment_request)))));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
     const auto add_comment_response = ParseResponse<ResponseAddComment>(post_comment_response.body);
     EXPECT_EQ(107001u, add_comment_response.ms.count());
@@ -849,7 +849,7 @@ TEST(CTFO, SmokeTest) {
                          actual_uid.c_str(),
                          actual_token.c_str(),
                          added_card_cid.c_str()),
-                  add_comment_request));
+                  JSON(Variant<RequestAddComment>(std::move(add_comment_request)))));
     EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
     const auto add_comment_response = ParseResponse<ResponseAddComment>(post_comment_response.body);
     EXPECT_EQ(108001u, add_comment_response.ms.count());
@@ -949,7 +949,7 @@ TEST(CTFO, SmokeTest) {
                          actual_uid.c_str(),
                          actual_token.c_str(),
                          added_card_cid.c_str()),
-                  add_comment_request));
+                  JSON(Variant<RequestAddComment>(std::move(add_comment_request)))));
     EXPECT_EQ(400, static_cast<int>(post_comment_response.code));
     EXPECT_EQ("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n", post_comment_response.body);
   }
@@ -966,7 +966,7 @@ TEST(CTFO, SmokeTest) {
                          actual_uid.c_str(),
                          actual_token.c_str(),
                          added_card_cid.c_str()),
-                  add_comment_request));
+                  JSON(Variant<RequestAddComment>(std::move(add_comment_request)))));
     EXPECT_EQ(400, static_cast<int>(post_comment_response.code));
     EXPECT_EQ("NEED EMPTY OR VALID PARENT_OID\n", post_comment_response.body);
   }
@@ -1217,7 +1217,7 @@ TEST(CTFO, SmokeTest) {
                            another_actual_uid.c_str(),
                            another_actual_token.c_str(),
                            added_card_cid.c_str()),
-                    add_comment_request));
+                    JSON(Variant<RequestAddComment>(std::move(add_comment_request)))));
       EXPECT_EQ(200, static_cast<int>(post_comment_response.code));
       const auto add_comment_response = ParseResponse<ResponseAddComment>(post_comment_response.body);
 
