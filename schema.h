@@ -169,7 +169,7 @@ CURRENT_STRUCT(User) {
   CURRENT_FIELD(level, uint8_t, 0u);   // User level [0, 9].
   CURRENT_FIELD(score, uint64_t, 0u);  // User score.
 
-  CURRENT_DEFAULT_CONSTRUCTOR(User) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(User) : us(current::time::Now()) {}
 
   void InitializeOwnKey() {}
 };
@@ -234,9 +234,9 @@ CURRENT_STRUCT(Card) {
   CURRENT_FIELD(skip_count, uint32_t, 0u);    // Number of users, who said "SKIP" on this card.
   CURRENT_FIELD(startup_index, double, 0.0);  // Cards with `startup_index != 0` will be on the top.
 
-  CURRENT_DEFAULT_CONSTRUCTOR(Card) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(Card) : us(current::time::Now()) {}
   CURRENT_CONSTRUCTOR(Card)(CID cid, const std::string& text, const Color& color)
-      : cid(cid), text(text), color(color) {}
+      : cid(cid), us(current::time::Now()), text(text), color(color) {}
 
   void InitializeOwnKey() {}
 };
@@ -248,8 +248,8 @@ CURRENT_STRUCT(AuthorCard) {
   CURRENT_USE_FIELD_AS_COL(cid);
   CURRENT_FIELD(us, std::chrono::microseconds, 0);
 
-  CURRENT_DEFAULT_CONSTRUCTOR(AuthorCard) {}
-  CURRENT_CONSTRUCTOR(AuthorCard)(UID uid, CID cid) : uid(uid), cid(cid) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(AuthorCard) : us(current::time::Now()) {}
+  CURRENT_CONSTRUCTOR(AuthorCard)(UID uid, CID cid) : uid(uid), cid(cid), us(current::time::Now()) {}
 };
 
 CURRENT_STRUCT(Answer) {
@@ -271,9 +271,9 @@ CURRENT_STRUCT(Favorite) {
   CURRENT_FIELD(us, std::chrono::microseconds, 0);
   CURRENT_FIELD(favorited, bool, false);
 
-  CURRENT_DEFAULT_CONSTRUCTOR(Favorite) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(Favorite) : us(current::time::Now()) {}
   CURRENT_CONSTRUCTOR(Favorite)(const UID uid, const CID cid, bool favorited = false)
-      : uid(uid), cid(cid), favorited(favorited) {}
+      : uid(uid), cid(cid), us(current::time::Now()), favorited(favorited) {}
 };
 
 CURRENT_STRUCT(Comment) {
@@ -288,10 +288,15 @@ CURRENT_STRUCT(Comment) {
   CURRENT_FIELD(author_uid, UID, UID::INVALID_USER);
   CURRENT_FIELD(text, std::string, "");
 
-  CURRENT_DEFAULT_CONSTRUCTOR(Comment) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(Comment) : us(current::time::Now()) {}
   CURRENT_CONSTRUCTOR(Comment)(
       const CID cid, const OID oid, const OID parent_oid, const UID author_uid, const std::string& text)
-      : cid(cid), oid(oid), parent_oid(parent_oid), author_uid(author_uid), text(text) {}
+      : cid(cid),
+        oid(oid),
+        us(current::time::Now()),
+        parent_oid(parent_oid),
+        author_uid(author_uid),
+        text(text) {}
 };
 
 CURRENT_STRUCT(CommentLike) {
@@ -521,7 +526,7 @@ CURRENT_STRUCT(data) {
   CURRENT_FIELD(timestamp, std::chrono::microseconds, 0);
   CURRENT_USE_FIELD_AS_COL(timestamp);
   CURRENT_FIELD(notification, T_NOTIFICATIONS_VARIANT);
-  CURRENT_DEFAULT_CONSTRUCTOR(data) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(data) : timestamp(current::time::Now()) {}
   CURRENT_CONSTRUCTOR(data)(UID uid, std::chrono::microseconds ms, T_NOTIFICATIONS_VARIANT && notification)
       : uid(uid), timestamp(ms), notification(std::move(notification)) {}
 
