@@ -33,6 +33,9 @@ DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(port, 8383, "Port to spawn CTFO RESTful server on.");
 DEFINE_string(storage_file, "./db.json", "The file to store the snapshot of the database in.");
 DEFINE_int32(midichlorians_port, 0, "Port to spawn midichlorians server on.");  // 0 = the same as `port`.
+DEFINE_string(midichlorians_file,
+              "./ctfo_events.log",
+              "Log file to store events received by midichlorians server");
 DEFINE_int32(rand_seed, 42, "The answer to the question of life, universe and everything.");
 DEFINE_int32(tick_interval_ms, 5 * 60 * 1000, "Maximum interval between event entries.");
 DEFINE_bool(debug_print, true, "Print debug info to stderr.");
@@ -44,6 +47,7 @@ int main(int argc, char **argv) {
              FLAGS_port,
              FLAGS_storage_file,
              FLAGS_midichlorians_port,
+             FLAGS_midichlorians_file,
              std::chrono::milliseconds(FLAGS_tick_interval_ms),
              FLAGS_debug_print).Join();
 }

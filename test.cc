@@ -48,12 +48,17 @@ using namespace current::midichlorians::server;
 std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
 #ifdef CTFO_DEBUG
   const std::string db_file = "unittest-db-" + suffix + ".log";
+  const std::string log_file = "unittest-log-" + suffix + ".log";
   current::FileSystem::RmFile(db_file, current::FileSystem::RmFileParameters::Silent);
+  current::FileSystem::RmFile(log_file, current::FileSystem::RmFileParameters::Silent);
 #else
   static_cast<void>(suffix);
 
   const std::string db_file = current::FileSystem::GenTmpFileName();
   current::FileSystem::ScopedRmFile scoped_rm_db_file(db_file);
+
+  const std::string log_file = current::FileSystem::GenTmpFileName();
+  current::FileSystem::ScopedRmFile scoped_rm_log_file(log_file);
 #endif
 
   current::time::ResetToZero();
@@ -64,6 +69,7 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
                                              FLAGS_api_port,
                                              db_file,
                                              FLAGS_midichlorians_port,
+                                             log_file,
                                              std::chrono::milliseconds(100)
 #ifdef CTFO_DEBUG
                                              // clang-format off

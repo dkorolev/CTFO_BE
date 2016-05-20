@@ -63,6 +63,7 @@ class CTFOServer final {
                       int port,
                       const std::string& storage_file,
                       int midichlorians_port,
+                      const std::string& midichlorians_file,
                       const std::chrono::milliseconds tick_interval_ms,
                       const bool debug_print_to_stderr = false)
       : port_(port),
@@ -70,6 +71,7 @@ class CTFOServer final {
             midichlorians_port ? midichlorians_port : port, *this, tick_interval_ms, "/ctfo/log", "OK\n"),
         debug_print_(debug_print_to_stderr),
         storage_(storage_file) {
+    midichlorians_stream_.open(midichlorians_file, std::ofstream::out | std::ofstream::app);
     std::ifstream cf(cards_file);
     assert(cf.good());
     storage_.ReadWriteTransaction([&cf](MutableFields<Storage> data) {
@@ -117,7 +119,10 @@ class CTFOServer final {
 
   void operator()(const current::midichlorians::server::TickLogEntry&) {}
 
-  void operator()(const current::midichlorians::server::EventLogEntry& e) { e.event.Call(*this); }
+  void operator()(const current::midichlorians::server::EventLogEntry& e) {
+    midichlorians_stream_ << JSON(e) << std::endl;
+    e.event.Call(*this);
+  }
 
   void operator()(const current::midichlorians::ios::iOSGenericEvent& event) { UpdateStateOnEvent(event); }
 
@@ -962,6 +967,7 @@ class CTFOServer final {
 
  private:
   const int port_;
+  std::ofstream midichlorians_stream_;
   MidichloriansServer midichlorians_server_;
   const bool debug_print_;
 
