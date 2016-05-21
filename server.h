@@ -140,7 +140,7 @@ class CTFOServer final {
 
   template <typename T_RESPONSE>
   Response MakeResponse(T_RESPONSE&& r) {
-    return Response(Variant<T_RESPONSE>(std::forward<T_RESPONSE>(r)));
+    return Response(JSON<JSONFormat::Minimalistic>(Variant<T_RESPONSE>(std::forward<T_RESPONSE>(r))));
   }
 
   void RouteAuthiOS(Request r) {
