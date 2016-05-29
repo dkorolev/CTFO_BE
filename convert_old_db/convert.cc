@@ -111,21 +111,24 @@ std::string GenericUpdate<new_ctfo::Card, Persisted_CardUpdated>(const std::chro
   size_t& skip_count = skip_count_map[cid];
 
   if (ctfo_count && data.ctfo_count <= ctfo_count) {
-    std::cerr << "ctfo_count: " << ctfo_count << " => " << data.ctfo_count << std::endl;
+    std::cerr << "ctfo_count: " << ctfo_count << " => " << data.ctfo_count;
+    std::cerr << ", CID= " << static_cast<uint64_t>(cid) << std::endl;
     data.ctfo_count = ++ctfo_count;
   } else {
     ctfo_count = data.ctfo_count;
   }
 
   if (tfu_count && data.tfu_count <= tfu_count) {
-    std::cerr << "tfu_count: " << tfu_count << " => " << data.tfu_count << std::endl;
+    std::cerr << "tfu_count: " << tfu_count << " => " << data.tfu_count;
+    std::cerr << ", CID= " << static_cast<uint64_t>(cid) << std::endl;
     data.tfu_count = ++tfu_count;
   } else {
     tfu_count = data.tfu_count;
   }
 
   if (skip_count && data.skip_count <= skip_count) {
-    std::cerr << "skip_count: " << skip_count << " => " << data.skip_count << std::endl;
+    std::cerr << "skip_count: " << skip_count << " => " << data.skip_count;
+    std::cerr << ", CID= " << static_cast<uint64_t>(cid) << std::endl;
     data.skip_count = ++skip_count;
   } else {
     skip_count = data.skip_count;
