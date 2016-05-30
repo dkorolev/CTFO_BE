@@ -69,6 +69,74 @@ std::string GenericUpdate(const std::chrono::microseconds timestamp, const std::
   return converted_json;
 }
 
+template <>
+std::string GenericUpdate<new_ctfo::Card, Persisted_CardUpdated>(const std::chrono::microseconds timestamp,
+                                                                 const std::vector<std::string>& tsv) {
+  assert(tsv.size() == 3u);
+
+  current::storage::Transaction<T_PERSISTED_VARIANT> transaction;
+
+  transaction.meta.timestamp = timestamp;
+  transaction.mutations.emplace_back(Persisted_CardUpdated());
+
+  std::string json = JSON(transaction);
+  std::string subjson = "{\"data\":" + JSON(new_ctfo::Card()) + "}";
+  const size_t offset = json.find(subjson);
+  assert(offset != std::string::npos);
+
+  std::string converted_json = json.substr(0u, offset) + tsv[2] + json.substr(offset + subjson.length());
+  const std::string sub_ms = "\"ms\":";
+  const size_t offset_ms = converted_json.find(sub_ms, offset);
+  if (offset != std::string::npos) {
+    const size_t offset_ms_start = offset_ms + sub_ms.length();
+    const size_t offset_ms_end = converted_json.find(',', offset_ms);
+    assert(offset_ms_end != std::string::npos);
+    std::string ms_value = converted_json.substr(offset_ms_start, offset_ms_end - offset_ms_start);
+    std::string sub_us = "\"us\":" + ms_value + "000";  // convert `ms` to `us` by adding 000 to the end
+    converted_json = converted_json.replace(offset_ms, offset_ms_end - offset_ms, sub_us);
+  }
+
+  // Now, the real thing: Detect those moments the counters go down.
+  using T_TRANSACTION = current::storage::Transaction<T_PERSISTED_VARIANT>;
+  auto result = ParseJSON<T_TRANSACTION>(converted_json);
+  auto& data = Value<Persisted_CardUpdated>(result.mutations[0]).data;
+  auto cid = data.cid;
+
+  static std::map<CID, size_t> ctfo_count_map;
+  static std::map<CID, size_t> tfu_count_map;
+  static std::map<CID, size_t> skip_count_map;
+
+  size_t& ctfo_count = ctfo_count_map[cid];
+  size_t& tfu_count = tfu_count_map[cid];
+  size_t& skip_count = skip_count_map[cid];
+
+  if (ctfo_count && data.ctfo_count <= ctfo_count) {
+    std::cerr << "ctfo_count: " << ctfo_count << " => " << data.ctfo_count;
+    std::cerr << ", CID= " << static_cast<uint64_t>(cid) << std::endl;
+    data.ctfo_count = ++ctfo_count;
+  } else {
+    ctfo_count = data.ctfo_count;
+  }
+
+  if (tfu_count && data.tfu_count <= tfu_count) {
+    std::cerr << "tfu_count: " << tfu_count << " => " << data.tfu_count;
+    std::cerr << ", CID= " << static_cast<uint64_t>(cid) << std::endl;
+    data.tfu_count = ++tfu_count;
+  } else {
+    tfu_count = data.tfu_count;
+  }
+
+  if (skip_count && data.skip_count <= skip_count) {
+    std::cerr << "skip_count: " << skip_count << " => " << data.skip_count;
+    std::cerr << ", CID= " << static_cast<uint64_t>(cid) << std::endl;
+    data.skip_count = ++skip_count;
+  } else {
+    skip_count = data.skip_count;
+  }
+
+  return JSON(result);
+}
+
 // Special case to convert `UIDAndCID` into `std::pair<UID, CID>`.
 template <typename T_RECORD, typename T_PERSISTED_RECORD>
 std::string StarredNotificationsSentDictionaryUpdate(const std::chrono::microseconds timestamp,
