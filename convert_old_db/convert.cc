@@ -48,10 +48,11 @@ std::string GenericUpdate(const std::chrono::microseconds timestamp, const std::
   current::storage::Transaction<T_PERSISTED_VARIANT> transaction;
 
   transaction.meta.timestamp = timestamp;
-  transaction.mutations.emplace_back(T_PERSISTED_RECORD());
+  T_PERSISTED_RECORD template_record;
+  transaction.mutations.emplace_back(template_record);
 
   std::string json = JSON(transaction);
-  std::string subjson = "{\"data\":" + JSON(T_RECORD()) + "}";
+  std::string subjson = "{\"data\":" + JSON(template_record.data) + "}";
   const size_t offset = json.find(subjson);
   assert(offset != std::string::npos);
 
