@@ -71,17 +71,18 @@ std::string GenericUpdate(const std::chrono::microseconds timestamp, const std::
 }
 
 template <>
-std::string GenericUpdate<new_ctfo::Card, Persisted_CardUpdated>(const std::chrono::microseconds timestamp,
-                                                                 const std::vector<std::string>& tsv) {
+std::string GenericUpdate<CTFO::Card, Persisted_CardUpdated>(const std::chrono::microseconds timestamp,
+                                                             const std::vector<std::string>& tsv) {
   assert(tsv.size() == 3u);
 
   current::storage::Transaction<T_PERSISTED_VARIANT> transaction;
 
   transaction.meta.timestamp = timestamp;
-  transaction.mutations.emplace_back(Persisted_CardUpdated());
+  Persisted_CardUpdated template_record;
+  transaction.mutations.emplace_back(template_record);
 
   std::string json = JSON(transaction);
-  std::string subjson = "{\"data\":" + JSON(new_ctfo::Card()) + "}";
+  std::string subjson = "{\"data\":" + JSON(template_record.data) + "}";
   const size_t offset = json.find(subjson);
   assert(offset != std::string::npos);
 
@@ -103,9 +104,9 @@ std::string GenericUpdate<new_ctfo::Card, Persisted_CardUpdated>(const std::chro
   auto& data = Value<Persisted_CardUpdated>(result.mutations[0]).data;
   auto cid = data.cid;
 
-  static std::map<CID, size_t> ctfo_count_map;
-  static std::map<CID, size_t> tfu_count_map;
-  static std::map<CID, size_t> skip_count_map;
+  static std::map<CTFO::CID, size_t> ctfo_count_map;
+  static std::map<CTFO::CID, size_t> tfu_count_map;
+  static std::map<CTFO::CID, size_t> skip_count_map;
 
   size_t& ctfo_count = ctfo_count_map[cid];
   size_t& tfu_count = tfu_count_map[cid];
