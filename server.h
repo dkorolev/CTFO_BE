@@ -413,6 +413,8 @@ class CTFOServer final {
                         card_entry.vote = "CTFO";
                       } else if (vote == ANSWER::TFU) {
                         card_entry.vote = "TFU";
+                      } else if (vote == ANSWER::SKIP) {
+                        card_entry.vote = "SKIP";
                       }
                     }
 
@@ -531,6 +533,8 @@ class CTFOServer final {
                         card_entry.vote = "CTFO";
                       } else if (vote == ANSWER::TFU) {
                         card_entry.vote = "TFU";
+                      } else if (vote == ANSWER::SKIP) {
+                        card_entry.vote = "SKIP";
                       }
                     }
 
@@ -619,6 +623,8 @@ class CTFOServer final {
                   card_entry.vote = "CTFO";
                 } else if (vote == ANSWER::TFU) {
                   card_entry.vote = "TFU";
+                } else if (vote == ANSWER::SKIP) {
+                  card_entry.vote = "SKIP";
                 }
               }
               const auto fav = favorites.Get(uid, card.cid);
@@ -1212,6 +1218,8 @@ class CTFOServer final {
               card_entry.vote = "CTFO";
             } else if (vote == ANSWER::TFU) {
               card_entry.vote = "TFU";
+            } else if (vote == ANSWER::SKIP) {
+              card_entry.vote = "SKIP";
             }
           }
 
@@ -1279,6 +1287,8 @@ class CTFOServer final {
                 card_entry.vote = "CTFO";
               } else if (vote == ANSWER::TFU) {
                 card_entry.vote = "TFU";
+              } else if (vote == ANSWER::SKIP) {
+                card_entry.vote = "SKIP";
               }
             }
 
