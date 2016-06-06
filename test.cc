@@ -470,7 +470,7 @@ TEST(CTFO, SmokeTest) {
 
     {
       // Request recent cards 24 hours later.
-      current::time::SetNow(std::chrono::microseconds((16001 + 1000 * 60 * 60 * 24) * 1000));
+      current::time::SetNow(std::chrono::microseconds((16001 + 1000ull * 60 * 60 * 24) * 1000));
 
       const auto feed_recent = ParseResponse<ResponseFeed>(
                                    HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",
@@ -487,7 +487,7 @@ TEST(CTFO, SmokeTest) {
 
     {
       // Request recent cards 48 hours later.
-      current::time::SetNow(std::chrono::microseconds((16001 + 1000 * 60 * 60 * 48) * 1000));
+      current::time::SetNow(std::chrono::microseconds((16001 + 1000ull * 60 * 60 * 48) * 1000));
 
       const auto feed_recent = ParseResponse<ResponseFeed>(
                                    HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&feed_count=1",

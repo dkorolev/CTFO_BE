@@ -72,6 +72,7 @@ class CTFOServer final {
         debug_print_(debug_print_to_stderr),
         storage_(storage_file) {
     midichlorians_stream_.open(midichlorians_file, std::ofstream::out | std::ofstream::app);
+
     static_cast<void>(cards_file);
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
     std::ifstream cf(cards_file);
@@ -85,8 +86,10 @@ class CTFOServer final {
       std::string line;
       while (std::getline(cf, line)) {
         const Card card = ParseJSON<Card>(line);
-        data.card.Add(card);
-        data.author_card.Add(AuthorCard{admin_uid, card.cid});
+        if (!Exists(data.card[card.cid])) {
+          data.card.Add(card);
+          data.author_card.Add(AuthorCard{admin_uid, card.cid});
+        }
       }
     }).Go();
 #endif
@@ -99,6 +102,7 @@ class CTFOServer final {
     HTTP(port_).Register("/ctfo/card", BindToThis(&CTFOServer::RouteCard));
     HTTP(port_).Register("/ctfo/comments", BindToThis(&CTFOServer::RouteComments));
     HTTP(port_).Register("/ctfo/comment", BindToThis(&CTFOServer::RouteComments));
+    HTTP(port_).Register("/initial_cards", BindToThis(&CTFOServer::RouteInitialCards));
   }
 
   ~CTFOServer() {
@@ -111,6 +115,7 @@ class CTFOServer final {
     HTTP(port_).UnRegister("/ctfo/card");
     HTTP(port_).UnRegister("/ctfo/comments");
     HTTP(port_).UnRegister("/ctfo/comment");
+    HTTP(port_).UnRegister("/initial_cards");
   }
 
   void Join() { HTTP(port_).Join(); }
@@ -270,7 +275,17 @@ class CTFOServer final {
       }
     }
   }
-
+  void RouteInitialCards(Request r) {
+    storage_.ReadOnlyTransaction([this](ImmutableFields<Storage> data) {
+      return MakeResponse(GenerateResponseFeed(
+          data,
+          ResponseUserEntry(),
+          10000u,
+          static_cast<uint64_t>(-1),
+          10000u,
+          true));
+    }, std::move(r)).Go();
+  }
   void RouteFavorites(Request r) {
     // TODO(dkorolev): Avoid this shameless copy-pasting.
     const UID uid = StringToUID(r.url.query["uid"]);
@@ -341,7 +356,7 @@ class CTFOServer final {
                     card_entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(card.us);
                     card_entry.color = card.color;
                     card_entry.relevance =
-                        0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1000 * 1000 * 60 * 60 * 24)));
+                        0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1000ll * 1000 * 60 * 60 * 24)));
                     card_entry.ctfo_score = 50u;
                     card_entry.tfu_score = 50u;
                     card_entry.ctfo_count = card.ctfo_count;
@@ -449,7 +464,7 @@ class CTFOServer final {
                     card_entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(card.us);
                     card_entry.color = card.color;
                     card_entry.relevance =
-                        0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1000 * 1000 * 60 * 60 * 24)));
+                        0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1e6 * 60 * 60 * 24)));
                     card_entry.ctfo_score = 50u;
                     card_entry.tfu_score = 50u;
                     card_entry.ctfo_count = card.ctfo_count;
@@ -1017,9 +1032,10 @@ class CTFOServer final {
   ResponseFeed GenerateResponseFeed(ImmutableFields<Storage> data,
                                     ResponseUserEntry user_entry,
                                     size_t feed_size,
-                                    uint64_t notifications_since) {
+                                    uint64_t notifications_since,
+                                    size_t FEED_SIZE_LIMIT = 300ul,
+                                    bool initial = false) {
     ResponseFeed response;
-    constexpr size_t FEED_SIZE_LIMIT = 300ul;
     const size_t max_count = std::min(feed_size, FEED_SIZE_LIMIT);
     response.user = user_entry;
 
@@ -1034,6 +1050,7 @@ class CTFOServer final {
 
     const uint64_t now = current::time::Now().count();
     for (const auto& card : cards) {
+      if (initial && card.ctfo_count + card.tfu_count + card.skip_count < 5) continue;
       if (!Exists(answers.Get(uid, card.cid)) && !Exists(flagged_cards.Get(card.cid, uid))) {
         const UID card_author_uid = [&data](CID cid) {
           const auto& author_cards = data.author_card;
@@ -1047,8 +1064,11 @@ class CTFOServer final {
           // For the recent feed, relevance is the function of the age of the card.
           // Added just now => 1.00. Added 24 hour ago => 0.99. Added 48 hours ago => 0.99^2. Etc.
           double time_order_key =
-              0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1000 * 1000 * 60 * 60 * 24)));
+              0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1000ll * 1000 * 60 * 60 * 24)));
           double hot_order_key = RandomDouble(0.2, 0.4);
+          if (initial) {
+            hot_order_key = 1.0 / (1.0 + exp(0.01 * (-1.0 * card.ctfo_count + +1.0 * card.tfu_count)));
+          }
           if (card.startup_index) {
             time_order_key = 1.0 - 1e-6 * card.startup_index;
             hot_order_key = 1.0 - 1e-6 * card.startup_index;
