@@ -27,8 +27,8 @@ SOFTWARE.
 #include <regex>
 
 #include "intermediate_types.h"
-#include "new_schema.h"
-#include "new_storage.h"
+#include "../storage.h"
+#include "../schema.h"
 
 #include "../../Current/Bricks/dflags/dflags.h"
 #include "../../Current/Bricks/time/chrono.h"
@@ -36,10 +36,10 @@ SOFTWARE.
 #include "../../Current/TypeSystem/struct.h"
 #include "../../Current/TypeSystem/Serialization/json.h"
 
-DEFINE_string(input, "db.json", "The name of the input data to convert.");
-DEFINE_string(output, "new_db.json", "The name of the input data to convert.");
+DEFINE_string(input, "old_db.json", "The name of the input data to convert.");
+DEFINE_string(output, "db.json", "The name of the output data to convert.");
 
-using T_PERSISTED_VARIANT = typename NewCTFO<SherlockStreamPersister>::transaction_t::variant_t;
+using T_PERSISTED_VARIANT = typename CTFOStorage<SherlockStreamPersister>::transaction_t::variant_t;
 
 template <typename T_RECORD, typename T_PERSISTED_RECORD>
 std::string GenericUpdate(const std::chrono::microseconds timestamp, const std::vector<std::string>& tsv) {
@@ -48,10 +48,11 @@ std::string GenericUpdate(const std::chrono::microseconds timestamp, const std::
   current::storage::Transaction<T_PERSISTED_VARIANT> transaction;
 
   transaction.meta.timestamp = timestamp;
-  transaction.mutations.emplace_back(T_PERSISTED_RECORD());
+  T_PERSISTED_RECORD template_record;
+  transaction.mutations.emplace_back(template_record);
 
   std::string json = JSON(transaction);
-  std::string subjson = "{\"data\":" + JSON(T_RECORD()) + "}";
+  std::string subjson = "{\"data\":" + JSON(template_record.data) + "}";
   const size_t offset = json.find(subjson);
   assert(offset != std::string::npos);
 
@@ -70,17 +71,18 @@ std::string GenericUpdate(const std::chrono::microseconds timestamp, const std::
 }
 
 template <>
-std::string GenericUpdate<new_ctfo::Card, Persisted_CardUpdated>(const std::chrono::microseconds timestamp,
-                                                                 const std::vector<std::string>& tsv) {
+std::string GenericUpdate<CTFO::Card, Persisted_CardUpdated>(const std::chrono::microseconds timestamp,
+                                                             const std::vector<std::string>& tsv) {
   assert(tsv.size() == 3u);
 
   current::storage::Transaction<T_PERSISTED_VARIANT> transaction;
 
   transaction.meta.timestamp = timestamp;
-  transaction.mutations.emplace_back(Persisted_CardUpdated());
+  Persisted_CardUpdated template_record;
+  transaction.mutations.emplace_back(template_record);
 
   std::string json = JSON(transaction);
-  std::string subjson = "{\"data\":" + JSON(new_ctfo::Card()) + "}";
+  std::string subjson = "{\"data\":" + JSON(template_record.data) + "}";
   const size_t offset = json.find(subjson);
   assert(offset != std::string::npos);
 
@@ -102,9 +104,9 @@ std::string GenericUpdate<new_ctfo::Card, Persisted_CardUpdated>(const std::chro
   auto& data = Value<Persisted_CardUpdated>(result.mutations[0]).data;
   auto cid = data.cid;
 
-  static std::map<CID, size_t> ctfo_count_map;
-  static std::map<CID, size_t> tfu_count_map;
-  static std::map<CID, size_t> skip_count_map;
+  static std::map<CTFO::CID, size_t> ctfo_count_map;
+  static std::map<CTFO::CID, size_t> tfu_count_map;
+  static std::map<CTFO::CID, size_t> skip_count_map;
 
   size_t& ctfo_count = ctfo_count_map[cid];
   size_t& tfu_count = tfu_count_map[cid];
@@ -217,7 +219,7 @@ std::string NotificationsUpdate(const std::chrono::microseconds timestamp,
   T_TRANSACTION transaction;
   transaction.meta.timestamp = timestamp;
 
-  new_ctfo::Notification notification;
+  CTFO::Notification notification;
   notification.timestamp = timestamp;
 
   std::regex mega_regex(
@@ -226,8 +228,8 @@ std::string NotificationsUpdate(const std::chrono::microseconds timestamp,
   std::string notification_type;
   std::string notification_data;
   if (std::regex_match(tsv[2], mega_match, mega_regex) && mega_match.size() == 4) {
-    notification.uid = new_ctfo::StringToUID("u0" + mega_match[1].str());
-    assert(notification.uid != UID::INVALID_USER);
+    notification.uid = CTFO::StringToUID("u0" + mega_match[1].str());
+    assert(notification.uid != CTFO::UID::INVALID_USER);
     // TODO(dk+mz): ignore notifications for admin user?
     notification_type = mega_match[2].str();
     notification_data = mega_match[3].str();
@@ -238,17 +240,17 @@ std::string NotificationsUpdate(const std::chrono::microseconds timestamp,
   }
 
   if (notification_type == "NotificationMyCardNewComment") {
-    notification.notification = new_ctfo::NotificationMyCardNewComment();
+    notification.notification = CTFO::NotificationMyCardNewComment();
   } else if (notification_type == "NotificationNewReplyToMyComment") {
-    notification.notification = new_ctfo::NotificationNewReplyToMyComment();
+    notification.notification = CTFO::NotificationNewReplyToMyComment();
   } else if (notification_type == "NotificationMyCommentLiked") {
-    notification.notification = new_ctfo::NotificationMyCommentLiked();
+    notification.notification = CTFO::NotificationMyCommentLiked();
   } else if (notification_type == "NotificationNewCommentOnCardIStarred") {
-    notification.notification = new_ctfo::NotificationNewCommentOnCardIStarred();
+    notification.notification = CTFO::NotificationNewCommentOnCardIStarred();
   } else if (notification_type == "NotificationMyCardStarred") {
-    notification.notification = new_ctfo::NotificationMyCardStarred();
+    notification.notification = CTFO::NotificationMyCardStarred();
   } else if (notification_type == "NotificationNewVotesOnMyCard") {
-    notification.notification = new_ctfo::NotificationNewVotesOnMyCard();
+    notification.notification = CTFO::NotificationNewVotesOnMyCard();
   } else {
     std::cerr << "Unknown notification type: " << notification_type << std::endl;
     std::exit(-1);
@@ -283,37 +285,35 @@ int main(int argc, char** argv) {
       handlers;
 
   // Dictionaries.
-  handlers["users.insert"] = GenericUpdate<new_ctfo::User, Persisted_UserUpdated>;
-  handlers["users.erase"] = DictionaryErase<new_ctfo::User, Persisted_UserDeleted>;
-  handlers["cards.insert"] = GenericUpdate<new_ctfo::Card, Persisted_CardUpdated>;
-  handlers["cards.erase"] = DictionaryErase<new_ctfo::User, Persisted_CardDeleted>;
+  handlers["users.insert"] = GenericUpdate<CTFO::User, Persisted_UserUpdated>;
+  handlers["users.erase"] = DictionaryErase<CTFO::User, Persisted_UserDeleted>;
+  handlers["cards.insert"] = GenericUpdate<CTFO::Card, Persisted_CardUpdated>;
+  handlers["cards.erase"] = DictionaryErase<CTFO::User, Persisted_CardDeleted>;
   // We never erase smth in the dictionaries below.
   handlers["starred_notification_already_sent.insert"] =
-      StarredNotificationsSentDictionaryUpdate<new_ctfo::StarNotificationAlreadySent,
+      StarredNotificationsSentDictionaryUpdate<CTFO::StarNotificationAlreadySent,
                                                Persisted_StarNotificationAlreadySentUpdated>;
-  handlers["banned_users.insert"] = GenericUpdate<new_ctfo::BannedUser, Persisted_BannedUserUpdated>;
+  handlers["banned_users.insert"] = GenericUpdate<CTFO::BannedUser, Persisted_BannedUserUpdated>;
 
   // Matrix updates.
-  handlers["auth_token.add"] = GenericUpdate<new_ctfo::AuthKeyTokenPair, Persisted_AuthKeyTokenPairUpdated>;
-  handlers["auth_uid.add"] = GenericUpdate<new_ctfo::UIDAuthKeyPair, Persisted_UIDAuthKeyPairUpdated>;
-  handlers["card_authors.add"] = GenericUpdate<new_ctfo::AuthorCard, Persisted_AuthorCardUpdated>;
-  handlers["answers.add"] = GenericUpdate<new_ctfo::Answer, Persisted_AnswerUpdated>;
-  handlers["favorites.add"] = GenericUpdate<new_ctfo::Favorite, Persisted_FavoriteUpdated>;
-  handlers["comments.add"] = GenericUpdate<new_ctfo::Comment, Persisted_CommentUpdated>;
-  handlers["comment_likes.add"] = GenericUpdate<new_ctfo::CommentLike, Persisted_CommentLikeUpdated>;
+  handlers["auth_token.add"] = GenericUpdate<CTFO::AuthKeyTokenPair, Persisted_AuthKeyTokenPairUpdated>;
+  handlers["auth_uid.add"] = GenericUpdate<CTFO::UIDAuthKeyPair, Persisted_UIDAuthKeyPairUpdated>;
+  handlers["card_authors.add"] = GenericUpdate<CTFO::AuthorCard, Persisted_AuthorCardUpdated>;
+  handlers["answers.add"] = GenericUpdate<CTFO::Answer, Persisted_AnswerUpdated>;
+  handlers["favorites.add"] = GenericUpdate<CTFO::Favorite, Persisted_FavoriteUpdated>;
+  handlers["comments.add"] = GenericUpdate<CTFO::Comment, Persisted_CommentUpdated>;
+  handlers["comment_likes.add"] = GenericUpdate<CTFO::CommentLike, Persisted_CommentLikeUpdated>;
   handlers["flagged_cards.add"] =
-      GenericUpdate<new_ctfo::CardFlagAsInappropriate, Persisted_CardFlagAsInappropriateUpdated>;
+      GenericUpdate<CTFO::CardFlagAsInappropriate, Persisted_CardFlagAsInappropriateUpdated>;
   handlers["flagged_comments.add"] =
-      GenericUpdate<new_ctfo::CommentFlagAsInappropriate, Persisted_CommentFlagAsInappropriateUpdated>;
-  handlers["user_reported_user.add"] =
-      GenericUpdate<new_ctfo::UserReportedUser, Persisted_UserReportedUserUpdated>;
-  handlers["user_blocked_user.add"] =
-      GenericUpdate<new_ctfo::UserBlockedUser, Persisted_UserBlockedUserUpdated>;
+      GenericUpdate<CTFO::CommentFlagAsInappropriate, Persisted_CommentFlagAsInappropriateUpdated>;
+  handlers["user_reported_user.add"] = GenericUpdate<CTFO::UserReportedUser, Persisted_UserReportedUserUpdated>;
+  handlers["user_blocked_user.add"] = GenericUpdate<CTFO::UserBlockedUser, Persisted_UserBlockedUserUpdated>;
 
   // Rare matrix deletes.
-  handlers["card_authors.delete"] = MatrixEraseSwapped<new_ctfo::AuthorCard, Persisted_AuthorCardDeleted>;
-  handlers["comments.delete"] = MatrixErase<new_ctfo::Comment, Persisted_CommentDeleted>;
-  handlers["comment_likes.delete"] = MatrixErase<new_ctfo::CommentLike, Persisted_CommentLikeDeleted>;
+  handlers["card_authors.delete"] = MatrixEraseSwapped<CTFO::AuthorCard, Persisted_AuthorCardDeleted>;
+  handlers["comments.delete"] = MatrixErase<CTFO::Comment, Persisted_CommentDeleted>;
+  handlers["comment_likes.delete"] = MatrixErase<CTFO::CommentLike, Persisted_CommentLikeDeleted>;
 
   // Notifications.
   handlers["notifications.add"] = NotificationsUpdate;

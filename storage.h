@@ -22,42 +22,38 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *******************************************************************************/
 
-#ifndef NEW_STORAGE_H
-#define NEW_STORAGE_H
+#ifndef STORAGE_H
+#define STORAGE_H
 
-#include "new_schema.h"
+#include "schema.h"
 
-#include "../../Current/Storage/storage.h"
-#include "../../Current/Storage/persister/sherlock.h"
+#include "../Current/Storage/storage.h"
+#include "../Current/Storage/persister/sherlock.h"
 
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::User, Persisted_User);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany,
-                            new_ctfo::AuthKeyTokenPair,
-                            Persisted_AuthKeyTokenPair);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, new_ctfo::UIDAuthKeyPair, Persisted_UIDAuthKeyPair);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::Card, Persisted_Card);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, new_ctfo::AuthorCard, Persisted_AuthorCard);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::Answer, Persisted_Answer);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::Favorite, Persisted_Favorite);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, new_ctfo::Comment, Persisted_Comment);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::CommentLike, Persisted_CommentLike);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, CTFO::User, Persisted_User);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, CTFO::AuthKeyTokenPair, Persisted_AuthKeyTokenPair);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, CTFO::UIDAuthKeyPair, Persisted_UIDAuthKeyPair);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, CTFO::Card, Persisted_Card);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, CTFO::AuthorCard, Persisted_AuthorCard);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, CTFO::Answer, Persisted_Answer);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, CTFO::Favorite, Persisted_Favorite);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedOneToUnorderedMany, CTFO::Comment, Persisted_Comment);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, CTFO::CommentLike, Persisted_CommentLike);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany,
-                            new_ctfo::CardFlagAsInappropriate,
+                            CTFO::CardFlagAsInappropriate,
                             Persisted_CardFlagAsInappropriate);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany,
-                            new_ctfo::CommentFlagAsInappropriate,
+                            CTFO::CommentFlagAsInappropriate,
                             Persisted_CommentFlagAsInappropriate);
-CURRENT_STORAGE_FIELD_ENTRY(OrderedManyToOrderedMany, new_ctfo::Notification, Persisted_Notification);
+CURRENT_STORAGE_FIELD_ENTRY(OrderedManyToOrderedMany, CTFO::Notification, Persisted_Notification);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary,
-                            new_ctfo::StarNotificationAlreadySent,
+                            CTFO::StarNotificationAlreadySent,
                             Persisted_StarNotificationAlreadySent);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany,
-                            new_ctfo::UserReportedUser,
-                            Persisted_UserReportedUser);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, new_ctfo::UserBlockedUser, Persisted_UserBlockedUser);
-CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, new_ctfo::BannedUser, Persisted_BannedUser);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, CTFO::UserReportedUser, Persisted_UserReportedUser);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, CTFO::UserBlockedUser, Persisted_UserBlockedUser);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, CTFO::BannedUser, Persisted_BannedUser);
 
-CURRENT_STORAGE(NewCTFO) {
+CURRENT_STORAGE(CTFOStorage) {
   CURRENT_STORAGE_FIELD(user, Persisted_User);
   CURRENT_STORAGE_FIELD(auth_token, Persisted_AuthKeyTokenPair);
   CURRENT_STORAGE_FIELD(uid_auth, Persisted_UIDAuthKeyPair);
@@ -76,4 +72,4 @@ CURRENT_STORAGE(NewCTFO) {
   CURRENT_STORAGE_FIELD(banned_user, Persisted_BannedUser);
 };
 
-#endif  // NEW_STORAGE_H
+#endif  // STORAGE_H

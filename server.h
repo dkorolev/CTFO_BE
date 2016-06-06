@@ -42,16 +42,11 @@ SOFTWARE.
 
 #include "../Current/Blocks/HTTP/api.h"
 
-#include "../Current/EventCollector/event_collector.h"
-
-#include "schema.h"
+#include "storage.h"
 #include "util.h"
 
 // Structured iOS events.
-#include "../Current/Midichlorians/Dev/Beta/MidichloriansDataDictionary.h"
-
-using namespace bricks::random;
-using namespace bricks::strings;
+#include "../Current/Midichlorians/Server/server.h"
 
 // TODO(dkorolev): Make these constructor parameters of `CTFOServer`.
 static const size_t FLAGS_blocks_to_ban = 5u;
@@ -59,96 +54,42 @@ static const size_t FLAGS_reports_to_ban = 10u;
 
 namespace CTFO {
 
-template <typename POLICY>
-struct StorageAPIImpl {
-  typename POLICY::Instance instance;
-
-  OrderedDictionary<User, POLICY> users{"users", instance};
-  OrderedDictionary<Card, POLICY> cards{"cards", instance};
-  LightweightMatrix<AuthKeyTokenPair, POLICY> auth_token{"auth_token", instance};
-  LightweightMatrix<AuthKeyUIDPair, POLICY> auth_uid{"auth_uid", instance};
-  LightweightMatrix<CardAuthor, POLICY> card_authors{"card_authors", instance};
-  LightweightMatrix<Answer, POLICY> answers{"answers", instance};
-  LightweightMatrix<Favorite, POLICY> favorites{"favorites", instance};
-  LightweightMatrix<Comment, POLICY> comments{"comments", instance};
-  LightweightMatrix<CommentLike, POLICY> comment_likes{"comment_likes", instance};
-  LightweightMatrix<CardFlagAsInappropriate, POLICY> flagged_cards{"flagged_cards", instance};
-  LightweightMatrix<CommentFlagAsInappropriate, POLICY> flagged_comments{"flagged_comments", instance};
-  LightweightMatrix<Notification, POLICY> notifications{"notifications", instance};
-  OrderedDictionary<StarNotificationAlreadySent, POLICY> starred_notification_already_sent{
-      "starred_notification_already_sent", instance};
-  LightweightMatrix<UserReportedUser, POLICY> user_reported_user{"user_reported_user", instance};
-  LightweightMatrix<UserBlockedUser, POLICY> user_blocked_user{"user_blocked_user", instance};
-  OrderedDictionary<BannedUser, POLICY> banned_users{"banned_users", instance};
-
-  // TODO(dkorolev): A templated version of the constructor.
-  StorageAPIImpl(const std::string& filename) : instance(filename) { instance.Run(); }
-};
-
-struct StorageAPI {
-  using T_DATA_IMPL = StorageAPIImpl<ReplayFromAndAppendToFileUsingCereal>;
-  typedef T_DATA_IMPL& T_DATA;
-
-  T_DATA_IMPL actual_data;
-
-  // Because meh. -- D.K.
-  struct SomethingThatCanWaitAndGo {
-    void Go() {}
-    void Wait() {}
-  };
-
-  template <typename F>
-  SomethingThatCanWaitAndGo Transaction(F&& f) {
-    f(actual_data);
-    return SomethingThatCanWaitAndGo();
-  }
-
-  template <typename F1, typename F2>
-  SomethingThatCanWaitAndGo Transaction(F1&& f1, F2&& f2) {
-    f2(f1(actual_data));
-    return SomethingThatCanWaitAndGo();
-  }
-
-  StorageAPI(const char* now_useless_name, const std::string& filename) : actual_data(filename) {
-    static_cast<void>(now_useless_name);
-  }
-};
-
 class CTFOServer final {
  public:
+  using Storage = CTFOStorage<SherlockStreamPersister>;
+  using MidichloriansServer = current::midichlorians::server::MidichloriansHTTPServer<CTFOServer>;
+
   explicit CTFOServer(const std::string& cards_file,
                       int port,
                       const std::string& storage_file,
-                      int event_log_port,
-                      const std::string& event_log_file,
-                      const bricks::time::MILLISECONDS_INTERVAL tick_interval_ms,
+                      int midichlorians_port,
+                      const std::string& midichlorians_file,
+                      const std::chrono::milliseconds tick_interval_ms,
                       const bool debug_print_to_stderr = false)
       : port_(port),
-        event_log_file_(event_log_file),
-        event_collector_(event_log_port ? event_log_port : port,
-                         event_log_stream_,
-                         tick_interval_ms,
-                         "/ctfo/log",
-                         "OK\n",
-                         std::bind(&CTFOServer::OnMidichloriansEvent, this, std::placeholders::_1)),
+        midichlorians_server_(
+            midichlorians_port ? midichlorians_port : port, *this, tick_interval_ms, "/ctfo/log", "OK\n"),
         debug_print_(debug_print_to_stderr),
-        storage_("CTFO storage", storage_file) {
-    event_log_stream_.open(event_log_file_, std::ofstream::out | std::ofstream::app);
+        storage_(storage_file) {
+    midichlorians_stream_.open(midichlorians_file, std::ofstream::out | std::ofstream::app);
 
     static_cast<void>(cards_file);
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
-    bricks::cerealize::CerealFileParser<Card, bricks::cerealize::CerealFormat::JSON> cf(cards_file);
-    storage_.Transaction([&cf](StorageAPI::T_DATA data) {
+    std::ifstream cf(cards_file);
+    assert(cf.good());
+    storage_.ReadWriteTransaction([&cf](MutableFields<Storage> data) {
       User admin_user;
       admin_user.uid = admin_uid;
       admin_user.level = 80;         // Superuser 80lvl.
       admin_user.score = 999999999;  // With one short to one billion points.
-      data.users.Insert(admin_user);
-      while (cf.Next([&data](const Card& card) {
-        data.cards.Insert(card);
-        data.card_authors.Add(CardAuthor{card.cid, admin_uid});
-      })) {
-        ;
+      data.user.Add(admin_user);
+      std::string line;
+      while (std::getline(cf, line)) {
+        const Card card = ParseJSON<Card>(line);
+        if (!Exists(data.card[card.cid])) {
+          data.card.Add(card);
+          data.author_card.Add(AuthorCard{admin_uid, card.cid});
+        }
       }
     }).Go();
 #endif
@@ -161,6 +102,7 @@ class CTFOServer final {
     HTTP(port_).Register("/ctfo/card", BindToThis(&CTFOServer::RouteCard));
     HTTP(port_).Register("/ctfo/comments", BindToThis(&CTFOServer::RouteComments));
     HTTP(port_).Register("/ctfo/comment", BindToThis(&CTFOServer::RouteComments));
+    HTTP(port_).Register("/initial_cards", BindToThis(&CTFOServer::RouteInitialCards));
   }
 
   ~CTFOServer() {
@@ -173,9 +115,24 @@ class CTFOServer final {
     HTTP(port_).UnRegister("/ctfo/card");
     HTTP(port_).UnRegister("/ctfo/comments");
     HTTP(port_).UnRegister("/ctfo/comment");
+    HTTP(port_).UnRegister("/initial_cards");
   }
 
   void Join() { HTTP(port_).Join(); }
+
+  template <typename T_EVENT>
+  void operator()(const T_EVENT& e) {
+    DebugPrint("Not an `iOSGenericEvent`: " + JSON(e));
+  }
+
+  void operator()(const current::midichlorians::server::TickLogEntry&) {}
+
+  void operator()(const current::midichlorians::server::EventLogEntry& e) {
+    midichlorians_stream_ << JSON(e) << std::endl;
+    e.event.Call(*this);
+  }
+
+  void operator()(const current::midichlorians::ios::iOSGenericEvent& event) { UpdateStateOnEvent(event); }
 
  private:
   typedef void (CTFOServer::*CTFOServerMemberFunctionServingRequest)(Request);
@@ -183,6 +140,16 @@ class CTFOServer final {
   std::function<void(Request)> BindToThis(CTFOServerMemberFunctionServingRequest handler) {
     return std::bind(handler, this, std::placeholders::_1);
   };
+
+  template <typename T_REQUEST>
+  T_REQUEST ParseRequest(const std::string& source) {
+    return Value<T_REQUEST>(ParseJSON<Variant<T_REQUEST>, JSONFormat::Minimalistic>(source));
+  }
+
+  template <typename T_RESPONSE>
+  Response MakeResponse(T_RESPONSE&& r) {
+    return Response(JSON<JSONFormat::Minimalistic>(Variant<T_RESPONSE>(std::forward<T_RESPONSE>(r))));
+  }
 
   void RouteAuthiOS(Request r) {
     if (r.method != "POST") {
@@ -196,37 +163,34 @@ class CTFOServer final {
       const std::string& notifications_since_as_string = r.url.query["notifications_since"];
       const uint64_t notifications_since = notifications_since_as_string.empty()
                                                ? static_cast<uint64_t>(-1)
-                                               : FromString<uint64_t>(notifications_since_as_string);
+                                               : current::FromString<uint64_t>(notifications_since_as_string);
       if (device_id.empty() || app_key.empty()) {
         DebugPrint(Printf("[/ctfo/auth/ios] Wrong query parameters. Requested URL = '%s'",
                           r.url.ComposeURL().c_str()));
         r("NEED VALID ID-KEY PAIR\n", HTTPResponseCode.BadRequest);
       } else {
-        const size_t feed_count = FromString<size_t>(r.url.query.get("feed_count", "20"));
+        const size_t feed_count = current::FromString<size_t>(r.url.query.get("feed_count", "20"));
         // Searching for users with the corresponding authentication key.
-        storage_.Transaction(
-            [this, device_id, app_key, feed_count, notifications_since](StorageAPI::T_DATA data) {
+        storage_.ReadWriteTransaction(  // clang-format off
+            [this, device_id, app_key, feed_count, notifications_since](MutableFields<Storage> data) {
               AuthKey auth_key("iOS::" + device_id + "::" + app_key, AUTH_TYPE::IOS);
               UID uid = UID::INVALID_USER;
               User user;
               ResponseUserEntry user_entry;
               std::string token;
 
-              const auto& auth_uid_accessor = data.auth_uid;
-              if (auth_uid_accessor.Rows().Has(auth_key)) {
-                // Something went terribly wrong
-                // if we have more than one UID for authentication key.
-                assert(Value(auth_uid_accessor.Rows()[auth_key]).Size() == 1u);
-                uid = Value(auth_uid_accessor.Rows()[auth_key]).begin()->uid;
+              const auto& uid_auth_accessor = data.uid_auth;
+              if (uid_auth_accessor.Cols().Has(auth_key)) {
+                uid = Value(uid_auth_accessor.GetEntryFromCol(auth_key)).uid;
               }
 
               auto& auth_token_mutator = data.auth_token;
               if (uid != UID::INVALID_USER) {
                 // User exists => invalidate all tokens.
-                for (const auto& auth_token : Value(auth_token_mutator.Rows()[auth_key])) {
+                for (const auto& auth_token : auth_token_mutator.Row(auth_key)) {
                   auth_token_mutator.Add(AuthKeyTokenPair(auth_key, auth_token.token, false));
                 }
-                user = Value(data.users[uid]);
+                user = Value(data.user[uid]);
               }
 
               // Generate a new token.
@@ -238,30 +202,29 @@ class CTFOServer final {
               if (uid != UID::INVALID_USER) {  // Existing user.
                 user_entry.score = user.score;
                 DebugPrint(
-                    Printf("[/ctfo/auth/ios] Existing user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
-                           UIDToString(uid).c_str(),
-                           device_id.c_str(),
-                           app_key.c_str(),
-                           token.c_str()));
+                  Printf("[/ctfo/auth/ios] Existing user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
+                         UIDToString(uid).c_str(),
+                         device_id.c_str(),
+                         app_key.c_str(),
+                         token.c_str()));
               } else {  // New user.
                 uid = RandomUID();
                 user.uid = uid;
-                data.users.Insert(user);
-                data.auth_uid.Add(AuthKeyUIDPair(auth_key, user.uid));
+                data.user.Add(user);
+                data.uid_auth.Add(UIDAuthKeyPair(user.uid, auth_key));
               }
-              DebugPrint(Printf("[/ctfo/auth/ios] New user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
-                                UIDToString(uid).c_str(),
-                                device_id.c_str(),
-                                app_key.c_str(),
-                                token.c_str()));
+              DebugPrint(
+                Printf("[/ctfo/auth/ios] New user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
+                       UIDToString(uid).c_str(),
+                       device_id.c_str(),
+                       app_key.c_str(),
+                       token.c_str()));
 
-              CopyUserInfoToResponseEntry(user, Exists(data.banned_users[uid]), user_entry);
+              CopyUserInfoToResponseEntry(user, Exists(data.banned_user[uid]), user_entry);
               user_entry.token = token;
 
-              ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
-              return Response(rfeed, "feed");
-            },
-            std::move(r));
+              return MakeResponse(GenerateResponseFeed(data, user_entry, feed_count, notifications_since));
+            }, std::move(r)).Go();  // clang-format on
       }
     }
   }
@@ -270,7 +233,7 @@ class CTFOServer final {
     const std::string& notifications_since_as_string = r.url.query["notifications_since"];
     const uint64_t notifications_since = notifications_since_as_string.empty()
                                              ? static_cast<uint64_t>(-1)
-                                             : FromString<uint64_t>(notifications_since_as_string);
+                                             : current::FromString<uint64_t>(notifications_since_as_string);
     const std::string token = r.url.query["token"];
     if (r.method != "GET") {
       DebugPrint(Printf("[/ctfo/feed] Wrong method '%s'. Requested URL = '%s'",
@@ -282,41 +245,47 @@ class CTFOServer final {
         DebugPrint(Printf("[/ctfo/feed] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
       } else {
-        const size_t feed_count = FromString<size_t>(r.url.query.get("feed_count", "20"));
+        const size_t feed_count = current::FromString<size_t>(r.url.query.get("feed_count", "20"));
         const std::string requested_url = r.url.ComposeURL();
-        storage_.Transaction(
-            [this, uid, token, requested_url, feed_count, notifications_since](StorageAPI::T_DATA data) {
+        storage_.ReadOnlyTransaction(  // clang-format off
+            [this, uid, token, requested_url, feed_count, notifications_since](ImmutableFields<Storage> data) {
               bool token_is_valid = false;
               const auto& auth_token_accessor = data.auth_token;
               if (auth_token_accessor.Cols().Has(token)) {
-                // Something went terribly wrong
-                // if we have more than one authentication key for token.
-                assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-                if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
+                if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
                   // Double check, if the provided `uid` is correct as well.
-                  const auto& auth_uid_accessor = data.auth_uid;
-                  token_is_valid =
-                      auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
+                  const auto& uid_auth_accessor = data.uid_auth;
+                  token_is_valid = Exists(uid_auth_accessor.Get(
+                    uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
                 }
               }
               if (!token_is_valid) {
                 DebugPrint(Printf("[/ctfo/feed] Invalid token. Requested URL = '%s'", requested_url.c_str()));
                 return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
               } else {
-                DebugPrint(Printf("[/ctfo/feed] Token validated. Requested URL = '%s'", requested_url.c_str()));
-                const auto user = Value(data.users[uid]);
+                DebugPrint(Printf("[/ctfo/feed] Token validated. Requested URL = '%s'",
+                                  requested_url.c_str()));
+                const auto user = Value(data.user[uid]);
                 ResponseUserEntry user_entry;
-                CopyUserInfoToResponseEntry(user, Exists(data.banned_users[uid]), user_entry);
+                CopyUserInfoToResponseEntry(user, Exists(data.banned_user[uid]), user_entry);
                 user_entry.token = token;
-                ResponseFeed rfeed = GenerateResponseFeed(data, user_entry, feed_count, notifications_since);
-                return Response(rfeed, "feed");
+                return MakeResponse(GenerateResponseFeed(data, user_entry, feed_count, notifications_since));
               }
-            },
-            std::move(r));
+            }, std::move(r)).Go();  // clang-format on
       }
     }
   }
-
+  void RouteInitialCards(Request r) {
+    storage_.ReadOnlyTransaction([this](ImmutableFields<Storage> data) {
+      return MakeResponse(GenerateResponseFeed(
+          data,
+          ResponseUserEntry(),
+          10000u,
+          static_cast<uint64_t>(-1),
+          10000u,
+          true));
+    }, std::move(r)).Go();
+  }
   void RouteFavorites(Request r) {
     // TODO(dkorolev): Avoid this shameless copy-pasting.
     const UID uid = StringToUID(r.url.query["uid"]);
@@ -331,18 +300,15 @@ class CTFOServer final {
         DebugPrint(Printf("[/ctfo/favs] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
       } else {
-        storage_.Transaction([this, uid, token](StorageAPI::T_DATA data) {
+        storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<Storage> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
           if (auth_token_accessor.Cols().Has(token)) {
-            // Something went terribly wrong
-            // if we have more than one authentication key for token.
-            assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-            if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
+            if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto& auth_uid_accessor = data.auth_uid;
-              token_is_valid =
-                  auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
+              const auto& uid_auth_accessor = data.uid_auth;
+              token_is_valid = Exists(
+                  uid_auth_accessor.Get(uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
             }
           }
           if (!token_is_valid) {
@@ -350,24 +316,21 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint("[/ctfo/favs] Token validated.");
-            const auto user = data.users[uid];
+            const auto user = data.user[uid];
             if (!Exists(user)) {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
               ResponseFavs rfavs;
-              CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_users[uid]), rfavs.user);
+              CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_user[uid]), rfavs.user);
 
-              const auto& answers = data.answers;
+              const auto& answers = data.answer;
 
               // Get favs.
-              std::vector<std::pair<uint64_t, CID>> favs;
-              const auto& favorites = data.favorites;
-              const auto& per_user_favs = favorites.Rows()[uid];
-              if (Exists(per_user_favs)) {
-                for (const auto& fav : Value(per_user_favs)) {
-                  if (fav.favorited) {
-                    favs.emplace_back(fav.ms, fav.cid);
-                  }
+              std::vector<std::pair<std::chrono::microseconds, CID>> favs;
+              const auto& favorites = data.favorite;
+              for (const auto& fav : favorites.Row(uid)) {
+                if (fav.favorited) {
+                  favs.emplace_back(fav.us, fav.cid);
                 }
               }
 
@@ -375,31 +338,25 @@ class CTFOServer final {
               std::sort(favs.rbegin(), favs.rend());
 
               // And publish them.
-              const auto& card_authors = data.card_authors;
-              const auto& comments = data.comments;
+              const auto& author_card = data.author_card;
+              const auto& comments = data.comment;
               const auto GenerateCardForFavs =
-                  [this, uid, &answers, &card_authors, &comments](const Card& card) {
+                  [this, uid, &answers, &author_card, &comments](const Card& card) {
                     ResponseCardEntry card_entry;
                     card_entry.cid = CIDToString(card.cid);
-                    const auto iterable = card_authors.Rows()[card.cid];
-                    if (Exists(iterable)) {
-                      const auto value = Value(iterable);
-                      if (value.Size() == 1u) {
-                        const UID author_uid = (*value.begin()).uid;
-                        card_entry.author_uid = UIDToString(author_uid);
-                        card_entry.is_my_card = (uid == author_uid);
-                      }
+                    const auto card_auth = author_card.GetEntryFromCol(card.cid);
+                    if (Exists(card_auth)) {
+                      const UID author_uid = Value(card_auth).uid;
+                      card_entry.author_uid = UIDToString(author_uid);
+                      card_entry.is_my_card = (uid == author_uid);
                     }
-                    const auto comments_per_card = comments.Rows()[card.cid];
-                    if (Exists(comments_per_card)) {
-                      card_entry.number_of_comments = Value(comments_per_card).Size();
-                    }
-                    const auto now = static_cast<uint64_t>(bricks::time::Now());
+                    card_entry.number_of_comments = comments.Row(card.cid).Size();
+                    const uint64_t now = current::time::Now().count();
                     card_entry.text = card.text;
-                    card_entry.ms = card.ms;
+                    card_entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(card.us);
                     card_entry.color = card.color;
                     card_entry.relevance =
-                        0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+                        0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1000ll * 1000 * 60 * 60 * 24)));
                     card_entry.ctfo_score = 50u;
                     card_entry.tfu_score = 50u;
                     card_entry.ctfo_count = card.ctfo_count;
@@ -424,17 +381,17 @@ class CTFOServer final {
                   };
 
               for (const auto& c : favs) {
-                const auto card = data.cards[c.second];
+                const auto card = data.card[c.second];
                 if (Exists(card)) {
                   rfavs.cards.push_back(GenerateCardForFavs(Value(card)));
                 }
               }
 
-              rfavs.ms = static_cast<uint64_t>(bricks::time::Now());
-              return Response(rfavs, "favs");
+              rfavs.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+              return MakeResponse(std::move(rfavs));
             }
           }
-        }, std::move(r));
+        }, std::move(r)).Go();
       }
     }
   }
@@ -453,18 +410,15 @@ class CTFOServer final {
         DebugPrint(Printf("[/ctfo/my_cards] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
       } else {
-        storage_.Transaction([this, uid, token](StorageAPI::T_DATA data) {
+        storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<Storage> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
-          if (auth_token_accessor.Cols().Has(token)) {
-            // Something went terribly wrong
-            // if we have more than one authentication key for token.
-            assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-            if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
+          if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
+            if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto& auth_uid_accessor = data.auth_uid;
-              token_is_valid =
-                  auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
+              const auto& uid_auth_accessor = data.uid_auth;
+              token_is_valid = Exists(
+                  uid_auth_accessor.Get(uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
             }
           }
           if (!token_is_valid) {
@@ -472,54 +426,45 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint("[/ctfo/my_cards] Token validated.");
-            const auto user = data.users[uid];
+            const auto user = data.user[uid];
             if (!Exists(user)) {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
               ResponseMyCards r_my_cards;
-              CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_users[uid]), r_my_cards.user);
+              CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_user[uid]), r_my_cards.user);
 
-              const auto& answers = data.answers;
-              const auto& favorites = data.favorites;
+              const auto& answers = data.answer;
+              const auto& favorites = data.favorite;
 
               // Get my cards.
-              std::vector<std::pair<uint64_t, CID>> my_cards;
-              const auto& cards_by_author = data.card_authors.Cols()[uid];
-              if (Exists(cards_by_author)) {
-                for (const auto& my_card : Value(cards_by_author)) {
-                  my_cards.emplace_back(my_card.ms, my_card.cid);
-                }
+              std::vector<std::pair<std::chrono::microseconds, CID>> my_cards;
+              for (const auto& my_card : data.author_card.Row(uid)) {
+                my_cards.emplace_back(my_card.us, my_card.cid);
               }
 
               // In reverse chronological order.
               std::sort(my_cards.rbegin(), my_cards.rend());
 
               // And publish them.
-              const auto& card_authors = data.card_authors;
-              const auto& comments = data.comments;
+              const auto& author_cards = data.author_card;
+              const auto& comments = data.comment;
               const auto GenerateCardForMyCards =
-                  [this, uid, &answers, &favorites, &card_authors, &comments](const Card& card) {
+                  [this, uid, &answers, &favorites, &author_cards, &comments](const Card& card) {
                     ResponseCardEntry card_entry;
                     card_entry.cid = CIDToString(card.cid);
-                    const auto card_authors_iterator = card_authors.Rows()[card.cid];
-                    if (Exists(card_authors_iterator)) {
-                      const auto value = Value(card_authors_iterator);
-                      if (value.Size() == 1u) {
-                        const UID author_uid = (*value.begin()).uid;
-                        card_entry.author_uid = UIDToString(author_uid);
-                        card_entry.is_my_card = (uid == author_uid);
-                      }
+                    const auto card_auth = author_cards.GetEntryFromCol(card.cid);
+                    if (Exists(card_auth)) {
+                      const UID author_uid = Value(card_auth).uid;
+                      card_entry.author_uid = UIDToString(author_uid);
+                      card_entry.is_my_card = (uid == author_uid);
                     }
-                    const auto comments_iterator = comments.Rows()[card.cid];
-                    if (Exists(comments_iterator)) {
-                      card_entry.number_of_comments = Value(comments_iterator).Size();
-                    }
-                    const auto now = static_cast<uint64_t>(bricks::time::Now());
+                    card_entry.number_of_comments = comments.Row(card.cid).Size();
+                    const uint64_t now = current::time::Now().count();
                     card_entry.text = card.text;
-                    card_entry.ms = card.ms;
+                    card_entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(card.us);
                     card_entry.color = card.color;
                     card_entry.relevance =
-                        0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+                        0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1e6 * 60 * 60 * 24)));
                     card_entry.ctfo_score = 50u;
                     card_entry.tfu_score = 50u;
                     card_entry.ctfo_count = card.ctfo_count;
@@ -548,17 +493,17 @@ class CTFOServer final {
                   };
 
               for (const auto& c : my_cards) {
-                const auto card = data.cards[c.second];
+                const auto card = data.card[c.second];
                 if (Exists(card)) {
                   r_my_cards.cards.push_back(GenerateCardForMyCards(Value(card)));
                 }
               }
 
-              r_my_cards.ms = static_cast<uint64_t>(bricks::time::Now());
-              return Response(r_my_cards, "my_cards");
+              r_my_cards.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+              return MakeResponse(std::move(r_my_cards));
             }
           }
-        }, std::move(r));
+        }, std::move(r)).Go();
       }
     }
   }
@@ -577,34 +522,28 @@ class CTFOServer final {
             Printf("[/ctfo/card] Non-empty yet invalid UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED EMPTY OR VALID UID\n", HTTPResponseCode.BadRequest);
       } else {
-        storage_.Transaction([this, cid, uid](StorageAPI::T_DATA data) {
-          const auto card_wrapper = data.cards[cid];
+        storage_.ReadOnlyTransaction([this, cid, uid](ImmutableFields<Storage> data) {
+          const auto card_wrapper = data.card[cid];
           if (!Exists(card_wrapper)) {
             return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
           } else {
             const Card& card = Value(card_wrapper);
-            const auto& answers = data.answers;
-            const auto& comments = data.comments;
-            const auto& favorites = data.favorites;
-            const auto& card_authors = data.card_authors;
+            const auto& answers = data.answer;
+            const auto& comments = data.comment;
+            const auto& favorites = data.favorite;
+            const auto& author_cards = data.author_card;
             // TODO(dkorolev): This beautiful copy-paste will eventually go away.
             ResponseCardEntry card_entry;
             card_entry.cid = CIDToString(card.cid);
-            const auto iterable = card_authors.Rows()[card.cid];
-            if (Exists(iterable)) {
-              const auto v = Value(iterable);
-              if (v.Size() == 1u) {
-                const UID author_uid = (*v.begin()).uid;
-                card_entry.author_uid = UIDToString(author_uid);
-                card_entry.is_my_card = (uid == UID::INVALID_USER ? false : (uid == author_uid));
-              }
+            const auto card_auth = author_cards.GetEntryFromCol(card.cid);
+            if (Exists(card_auth)) {
+              const UID author_uid = Value(card_auth).uid;
+              card_entry.author_uid = UIDToString(author_uid);
+              card_entry.is_my_card = (uid == UID::INVALID_USER ? false : (uid == author_uid));
             }
-            const auto comments_iterator = comments.Rows()[card.cid];
-            if (Exists(comments_iterator)) {
-              card_entry.number_of_comments = Value(comments_iterator).Size();
-            }
+            card_entry.number_of_comments = comments.Row(card.cid).Size();
             card_entry.text = card.text;
-            card_entry.ms = card.ms;
+            card_entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(card.us);
             card_entry.color = card.color;
             card_entry.relevance = 1.0;  // When `GET`-ting a card, make it 1.0.
             card_entry.ctfo_score = 50u;
@@ -633,9 +572,9 @@ class CTFOServer final {
               }
             }
 
-            return Response(card_entry, "card");
+            return MakeResponse(std::move(card_entry));
           }
-        }, std::move(r));
+        }, std::move(r)).Go();
       }
     } else if (r.method == "POST") {
       const UID uid = StringToUID(r.url.query["uid"]);
@@ -647,58 +586,59 @@ class CTFOServer final {
         const std::string requested_url = r.url.ComposeURL();
         const CID cid = RandomCID();
         try {
-          AddCardRequest request;
+          RequestAddCard request;
           try {
-            CerealizeParseJSON(r.body, request);
-          } catch (const bricks::ParseJSONException&) {
-            const auto short_request = CerealizeParseJSON<AddCardShortRequest>(r.body);
+            request = ParseRequest<RequestAddCard>(r.body);
+          } catch (const current::TypeSystemParseJSONException&) {
+            const auto short_request = ParseRequest<RequestAddCardShort>(r.body);
             request.text = short_request.text;
             request.color = CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()];
           }
-          storage_.Transaction([this, cid, uid, token, request, requested_url](StorageAPI::T_DATA data) {
-            bool token_is_valid = false;
-            const auto& auth_token_accessor = data.auth_token;
-            if (auth_token_accessor.Cols().Has(token)) {
-              // Something went terribly wrong
-              // if we have more than one authentication key for token.
-              assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-              if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
-                // Double check, if the provided `uid` is correct as well.
-                const auto& auth_uid_accessor = data.auth_uid;
-                token_is_valid =
-                    auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
-              }
-            }
-            if (!token_is_valid) {
-              DebugPrint(Printf("[/ctfo/card] Invalid token. Requested URL = '%s'", requested_url.c_str()));
-              return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
-            } else {
-              DebugPrint(Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
-              const auto now = static_cast<uint64_t>(bricks::time::Now());
+          storage_.ReadWriteTransaction(  // clang-format off
+              [this, cid, uid, token, request, requested_url](MutableFields<Storage> data) {
+                bool token_is_valid = false;
+                const auto& auth_token_accessor = data.auth_token;
+                if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
+                  if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+                    // Double check, if the provided `uid` is correct as well.
+                    const auto& uid_auth_accessor = data.uid_auth;
+                    token_is_valid = Exists(uid_auth_accessor.Get(
+                        uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
+                  }
+                }
+                if (!token_is_valid) {
+                  DebugPrint(Printf("[/ctfo/card] Invalid token. Requested URL = '%s'",
+                                    requested_url.c_str()));
+                  return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                } else {
+                  DebugPrint(Printf("[/ctfo/card] Token validated. Requested URL = '%s'",
+                                    requested_url.c_str()));
+                  const auto now = current::time::Now();
 
-              auto& cards_mutator = data.cards;
-              auto& authors_mutator = data.card_authors;
+                  auto& cards_mutator = data.card;
+                  auto& authors_mutator = data.author_card;
 
-              Card card;
-              card.cid = cid;
-              card.text = request.text;
-              card.color = request.color;
-              cards_mutator.Insert(card);
+                  Card card;
+                  card.cid = cid;
+                  card.text = request.text;
+                  card.color = request.color;
+                  cards_mutator.Add(card);
 
-              CardAuthor author;
-              author.uid = uid;
-              author.cid = cid;
-              authors_mutator.Add(author);
+                  AuthorCard author;
+                  author.uid = uid;
+                  author.cid = cid;
+                  authors_mutator.Add(author);
 
-              AddCardResponse response;
-              response.ms = now;
-              response.cid = CIDToString(cid);
-              return Response(response, "created");
-            }
-          }, std::move(r));
-        } catch (const bricks::ParseJSONException&) {
-          DebugPrint(Printf("[/ctfo/card] Could not parse POST body. Requested URL = '%s'",
-                            r.url.ComposeURL().c_str()));
+                  ResponseAddCard response;
+                  response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
+                  response.cid = CIDToString(cid);
+                  return MakeResponse(std::move(response));
+                }
+              }, std::move(r)).Go();  // clang-format on
+        } catch (const current::TypeSystemParseJSONException& e) {
+          DebugPrint(Printf("[/ctfo/card] Could not parse POST body. Requested URL = '%s', e = '%s'",
+                            r.url.ComposeURL().c_str(),
+                            e.what()));
           r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
         }
       }
@@ -711,18 +651,15 @@ class CTFOServer final {
         r("NEED VALID CID\n", HTTPResponseCode.BadRequest);
       } else {
         const std::string requested_url = r.url.ComposeURL();
-        storage_.Transaction([this, requested_url, uid, cid, token](StorageAPI::T_DATA data) {
+        storage_.ReadWriteTransaction([this, requested_url, uid, cid, token](MutableFields<Storage> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
-          if (auth_token_accessor.Cols().Has(token)) {
-            // Something went terribly wrong
-            // if we have more than one authentication key for token.
-            assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-            if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
+          if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
+            if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto& auth_uid_accessor = data.auth_uid;
-              token_is_valid =
-                  auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
+              const auto& uid_auth_accessor = data.uid_auth;
+              token_is_valid = Exists(
+                  uid_auth_accessor.Get(uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
             }
           }
           if (!token_is_valid) {
@@ -730,41 +667,34 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint(Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
-            auto& cards_mutator = data.cards;
-            auto& card_authors_mutator = data.card_authors;
-            const auto& card_author_accessor = card_authors_mutator.Rows()[cid];
-            if (Exists(card_author_accessor)) {
-              const auto v = Value(card_author_accessor);
-              if (v.Size() != 1u) {
-                return Response("SOMETHING WENT WRONG\n", HTTPResponseCode.InternalServerError);
+            auto& cards_mutator = data.card;
+            auto& author_cards_mutator = data.author_card;
+            const auto author_card = author_cards_mutator.GetEntryFromCol(cid);
+            if (Exists(author_card)) {
+              const UID author_uid = Value(author_card).uid;
+              if (author_uid != uid) {
+                return Response("NOT YOUR CARD BRO\n", HTTPResponseCode.Unauthorized);
               } else {
-                const UID author_uid = (*v.begin()).uid;
-                if (author_uid != uid) {
-                  return Response("NOT YOUR CARD BRO\n", HTTPResponseCode.Unauthorized);
-                } else {
-                  cards_mutator.Erase(cid);
-                  card_authors_mutator.Delete(cid, uid);
-                  auto& comments_mutator = data.comments;
-                  std::vector<OID> oids_to_delete;
-                  const auto comments_per_card = comments_mutator.Rows()[cid];
-                  if (Exists(comments_per_card)) {
-                    for (const Comment& c : Value(comments_per_card)) {
-                      oids_to_delete.push_back(c.oid);
-                    }
-                  }
-                  for (const OID& o : oids_to_delete) {
-                    comments_mutator.Delete(cid, o);
-                  }
-                  DeleteCardResponse response;
-                  response.ms = static_cast<uint64_t>(bricks::time::Now());
-                  return Response(response, "deleted");
+                cards_mutator.Erase(cid);
+                author_cards_mutator.Erase(uid, cid);
+                auto& comments_mutator = data.comment;
+                std::vector<OID> oids_to_delete;
+                const auto comments_per_card = comments_mutator.Rows()[cid];
+                for (const auto& c : comments_mutator.Row(cid)) {
+                  oids_to_delete.push_back(c.oid);
                 }
+                for (const OID& o : oids_to_delete) {
+                  comments_mutator.Erase(cid, o);
+                }
+                ResponseDeleteCard response;
+                response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+                return MakeResponse(std::move(response));
               }
             } else {
               return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
             }
           }
-        }, std::move(r));
+        }, std::move(r)).Go();
       }
     } else {
       DebugPrint(Printf("[/ctfo/card] Wrong method '%s'. Requested URL = '%s'",
@@ -788,18 +718,15 @@ class CTFOServer final {
     } else {
       if (r.method == "GET") {
         const std::string requested_url = r.url.ComposeURL();
-        storage_.Transaction([this, uid, cid, token, requested_url](StorageAPI::T_DATA data) {
+        storage_.ReadOnlyTransaction([this, uid, cid, token, requested_url](ImmutableFields<Storage> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
-          if (auth_token_accessor.Cols().Has(token)) {
-            // Something went terribly wrong
-            // if we have more than one authentication key for token.
-            assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-            if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
+          if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
+            if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto& auth_uid_accessor = data.auth_uid;
-              token_is_valid =
-                  auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
+              const auto& uid_auth_accessor = data.uid_auth;
+              token_is_valid = Exists(
+                  uid_auth_accessor.Get(uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
             }
           }
           if (!token_is_valid) {
@@ -807,50 +734,45 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint("[/ctfo/comments] Token validated.");
-            if (!Exists(data.cards[cid])) {
+            if (!Exists(data.card[cid])) {
               return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
             }
-            const auto user = data.users[uid];
+            const auto user = data.user[uid];
             if (!Exists(user)) {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
-              const auto& users_accessor = data.users;
-              const auto& comments_accessor = data.comments;
-              const auto& comment_likes_accessor = data.comment_likes;
-              const auto& comment_flagged_accessor = data.flagged_comments;
+              const auto& users_accessor = data.user;
+              const auto& comments_accessor = data.comment;
+              const auto& comment_likes_accessor = data.comment_like;
+              const auto& comment_flagged_accessor = data.flagged_comment;
               std::vector<Comment> proto_comments;
               std::set<OID> flagged_comments;
-              const auto& comments = data.comments;
-              const auto comments_per_card = comments.Rows()[cid];
-              if (Exists(comments_per_card)) {
-                for (const auto& comment : Value(comments_per_card)) {
-                  if (comment_flagged_accessor.Has(comment.oid, uid)) {
+              if (!comments_accessor.Row(cid).Empty()) {
+                for (const auto& comment : comments_accessor.Row(cid)) {
+                  if (Exists(comment_flagged_accessor.Get(comment.oid, uid))) {
                     flagged_comments.insert(comment.oid);
                   }
                   // Make sure to not return comments left by the users the current user has blocked,
                   // comments left by banned users, or comments that are 2nd level with the 1st level comment
                   // being a comment from the user whom the current user has blocked, or who are banned.
                   bool comment_hidden_due_to_block_or_ban = false;
-                  if (data.user_blocked_user.Has(uid, comment.author_uid)) {
+                  if (Exists(data.user_blocked_user.Get(uid, comment.author_uid))) {
                     comment_hidden_due_to_block_or_ban = true;
-                  } else if (Exists(data.banned_users[comment.author_uid])) {
+                  } else if (Exists(data.banned_user[comment.author_uid])) {
                     comment_hidden_due_to_block_or_ban = true;
                   } else if (comment.parent_oid != OID::INVALID_COMMENT) {
-                    const auto top_level_comments = comments_accessor.Cols()[comment.parent_oid];
-                    if (Exists(top_level_comments)) {
-                      const auto v = Value(top_level_comments);
-                      if (v.Size() == 1u) {
-                        const Comment& parent_comment = *v.begin();
-                        if (data.user_blocked_user.Has(uid, parent_comment.author_uid)) {
-                          comment_hidden_due_to_block_or_ban = true;
-                        } else if (Exists(data.banned_users[parent_comment.author_uid])) {
-                          comment_hidden_due_to_block_or_ban = true;
-                        }
+                    const auto top_level_comment = comments_accessor.GetEntryFromCol(comment.parent_oid);
+                    if (Exists(top_level_comment)) {
+                      const Comment& parent_comment = Value(top_level_comment);
+                      if (Exists(data.user_blocked_user.Get(uid, parent_comment.author_uid))) {
+                        comment_hidden_due_to_block_or_ban = true;
+                      } else if (Exists(data.banned_user[parent_comment.author_uid])) {
+                        comment_hidden_due_to_block_or_ban = true;
                       }
                     }
                   }
                   if (!comment_hidden_due_to_block_or_ban) {
-                    proto_comments.push_back(comment);
+                    proto_comments.push_back(Value(comment));
                   }
                 }
               }
@@ -859,16 +781,13 @@ class CTFOServer final {
                 uint64_t top_level_comment_timestamp = 0u;
                 if (c.parent_oid == OID::INVALID_COMMENT) {
                   // This comment is top-level.
-                  top_level_comment_timestamp = c.ms;
+                  top_level_comment_timestamp = c.us.count();
                 } else {
                   // This is a 2nd-level comment.
-                  comment_timestamp = c.ms;
-                  const auto top_level_comments = comments_accessor.Cols()[c.parent_oid];
-                  if (Exists(top_level_comments)) {
-                    const auto v = Value(top_level_comments);
-                    if (v.Size() == 1u) {
-                      top_level_comment_timestamp = (*v.begin()).ms;
-                    }
+                  comment_timestamp = c.us.count();
+                  const auto top_level_comment = comments_accessor.GetEntryFromCol(c.parent_oid);
+                  if (Exists(top_level_comment)) {
+                    top_level_comment_timestamp = Value(top_level_comment).us.count();
                   }
                 }
                 // Top-level comments reverse chronologically, 2nd level comments chronologically.
@@ -879,7 +798,7 @@ class CTFOServer final {
                   proto_comments.end(),
                   [&sortkey](const Comment& lhs, const Comment& rhs) { return sortkey(lhs) < sortkey(rhs); });
               ResponseComments response;
-              response.ms = static_cast<uint64_t>(bricks::time::Now());
+              response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
               std::vector<ResponseComment>& output_comments = response.comments;
               for (const auto& comment : proto_comments) {
                 // TODO(dkorolev): Need a function to convert `Comment` into `ResponseComment`.
@@ -903,127 +822,114 @@ class CTFOServer final {
                   c.liked = v.Has(uid);
                 }
                 c.flagged_inappropriate = flagged_comments.count(comment.oid);
-                c.ms = comment.ms;
+                c.ms = std::chrono::duration_cast<std::chrono::milliseconds>(comment.us);
                 output_comments.push_back(std::move(c));
               }
-              return Response(response, "comments");
+              return MakeResponse(std::move(response));
             }
           }
-        }, std::move(r));
+        }, std::move(r)).Go();
       } else if (r.method == "POST") {
         const std::string requested_url = r.url.ComposeURL();
         const OID oid = RandomOID();
         try {
-          AddCommentRequest request;
+          RequestAddComment request;
           try {
-            CerealizeParseJSON(r.body, request);
-          } catch (const bricks::ParseJSONException&) {
-            const auto short_request = CerealizeParseJSON<AddCommentShortRequest>(r.body);
+            request = ParseRequest<RequestAddComment>(r.body);
+          } catch (const current::TypeSystemParseJSONException&) {
+            const auto short_request = ParseRequest<RequestAddCommentShort>(r.body);
             request.text = short_request.text;
           }
-          storage_.Transaction([this, cid, uid, oid, token, request, requested_url](StorageAPI::T_DATA data) {
-            bool token_is_valid = false;
-            const auto& auth_token_accessor = data.auth_token;
-            if (auth_token_accessor.Cols().Has(token)) {
-              // Something went terribly wrong
-              // if we have more than one authentication key for token.
-              assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-              if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
-                // Double check, if the provided `uid` is correct as well.
-                const auto& auth_uid_accessor = data.auth_uid;
-                token_is_valid =
-                    auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
-              }
-            }
-            if (!token_is_valid) {
-              DebugPrint(Printf("[/ctfo/comments] Invalid token. Requested URL = '%s'", requested_url.c_str()));
-              return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
-            } else {
-              DebugPrint(
-                  Printf("[/ctfo/comments] Token validated. Requested URL = '%s'", requested_url.c_str()));
-              const auto now = static_cast<uint64_t>(bricks::time::Now());
-
-              UID card_author_uid = UID::INVALID_USER;
-              OID parent_oid =
-                  (!request.parent_oid.empty()) ? StringToOID(request.parent_oid) : OID::INVALID_COMMENT;
-              UID parent_comment_author_uid = UID::INVALID_USER;
-              const auto& card_authors = data.card_authors;
-              const auto iterable = card_authors.Rows()[cid];
-              if (Exists(iterable)) {
-                const auto v = Value(iterable);
-                if (v.Size() == 1u) {
-                  card_author_uid = (*v.begin()).uid;
-                }
-              }
-
-              auto& comments_mutator = data.comments;
-
-              Comment comment;
-              comment.cid = cid;
-              comment.oid = oid;
-              comment.author_uid = uid;
-              comment.text = request.text;
-
-              if (parent_oid != OID::INVALID_COMMENT) {
-                comment.parent_oid = parent_oid;
-                const auto iterable = comments_mutator.Cols()[parent_oid];
-                if (Exists(iterable)) {
-                  const auto v = Value(iterable);
-                  if (v.Size() != 1u) {
-                    // TODO(dkorolev): This error is oh so wrong. Fix it.
-                    return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
-                  } else {
-                    const Comment& parent_comment = *v.begin();
-                    if (parent_comment.parent_oid != OID::INVALID_COMMENT) {
-                      return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n", HTTPResponseCode.BadRequest);
-                    }
-                    parent_comment_author_uid = parent_comment.author_uid;
+          storage_.ReadWriteTransaction(  // clang-format off
+              [this, cid, uid, oid, token, request, requested_url](MutableFields<Storage> data) {
+                bool token_is_valid = false;
+                const auto& auth_token_accessor = data.auth_token;
+                if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
+                  if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+                    // Double check, if the provided `uid` is correct as well.
+                    const auto& uid_auth_accessor = data.uid_auth;
+                    token_is_valid = Exists(uid_auth_accessor.Get(
+                        uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
                   }
+                }
+                if (!token_is_valid) {
+                  DebugPrint(Printf("[/ctfo/comments] Invalid token. Requested URL = '%s'",
+                                    requested_url.c_str()));
+                  return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
                 } else {
-                  return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
-                }
-              }
+                  DebugPrint(Printf("[/ctfo/comments] Token validated. Requested URL = '%s'",
+                                    requested_url.c_str()));
+                  const auto now = current::time::Now();
 
-              comments_mutator.Add(comment);
-
-              // Emit the "new comment on my card" notification.
-              if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
-                // Do not send "new comment on my card" if it is the reply to my own comment.
-                if (parent_comment_author_uid == UID::INVALID_USER ||
-                    parent_comment_author_uid != card_author_uid) {
-                  data.notifications.Add(Notification(
-                      card_author_uid, now, std::make_shared<NotificationMyCardNewComment>(comment)));
-                }
-              }
-
-              // Emit the "new comment on a card you starred" notification.
-              const auto card_favoriters = data.favorites.Cols()[cid];
-              if (Exists(card_favoriters)) {
-                for (const Favorite& fav : Value(card_favoriters)) {
-                  // Do not send the notification if the favoriter is the author of the card.
-                  // (As the code above has already sent the "new comment on my card" notification.)
-                  if (fav.uid != uid && fav.uid != card_author_uid) {
-                    data.notifications.Add(Notification(
-                        fav.uid, now, std::make_shared<NotificationNewCommentOnCardIStarred>(uid, comment)));
+                  UID card_author_uid = UID::INVALID_USER;
+                  OID parent_oid = (!request.parent_oid.empty()) ? StringToOID(request.parent_oid)
+                                                                  : OID::INVALID_COMMENT;
+                  UID parent_comment_author_uid = UID::INVALID_USER;
+                  const auto& author_cards = data.author_card;
+                  const auto element = author_cards.GetEntryFromCol(cid);
+                  if (Exists(element)) {
+                    card_author_uid = Value(element).uid;
                   }
+
+                  auto& comments_mutator = data.comment;
+
+                  Comment comment;
+                  comment.cid = cid;
+                  comment.oid = oid;
+                  comment.author_uid = uid;
+                  comment.text = request.text;
+
+                  if (parent_oid != OID::INVALID_COMMENT) {
+                    comment.parent_oid = parent_oid;
+                    const auto v = comments_mutator.GetEntryFromCol(parent_oid);
+                    if (Exists(v)) {
+                      const Comment& parent_comment = Value(v);
+                      if (parent_comment.parent_oid != OID::INVALID_COMMENT) {
+                        return Response("ATTEMPTED TO ADD A 3RD LEVEL COMMENT\n",
+                                        HTTPResponseCode.BadRequest);
+                      }
+                      parent_comment_author_uid = parent_comment.author_uid;
+                    } else {
+                      return Response("NEED EMPTY OR VALID PARENT_OID\n", HTTPResponseCode.BadRequest);
+                    }
+                  }
+
+                  comments_mutator.Add(comment);
+
+                  // Emit the "new comment on my card" notification.
+                  if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
+                    // Do not send "new comment on my card" if it is the reply to my own comment.
+                    if (parent_comment_author_uid == UID::INVALID_USER ||
+                        parent_comment_author_uid != card_author_uid) {
+                      data.notification.Add(
+                          Notification(card_author_uid, now, NotificationMyCardNewComment(comment)));
+                    }
+                  }
+
+                  // Emit the "new comment on a card you starred" notification.
+                  for (const Favorite& fav : data.favorite.Col(cid)) {
+                    // Do not send the notification if the favoriter is the author of the card.
+                    // (As the code above has already sent the "new comment on my card" notification.)
+                    if (fav.uid != uid && fav.uid != card_author_uid) {
+                      data.notification.Add(Notification(
+                          fav.uid, now, NotificationNewCommentOnCardIStarred(uid, comment)));
+                    }
+                  }
+
+                  if (parent_comment_author_uid != UID::INVALID_USER &&
+                      parent_comment_author_uid != uid) {
+                    // Emit the "new reply to your comment" notification.
+                    data.notification.Add(Notification(
+                        parent_comment_author_uid, now, NotificationNewReplyToMyComment(comment)));
+                  }
+
+                  ResponseAddComment response;
+                  response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
+                  response.oid = OIDToString(oid);
+                  return MakeResponse(std::move(response));
                 }
-              }
-
-              if (parent_comment_author_uid != UID::INVALID_USER && parent_comment_author_uid != uid) {
-                // Emit the "new reply to your comment" notification.
-                data.notifications.Add(
-                    Notification(parent_comment_author_uid,
-                                 now,
-                                 std::make_shared<NotificationNewReplyToMyComment>(comment)));
-              }
-
-              AddCommentResponse response;
-              response.ms = now;
-              response.oid = OIDToString(oid);
-              return Response(response, "created");
-            }
-          }, std::move(r));
-        } catch (const bricks::ParseJSONException&) {
+              }, std::move(r)).Go();  // clang-format on
+        } catch (const current::TypeSystemParseJSONException&) {
           DebugPrint(Printf("[/ctfo/comments] Could not parse POST body. Requested URL = '%s'",
                             r.url.ComposeURL().c_str()));
           r("NEED VALID BODY\n", HTTPResponseCode.BadRequest);
@@ -1035,46 +941,44 @@ class CTFOServer final {
           r("NEED VALID OID\n", HTTPResponseCode.BadRequest);
         } else {
           const std::string requested_url = r.url.ComposeURL();
-          storage_.Transaction([this, requested_url, uid, cid, token, oid](StorageAPI::T_DATA data) {
-            bool token_is_valid = false;
-            const auto& auth_token_accessor = data.auth_token;
-            if (auth_token_accessor.Cols().Has(token)) {
-              // Something went terribly wrong
-              // if we have more than one authentication key for token.
-              assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-              if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
-                // Double check, if the provided `uid` is correct as well.
-                const auto& auth_uid_accessor = data.auth_uid;
-                token_is_valid =
-                    auth_uid_accessor.Has(Value(auth_token_accessor.Cols()[token]).begin().key(), uid);
-              }
-            }
-            if (!token_is_valid) {
-              DebugPrint(Printf("[/ctfo/comments] Invalid token. Requested URL = '%s'", requested_url.c_str()));
-              return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
-            } else {
-              DebugPrint(
-                  Printf("[/ctfo/comments] Token validated. Requested URL = '%s'", requested_url.c_str()));
-              // TODO(dkorolev): Do something smart about non-existing comments.
-              auto& comments_mutator = data.comments;
-              std::vector<OID> oids_to_delete;
-              oids_to_delete.push_back(oid);
-              const auto comments_per_card = comments_mutator.Rows()[cid];
-              if (Exists(comments_per_card)) {
-                for (const Comment& c : Value(comments_per_card)) {
-                  if (c.parent_oid == oid) {
-                    oids_to_delete.push_back(c.oid);
+          storage_.ReadWriteTransaction(  // clang-format off
+              [this, requested_url, uid, cid, token, oid](MutableFields<Storage> data) {
+                bool token_is_valid = false;
+                const auto& auth_token_accessor = data.auth_token;
+                if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
+                  if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+                    // Double check, if the provided `uid` is correct as well.
+                    const auto& uid_auth_accessor = data.uid_auth;
+                    token_is_valid = Exists(uid_auth_accessor.Get(
+                        uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
                   }
                 }
-                for (const OID& o : oids_to_delete) {
-                  comments_mutator.Delete(cid, o);
+                if (!token_is_valid) {
+                  DebugPrint(Printf("[/ctfo/comments] Invalid token. Requested URL = '%s'",
+                                     requested_url.c_str()));
+                  return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
+                } else {
+                  DebugPrint(Printf("[/ctfo/comments] Token validated. Requested URL = '%s'",
+                                     requested_url.c_str()));
+                  // TODO(dkorolev): Do something smart about non-existing comments.
+                  auto& comments_mutator = data.comment;
+                  std::vector<OID> oids_to_delete;
+                  oids_to_delete.push_back(oid);
+                  const auto comments_per_card = comments_mutator.Rows()[cid];
+                  for (const Comment& c : comments_mutator.Row(cid)) {
+                    if (c.parent_oid == oid) {
+                      oids_to_delete.push_back(c.oid);
+                    }
+                  }
+                  for (const OID& o : oids_to_delete) {
+                    comments_mutator.Erase(cid, o);
+                  }
+                  ResponseDeleteComment response;
+                  response.ms =
+                      std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+                  return MakeResponse(std::move(response));
                 }
-              }
-              DeleteCommentResponse response;
-              response.ms = static_cast<uint64_t>(bricks::time::Now());
-              return Response(response, "deleted");
-            }
-          }, std::move(r));
+              }, std::move(r)).Go();  // clang-format on
         }
       } else {
         DebugPrint(Printf("[/ctfo/comments] Wrong method '%s'. Requested URL = '%s'",
@@ -1087,12 +991,11 @@ class CTFOServer final {
 
  private:
   const int port_;
-  const std::string event_log_file_;
-  std::ofstream event_log_stream_;
-  EventCollectorHTTPServer event_collector_;
+  std::ofstream midichlorians_stream_;
+  MidichloriansServer midichlorians_server_;
   const bool debug_print_;
 
-  StorageAPI storage_;
+  Storage storage_;
 
   const std::map<std::string, LOG_EVENT> valid_responses_ = {{"CTFO", LOG_EVENT::CTFO},
                                                              {"TFU", LOG_EVENT::TFU},
@@ -1126,45 +1029,46 @@ class CTFOServer final {
     entry.banned = banned;
   }
 
-  ResponseFeed GenerateResponseFeed(StorageAPI::T_DATA data,
+  ResponseFeed GenerateResponseFeed(ImmutableFields<Storage> data,
                                     ResponseUserEntry user_entry,
                                     size_t feed_size,
-                                    uint64_t notifications_since) {
+                                    uint64_t notifications_since,
+                                    size_t FEED_SIZE_LIMIT = 300ul,
+                                    bool initial = false) {
     ResponseFeed response;
-    constexpr size_t FEED_SIZE_LIMIT = 300ul;
     const size_t max_count = std::min(feed_size, FEED_SIZE_LIMIT);
     response.user = user_entry;
 
-    const auto& cards = data.cards;
-    const auto& answers = data.answers;
-    const auto& flagged_cards = data.flagged_cards;
-    const auto& favorites = data.favorites;
+    const auto& cards = data.card;
+    const auto& answers = data.answer;
+    const auto& flagged_cards = data.flagged_card;
+    const auto& favorites = data.favorite;
 
     std::set<std::pair<double, CID>> hot_cards;
     std::set<std::pair<double, CID>> recent_cards;
     const UID uid = StringToUID(response.user.uid);
 
-    const uint64_t now = static_cast<uint64_t>(bricks::time::Now());
+    const uint64_t now = current::time::Now().count();
     for (const auto& card : cards) {
-      if (!answers.Has(uid, card.cid) && !flagged_cards.Has(card.cid, uid)) {
+      if (initial && card.ctfo_count + card.tfu_count + card.skip_count < 5) continue;
+      if (!Exists(answers.Get(uid, card.cid)) && !Exists(flagged_cards.Get(card.cid, uid))) {
         const UID card_author_uid = [&data](CID cid) {
-          const auto& card_authors = data.card_authors;
-          const auto iterable = card_authors.Rows()[cid];
-          if (Exists(iterable)) {
-            const auto v = Value(iterable);
-            if (v.Size() == 1u) {
-              return (*v.begin()).uid;
-            }
-          }
-          return UID::INVALID_USER;
+          const auto& author_cards = data.author_card;
+          const auto v = author_cards.GetEntryFromCol(cid);
+          return Exists(v) ? Value(v).uid : UID::INVALID_USER;
         }(card.cid);
 
-        if (card_author_uid == UID::INVALID_USER || (!Exists(data.banned_users[card_author_uid]) &&
-                                                     !data.user_blocked_user.Has(uid, card_author_uid))) {
+        if (card_author_uid == UID::INVALID_USER ||
+            (!Exists(data.banned_user[card_author_uid]) &&
+             !Exists(data.user_blocked_user.Get(uid, card_author_uid)))) {
           // For the recent feed, relevance is the function of the age of the card.
           // Added just now => 1.00. Added 24 hour ago => 0.99. Added 48 hours ago => 0.99^2. Etc.
-          double time_order_key = 0.9 * std::pow(0.99, (now - card.ms) * (1.0 / (1000 * 60 * 60 * 24)));
+          double time_order_key =
+              0.9 * std::pow(0.99, (now - card.us.count()) * (1.0 / (1000ll * 1000 * 60 * 60 * 24)));
           double hot_order_key = RandomDouble(0.2, 0.4);
+          if (initial) {
+            hot_order_key = 1.0 / (1.0 + exp(0.01 * (-1.0 * card.ctfo_count + +1.0 * card.tfu_count)));
+          }
           if (card.startup_index) {
             time_order_key = 1.0 - 1e-6 * card.startup_index;
             hot_order_key = 1.0 - 1e-6 * card.startup_index;
@@ -1181,27 +1085,21 @@ class CTFOServer final {
       }
     }
 
-    const auto& card_authors = data.card_authors;
-    const auto& comments = data.comments;
+    const auto& author_cards = data.author_card;
+    const auto& comments = data.comment;
     const auto GenerateCardForFeed =
-        [this, uid, &answers, &favorites, &comments, &card_authors](const Card& card) {
+        [this, uid, &answers, &favorites, &comments, &author_cards](const Card& card) {
           ResponseCardEntry card_entry;
           card_entry.cid = CIDToString(card.cid);
-          const auto iterable = card_authors.Rows()[card.cid];
-          if (Exists(iterable)) {
-            const auto v = Value(iterable);
-            if (v.Size() == 1u) {
-              const UID author_uid = (*v.begin()).uid;
-              card_entry.author_uid = UIDToString(author_uid);
-              card_entry.is_my_card = (uid == author_uid);
-            }
+          const auto v = author_cards.GetEntryFromCol(card.cid);
+          if (Exists(v)) {
+            const UID author_uid = Value(v).uid;
+            card_entry.author_uid = UIDToString(author_uid);
+            card_entry.is_my_card = (uid == author_uid);
           }
-          const auto comments_for_card = comments.Rows()[card.cid];
-          if (Exists(comments_for_card)) {
-            card_entry.number_of_comments = Value(comments_for_card).Size();
-          }
+          card_entry.number_of_comments = comments.Row(card.cid).Size();
           card_entry.text = card.text;
-          card_entry.ms = card.ms;
+          card_entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(card.us);
           card_entry.color = card.color;
           card_entry.relevance = 0.0;  // Will be overridden later.
           card_entry.ctfo_score = 50u;
@@ -1242,7 +1140,7 @@ class CTFOServer final {
 
     for (size_t i = 0; i < 2; ++i) {
       for (auto cit = prepared_cards[i].get().rbegin(); cit != prepared_cards[i].get().rend(); ++cit) {
-        const auto card = data.cards[cit->second];
+        const auto card = data.card[cit->second];
         if (Exists(card)) {
           feeds[i].get().push_back(GenerateCardForFeed(Value(card)));
           feeds[i].get().back().relevance = cit->first;
@@ -1253,24 +1151,18 @@ class CTFOServer final {
     if (notifications_since != static_cast<uint64_t>(-1)) {
       // Shamelessly copy-pasted from GenerateCardForFeed. -- D.K.
       const auto GenerateCardForNotification =
-          [this, uid, &answers, &favorites, &comments, &card_authors](const Card& card) {
+          [this, uid, &answers, &favorites, &comments, &author_cards](const Card& card) {
             ResponseCardEntry card_entry;
             card_entry.cid = CIDToString(card.cid);
-            const auto iterable = card_authors.Rows()[card.cid];
-            if (Exists(iterable)) {
-              const auto v = Value(iterable);
-              if (v.Size() == 1u) {
-                const UID author_uid = (*v.begin()).uid;
-                card_entry.author_uid = UIDToString(author_uid);
-                card_entry.is_my_card = (uid == author_uid);
-              }
+            const auto v = author_cards.GetEntryFromCol(card.cid);
+            if (Exists(v)) {
+              const UID author_uid = Value(v).uid;
+              card_entry.author_uid = UIDToString(author_uid);
+              card_entry.is_my_card = (uid == author_uid);
             }
-            const auto comments_for_card = comments.Rows()[card.cid];
-            if (Exists(comments_for_card)) {
-              card_entry.number_of_comments = Value(comments_for_card).Size();
-            }
+            card_entry.number_of_comments = comments.Row(card.cid).Size();
             card_entry.text = card.text;
-            card_entry.ms = card.ms;
+            card_entry.ms = std::chrono::duration_cast<std::chrono::milliseconds>(card.us);
             card_entry.color = card.color;
             card_entry.relevance = 0.0;  // Will be overridden later.
             card_entry.ctfo_score = 50u;
@@ -1301,35 +1193,32 @@ class CTFOServer final {
           };
       // TODO(dkorolev): `upper_bound`, not go through all notifications for this user.
       std::map<CID, ResponseCardEntry> cards_used;
-      const auto notifications_for_user = data.notifications.Rows()[uid];
-      if (Exists(notifications_for_user)) {
-        for (const Notification& notification : Value(notifications_for_user)) {
-          if (notification.timestamp.ms > notifications_since) {
-            const CID cid = notification.GetCID();
-            if (cid != CID::INVALID_CARD && !cards_used.count(cid)) {
-              const auto card = data.cards[cid];
-              if (Exists(card)) {
-                cards_used[cid] = GenerateCardForNotification(Value(card));
-              }
+      for (const Notification& notification : data.notification.Row(uid)) {
+        if (static_cast<uint64_t>(notification.timestamp.count()) > notifications_since) {
+          const CID cid = notification.GetCID();
+          if (cid != CID::INVALID_CARD && !cards_used.count(cid)) {
+            const auto card = data.card[cid];
+            if (Exists(card)) {
+              cards_used[cid] = GenerateCardForNotification(Value(card));
             }
-            // Explicitly hold off on sending notifications for already non-existent cards.
-            if (cid == CID::INVALID_CARD || cards_used.count(cid)) {
-              response.notifications.push_back(notification.BuildResponseNotification());
-              if (cid != CID::INVALID_CARD) {
-                response.notifications.back().card = cards_used[cid];
-              }
-              // TODO(dkorolev): Command line flag or parameter instead of bare `50`.
-              if (response.notifications.size() >= 50u) {
-                break;
-              }
+          }
+          // Explicitly hold off on sending notifications for already non-existent cards.
+          if (cid == CID::INVALID_CARD || cards_used.count(cid)) {
+            response.notifications.push_back(notification.BuildResponseNotification());
+            if (cid != CID::INVALID_CARD) {
+              response.notifications.back().card = cards_used[cid];
+            }
+            // TODO(dkorolev): Command line flag or parameter instead of bare `50`.
+            if (response.notifications.size() >= 50u) {
+              break;
             }
           }
         }
-        std::reverse(response.notifications.begin(), response.notifications.end());
       }
+      std::reverse(response.notifications.begin(), response.notifications.end());
     }
 
-    response.ms = static_cast<uint64_t>(bricks::time::Now());
+    response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
     DebugPrint(Printf("[RespondWithFeed] Generated response for UID '%s' with %u 'hot' and %u 'recent' cards",
                       response.user.uid.c_str(),
                       response.feed_hot.size(),
@@ -1337,320 +1226,287 @@ class CTFOServer final {
     return response;
   }
 
-  void OnMidichloriansEvent(const LogEntryWithHeaders& entry) {
-    std::unique_ptr<MidichloriansEvent> event;
-    if (entry.m == "POST") {
-      try {
-        CerealizeParseJSON(entry.b, event);
-        UpdateStateOnEvent(event);
-      } catch (const bricks::ParseJSONException&) {
-        DebugPrint(Printf("[OnMidichloriansEvent] ParseJSON failed. entry.b = '%s')", entry.b.c_str()));
-      }
-    } else {
-      if (entry.m != "TICK") {
-        DebugPrint(Printf(
-            "[OnMidichloriansEvent] Suspicious event with method '%s' (t = %llu)", entry.m.c_str(), entry.t));
-      }
-    }
-  }
-
-  void UpdateStateOnEvent(const std::unique_ptr<MidichloriansEvent>& event) {
-    DebugPrint("[UpdateStateOnEvent] Parsing event.");
+  void UpdateStateOnEvent(const current::midichlorians::ios::iOSGenericEvent& ge) {
     try {
-      const iOSGenericEvent& ge = dynamic_cast<const iOSGenericEvent&>(*event.get());
-      try {
-        const LOG_EVENT response = valid_responses_.at(ge.event);
-        const std::string& uid_str = ge.fields.at("uid");
-        const std::string token = ge.fields.at("token");
-        const std::string& whom_str = ge.fields.count("whom") ? ge.fields.at("whom") : "";
-        const std::string cid_str = ge.fields.count("cid") ? ge.fields.at("cid") : "";
-        const std::string oid_str = ge.fields.count("oid") ? ge.fields.at("oid") : "";
-        const UID uid = StringToUID(uid_str);
-        const UID whom = StringToUID(whom_str);
-        const CID cid = StringToCID(cid_str);
-        const OID oid = StringToOID(oid_str);
-        DebugPrint(Printf("[UpdateStateOnEvent] Event='%s', uid='%s', cid='%s', oid='%s', token='%s'",
-                          ge.event.c_str(),
-                          uid_str.c_str(),
-                          cid_str.c_str(),
-                          oid_str.c_str(),
-                          token.c_str()));
-        if (uid != UID::INVALID_USER) {
-          storage_.Transaction(
-              [this, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, response](
-                  StorageAPI::T_DATA data) {
-                const auto& auth_token_accessor = data.auth_token;
-                bool token_is_valid = false;
-                if (auth_token_accessor.Cols().Has(token)) {
-                  // Something went terribly wrong
-                  // if we have more than one authentication key for token.
-                  assert(Value(auth_token_accessor.Cols()[token]).Size() == 1u);
-                  if (Value(auth_token_accessor.Cols()[token]).begin()->valid) {
-                    token_is_valid = true;
-                  }
+      const LOG_EVENT response = valid_responses_.at(ge.event);
+      const std::string& uid_str = ge.fields.at("uid");
+      const std::string token = ge.fields.at("token");
+      const std::string& whom_str = ge.fields.count("whom") ? ge.fields.at("whom") : "";
+      const std::string cid_str = ge.fields.count("cid") ? ge.fields.at("cid") : "";
+      const std::string oid_str = ge.fields.count("oid") ? ge.fields.at("oid") : "";
+      const UID uid = StringToUID(uid_str);
+      const UID whom = StringToUID(whom_str);
+      const CID cid = StringToCID(cid_str);
+      const OID oid = StringToOID(oid_str);
+      DebugPrint(Printf("[UpdateStateOnEvent] Event='%s', uid='%s', cid='%s', oid='%s', token='%s'",
+                        ge.event.c_str(),
+                        uid_str.c_str(),
+                        cid_str.c_str(),
+                        oid_str.c_str(),
+                        token.c_str()));
+      if (uid != UID::INVALID_USER) {  // clang-format off
+        storage_.ReadWriteTransaction(
+            [this, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, response](
+                MutableFields<Storage> data) {
+              const auto& auth_token_accessor = data.auth_token;
+              bool token_is_valid = false;
+              if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
+                if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+                  token_is_valid = true;
                 }
-                if (token_is_valid) {
-                  if (!Exists(data.users[uid])) {
-                    DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s'.", uid_str.c_str()));
+              }
+              if (token_is_valid) {
+                if (!Exists(data.user[uid])) {
+                  DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s'.", uid_str.c_str()));
+                  return;
+                }
+                if (response == LOG_EVENT::SKIP || response == LOG_EVENT::CTFO ||
+                    response == LOG_EVENT::TFU) {
+                  if (cid == CID::INVALID_CARD) {
+                    DebugPrint("[UpdateStateOnEvent] No CID.");
                     return;
                   }
-                  if (response == LOG_EVENT::SKIP || response == LOG_EVENT::CTFO ||
-                      response == LOG_EVENT::TFU) {
-                    if (cid == CID::INVALID_CARD) {
-                      DebugPrint("[UpdateStateOnEvent] No CID.");
-                      return;
-                    }
-                    if (!Exists(data.cards[cid])) {
-                      DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in SKIP/CTFO/TFU.",
-                                        cid_str.c_str()));
-                      return;
-                    }
-                    // Do not overwrite existing answers, except for CTFO/TFU can and should overwrite SKIP.
-                    const bool has_answer = data.answers.Has(uid, cid);
-                    const bool skip_to_overwrite = 
-                        response != LOG_EVENT::SKIP &&
-                        has_answer &&
-                        Value(data.answers.Get(uid, cid)).answer == ANSWER::SKIP;
-                    if (!has_answer || skip_to_overwrite) {
-                      data.answers.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
-                      DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
-                                        UIDToString(uid).c_str(),
-                                        CIDToString(cid).c_str(),
-                                        static_cast<int>(response)));
-                      const auto optional_card = data.cards[cid];
-                      const auto optional_user = data.users[uid];
-                      if (Exists(optional_card) && Exists(optional_user)) {
-                        Card card = Value(optional_card);
-                        User user = Value(optional_user);
-                        if (response == LOG_EVENT::SKIP) {
-                          ++card.skip_count;
-                        } else {
-                          if (skip_to_overwrite) {
-                            if (card.skip_count) {
-                              // Extra safety just in case it's zero.
-                              --card.skip_count;
-                            }
-                          }
-                          if (response == LOG_EVENT::CTFO) {
-                            ++card.ctfo_count;
-                            DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
-                                              CIDToString(cid).c_str(),
-                                              card.ctfo_count));
-                            user.score += 50u;
-                            DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
-                                              UIDToString(uid).c_str(),
-                                              50u));
-                          } else if (response == LOG_EVENT::TFU) {
-                            ++card.tfu_count;
-                            DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
-                                              CIDToString(cid).c_str(),
-                                              card.tfu_count));
-                            user.score += 50u;
-                            DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
-                                              UIDToString(uid).c_str(),
-                                              50u));
-                          }
-                        }
-
-                        if (response != LOG_EVENT::SKIP && user.level < LEVEL_SCORES.size() - 1 &&
-                            user.score > LEVEL_SCORES[user.level + 1]) {
-                          user.score -= LEVEL_SCORES[user.level + 1];
-                          ++user.level;
-                          DebugPrint(Printf("[UpdateStateOnEvent] User '%s' got promoted to a new level = %u",
-                                            UIDToString(uid).c_str(),
-                                            user.level));
-                        }
-                        data.cards.Insert(card);
-                        data.users.Insert(user);
-
-                        if (response != LOG_EVENT::SKIP) {
-                          // Emit the "new votes on my card" notification.
-                          const auto iterable = data.card_authors.Rows()[cid];
-                          if (Exists(iterable)) {
-                            // Of course, there can only be one author, but meh. -- D.K.
-                            for (const auto& authors : Value(iterable)) {
-                              const UID author_uid = authors.uid;
-                              if (author_uid != UID::INVALID_USER && author_uid != uid) {
-                                data.notifications.Add(
-                                    Notification(author_uid,
-                                                 static_cast<uint64_t>(bricks::time::Now()),
-                                                 std::make_shared<NotificationNewVotesOnMyCard>(uid, cid)));
-                              }
-                            }
-                          }
-                        }
-                      }
-                    } else {
-                      DebugPrint(Printf("[UpdateStateOnEvent] Answer already exists: [%s, %s, %d]",
-                                        UIDToString(uid).c_str(),
-                                        CIDToString(cid).c_str(),
-                                        static_cast<int>(Value(data.answers.Get(uid, cid)).answer)));
-                    }
-                  } else if (response == LOG_EVENT::FAV_CARD || response == LOG_EVENT::UNFAV_CARD) {
-                    if (cid == CID::INVALID_CARD) {
-                      DebugPrint("[UpdateStateOnEvent] No CID.");
-                      return;
-                    }
-                    if (!Exists(data.cards[cid])) {
-                      DebugPrint(
-                          Printf("[UpdateStateOnEvent] Nonexistent CID '%s' FAV/UNFAV.", cid_str.c_str()));
-                      return;
-                    }
-                    auto& favorites_mutator = data.favorites;
-                    favorites_mutator.Add(Favorite(uid, cid, (response == LOG_EVENT::FAV_CARD)));
-                    DebugPrint(Printf("[UpdateStateOnEvent] Added favorite: [%s, %s, %s]",
+                  if (!Exists(data.card[cid])) {
+                    DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in SKIP/CTFO/TFU.",
+                                      cid_str.c_str()));
+                    return;
+                  }
+                  // Do not overwrite existing answers, except for CTFO/TFU can and should overwrite
+                  // SKIP.
+                  const bool has_answer = Exists(data.answer.Get(uid, cid));
+                  const bool skip_to_overwrite = response != LOG_EVENT::SKIP && has_answer &&
+                                                  Value(data.answer.Get(uid, cid)).answer == ANSWER::SKIP;
+                  if (!has_answer || skip_to_overwrite) {
+                    data.answer.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
+                    DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
                                       UIDToString(uid).c_str(),
                                       CIDToString(cid).c_str(),
-                                      (response == LOG_EVENT::FAV_CARD) ? "Favorite" : "Unfavorite"));
-
-                    if (response == LOG_EVENT::FAV_CARD) {
-                      // Emit the "my card starred" notification.
-                      const auto star_notification_key = UIDAndCID(uid, cid);
-                      if (!Exists(data.starred_notification_already_sent[star_notification_key])) {
-                        // Only send the notification about the behavior of this { user, card } once.
-                        data.starred_notification_already_sent.Insert(
-                            StarNotificationAlreadySent{star_notification_key});
-                        const auto iterable = data.card_authors.Rows()[cid];
-                        if (Exists(iterable)) {
-                          // Of course, there can only be one author, but meh. -- D.K.
-                          for (const auto& authors : Value(iterable)) {
-                            const UID author_uid = authors.uid;
-                            if (author_uid != UID::INVALID_USER && author_uid != uid) {
-                              data.notifications.Add(
-                                  Notification(author_uid,
-                                               static_cast<uint64_t>(bricks::time::Now()),
-                                               std::make_shared<NotificationMyCardStarred>(uid, cid)));
-                            }
+                                      static_cast<int>(response)));
+                    const auto optional_card = data.card[cid];
+                    const auto optional_user = data.user[uid];
+                    if (Exists(optional_card) && Exists(optional_user)) {
+                      Card card = Value(optional_card);
+                      User user = Value(optional_user);
+                      if (response == LOG_EVENT::SKIP) {
+                        ++card.skip_count;
+                      } else {
+                        if (skip_to_overwrite) {
+                          if (card.skip_count) {
+                            // Extra safety just in case it's zero.
+                            --card.skip_count;
                           }
                         }
-                      }
-                    }
-                  } else if (response == LOG_EVENT::LIKE_COMMENT || response == LOG_EVENT::UNLIKE_COMMENT ||
-                             response == LOG_EVENT::FLAG_COMMENT) {
-                    if (oid == OID::INVALID_COMMENT) {
-                      DebugPrint("[UpdateStateOnEvent] No OID.");
-                      return;
-                    }
-                    if (!data.comments.Cols().Has(oid)) {
-                      DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent OID '%s' LIKE/UNLIKE/FLAG.",
-                                        oid_str.c_str()));
-                      return;
-                    }
-                    if (response == LOG_EVENT::LIKE_COMMENT) {
-                      DebugPrint(Printf(
-                          "[UpdateStateOnEvent] Like comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
-                      CommentLike like;
-                      like.oid = oid;
-                      like.uid = uid;
-                      data.comment_likes.Add(like);
-
-                      // Emit the "my comment liked" notification.
-                      const auto comments_iterator = data.comments.Cols()[oid];
-                      if (Exists(comments_iterator)) {
-                        const auto comments = Value(comments_iterator);
-                        if (comments.Size() == 1u) {
-                          const Comment& comment = *comments.begin();
-                          UID comment_author_uid = comment.author_uid;
-                          if (comment_author_uid != UID::INVALID_USER && comment_author_uid != like.uid) {
-                            data.notifications.Add(
-                                Notification(comment_author_uid,
-                                             static_cast<uint64_t>(bricks::time::Now()),
-                                             std::make_shared<NotificationMyCommentLiked>(like.uid, comment)));
-                          }
+                        if (response == LOG_EVENT::CTFO) {
+                          ++card.ctfo_count;
+                          DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
+                                            CIDToString(cid).c_str(),
+                                            card.ctfo_count));
+                          user.score += 50u;
+                          DebugPrint(
+                              Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
+                                     UIDToString(uid).c_str(),
+                                     50u));
+                        } else if (response == LOG_EVENT::TFU) {
+                          ++card.tfu_count;
+                          DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
+                                            CIDToString(cid).c_str(),
+                                            card.tfu_count));
+                          user.score += 50u;
+                          DebugPrint(
+                              Printf("[UpdateStateOnEvent] User '%s' got %u points for 'TFU' answer",
+                                     UIDToString(uid).c_str(),
+                                     50u));
                         }
                       }
 
-                    } else if (response == LOG_EVENT::UNLIKE_COMMENT) {
-                      DebugPrint(Printf(
-                          "[UpdateStateOnEvent] Unlike comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
-                      data.comment_likes.Delete(oid, uid);
-                    } else if (response == LOG_EVENT::FLAG_COMMENT) {
-                      DebugPrint(Printf(
-                          "[UpdateStateOnEvent] Flag comment '%s' '%s'.", uid_str.c_str(), oid_str.c_str()));
-                      CommentFlagAsInappropriate flag;
-                      flag.oid = oid;
-                      flag.uid = uid;
-                      data.flagged_comments.Add(flag);
-                    } else {
-                      DebugPrint(
-                          Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
-                                 static_cast<int>(response),
-                                 uid_str.c_str(),
-                                 cid_str.c_str(),
-                                 token.c_str()));
-                    }
-                  } else if (response == LOG_EVENT::FLAG_CARD) {
-                    if (cid == CID::INVALID_CARD) {
-                      DebugPrint("[UpdateStateOnEvent] No CID.");
-                      return;
-                    }
-                    if (!Exists(data.cards[cid])) {
-                      DebugPrint(
-                          Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in FLAG_CARD.", cid_str.c_str()));
-                      return;
-                    }
-                    DebugPrint(
-                        Printf("[UpdateStateOnEvent] Flag card '%s' '%s'.", uid_str.c_str(), cid_str.c_str()));
-                    CardFlagAsInappropriate flag;
-                    flag.cid = cid;
-                    flag.uid = uid;
-                    data.flagged_cards.Add(flag);
-                  } else if (response == LOG_EVENT::REPORT_USER || response == LOG_EVENT::BLOCK_USER) {
-                    if (whom == UID::INVALID_USER) {
-                      DebugPrint("[UpdateStateOnEvent] No WHOM.");
-                      return;
-                    }
-                    if (whom == uid) {
-                      DebugPrint("[UpdateStateOnEvent] WHOM == UID.");
-                      return;
-                    }
-                    if (whom == admin_uid) {
-                      DebugPrint("[UpdateStateOnEvent] WHOM == ADMIN_UID.");
-                      return;
-                    }
-                    DebugPrint(Printf("[UpdateStateOnEvent] '%s' %s '%s'.",
-                                      uid_str.c_str(),
-                                      (response == LOG_EVENT::REPORT_USER) ? "reported" : "blocked",
-                                      whom_str.c_str()));
-                    if (response == LOG_EVENT::REPORT_USER) {
-                      data.user_reported_user.Add(UserReportedUser(uid, whom));
-                    } else {
-                      data.user_blocked_user.Add(UserBlockedUser(uid, whom));
-                    }
-                    {
-                      const auto blocks = data.user_blocked_user.Cols()[whom];
-                      const auto reports = data.user_reported_user.Cols()[whom];
-                      if ((Exists(blocks) && Value(blocks).Size() >= FLAGS_blocks_to_ban) ||
-                          (Exists(reports) && Value(reports).Size() >= FLAGS_reports_to_ban)) {
-                        BanUser(data, whom);
+                      if (response != LOG_EVENT::SKIP && user.level < LEVEL_SCORES.size() - 1 &&
+                          user.score > LEVEL_SCORES[user.level + 1]) {
+                        user.score -= LEVEL_SCORES[user.level + 1];
+                        ++user.level;
+                        DebugPrint(
+                            Printf("[UpdateStateOnEvent] User '%s' got promoted to a new level = %u",
+                                  UIDToString(uid).c_str(),
+                                  user.level));
+                      }
+                      data.card.Add(card);
+                      data.user.Add(user);
+
+                      if (response != LOG_EVENT::SKIP) {
+                        // Emit the "new votes on my card" notification.
+                        const auto author = data.author_card.GetEntryFromCol(cid);
+                        if (Exists(author)) {
+                          const UID author_uid = Value(author).uid;
+                          if (author_uid != UID::INVALID_USER && author_uid != uid) {
+                            data.notification.Add(Notification(author_uid,
+                                                               current::time::Now(),
+                                                               NotificationNewVotesOnMyCard(uid, cid)));
+                          }
+                        }
                       }
                     }
                   } else {
+                    DebugPrint(Printf("[UpdateStateOnEvent] Answer already exists: [%s, %s, %d]",
+                                      UIDToString(uid).c_str(),
+                                      CIDToString(cid).c_str(),
+                                      static_cast<int>(Value(data.answer.Get(uid, cid)).answer)));
+                  }
+                } else if (response == LOG_EVENT::FAV_CARD || response == LOG_EVENT::UNFAV_CARD) {
+                  if (cid == CID::INVALID_CARD) {
+                    DebugPrint("[UpdateStateOnEvent] No CID.");
+                    return;
+                  }
+                  if (!Exists(data.card[cid])) {
                     DebugPrint(
-                        Printf("[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
-                               static_cast<int>(response),
-                               uid_str.c_str(),
-                               cid_str.c_str(),
-                               token.c_str()));
+                        Printf("[UpdateStateOnEvent] Nonexistent CID '%s' FAV/UNFAV.", cid_str.c_str()));
+                    return;
+                  }
+                  auto& favorites_mutator = data.favorite;
+                  favorites_mutator.Add(Favorite(uid, cid, (response == LOG_EVENT::FAV_CARD)));
+                  DebugPrint(Printf("[UpdateStateOnEvent] Added favorite: [%s, %s, %s]",
+                                    UIDToString(uid).c_str(),
+                                    CIDToString(cid).c_str(),
+                                    (response == LOG_EVENT::FAV_CARD) ? "Favorite" : "Unfavorite"));
+
+                  if (response == LOG_EVENT::FAV_CARD) {
+                    // Emit the "my card starred" notification.
+                    const auto star_notification_key = UIDAndCID(uid, cid);
+                    if (!Exists(data.starred_notification_already_sent[star_notification_key])) {
+                      // Only send the notification about the behavior of this { user, card } once.
+                      data.starred_notification_already_sent.Add(
+                          StarNotificationAlreadySent{star_notification_key});
+                      const auto author = data.author_card.GetEntryFromCol(cid);
+                      if (Exists(author)) {
+                        const UID author_uid = Value(author).uid;
+                        if (author_uid != UID::INVALID_USER && author_uid != uid) {
+                          data.notification.Add(Notification(
+                              author_uid, current::time::Now(), NotificationMyCardStarred(uid, cid)));
+                        }
+                      }
+                    }
+                  }
+                } else if (response == LOG_EVENT::LIKE_COMMENT ||
+                           response == LOG_EVENT::UNLIKE_COMMENT ||
+                           response == LOG_EVENT::FLAG_COMMENT) {
+                  if (oid == OID::INVALID_COMMENT) {
+                    DebugPrint("[UpdateStateOnEvent] No OID.");
+                    return;
+                  }
+                  if (!data.comment.Cols().Has(oid)) {
+                    DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent OID '%s' LIKE/UNLIKE/FLAG.",
+                                      oid_str.c_str()));
+                    return;
+                  }
+                  if (response == LOG_EVENT::LIKE_COMMENT) {
+                    DebugPrint(Printf("[UpdateStateOnEvent] Like comment '%s' '%s'.",
+                                      uid_str.c_str(),
+                                      oid_str.c_str()));
+                    CommentLike like;
+                    like.oid = oid;
+                    like.uid = uid;
+                    data.comment_like.Add(like);
+
+                    // Emit the "my comment liked" notification.
+                    const auto v = data.comment.GetEntryFromCol(oid);
+                    if (Exists(v)) {
+                      const Comment& comment = Value(v);
+                      UID comment_author_uid = comment.author_uid;
+                      if (comment_author_uid != UID::INVALID_USER && comment_author_uid != like.uid) {
+                        data.notification.Add(
+                            Notification(comment_author_uid,
+                                         current::time::Now(),
+                                         NotificationMyCommentLiked(like.uid, comment)));
+                      }
+                    }
+
+                  } else if (response == LOG_EVENT::UNLIKE_COMMENT) {
+                    DebugPrint(Printf("[UpdateStateOnEvent] Unlike comment '%s' '%s'.",
+                                      uid_str.c_str(),
+                                      oid_str.c_str()));
+                    data.comment_like.Erase(oid, uid);
+                  } else if (response == LOG_EVENT::FLAG_COMMENT) {
+                    DebugPrint(Printf("[UpdateStateOnEvent] Flag comment '%s' '%s'.",
+                                      uid_str.c_str(),
+                                      oid_str.c_str()));
+                    CommentFlagAsInappropriate flag;
+                    flag.oid = oid;
+                    flag.uid = uid;
+                    data.flagged_comment.Add(flag);
+                  } else {
+                    DebugPrint(Printf(
+                        "[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
+                        static_cast<int>(response),
+                        uid_str.c_str(),
+                        cid_str.c_str(),
+                        token.c_str()));
+                  }
+                } else if (response == LOG_EVENT::FLAG_CARD) {
+                  if (cid == CID::INVALID_CARD) {
+                    DebugPrint("[UpdateStateOnEvent] No CID.");
+                    return;
+                  }
+                  if (!Exists(data.card[cid])) {
+                    DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent CID '%s' in FLAG_CARD.",
+                                      cid_str.c_str()));
+                    return;
+                  }
+                  DebugPrint(Printf(
+                      "[UpdateStateOnEvent] Flag card '%s' '%s'.", uid_str.c_str(), cid_str.c_str()));
+                  CardFlagAsInappropriate flag;
+                  flag.cid = cid;
+                  flag.uid = uid;
+                  data.flagged_card.Add(flag);
+                } else if (response == LOG_EVENT::REPORT_USER || response == LOG_EVENT::BLOCK_USER) {
+                  if (whom == UID::INVALID_USER) {
+                    DebugPrint("[UpdateStateOnEvent] No WHOM.");
+                    return;
+                  }
+                  if (whom == uid) {
+                    DebugPrint("[UpdateStateOnEvent] WHOM == UID.");
+                    return;
+                  }
+                  if (whom == admin_uid) {
+                    DebugPrint("[UpdateStateOnEvent] WHOM == ADMIN_UID.");
+                    return;
+                  }
+                  DebugPrint(Printf("[UpdateStateOnEvent] '%s' %s '%s'.",
+                                    uid_str.c_str(),
+                                    (response == LOG_EVENT::REPORT_USER) ? "reported" : "blocked",
+                                    whom_str.c_str()));
+                  if (response == LOG_EVENT::REPORT_USER) {
+                    data.user_reported_user.Add(UserReportedUser(uid, whom));
+                  } else {
+                    data.user_blocked_user.Add(UserBlockedUser(uid, whom));
+                  }
+                  {
+                    const auto blocks = data.user_blocked_user.Cols()[whom];
+                    const auto reports = data.user_reported_user.Cols()[whom];
+                    if ((Exists(blocks) && Value(blocks).Size() >= FLAGS_blocks_to_ban) ||
+                        (Exists(reports) && Value(reports).Size() >= FLAGS_reports_to_ban)) {
+                      BanUser(data, whom);
+                    }
                   }
                 } else {
-                  DebugPrint(
-                      Printf("[UpdateStateOnEvent] Not valid token '%s' found in event.", token.c_str()));
+                  DebugPrint(Printf(
+                      "[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
+                      static_cast<int>(response),
+                      uid_str.c_str(),
+                      cid_str.c_str(),
+                      token.c_str()));
                 }
-              });
-        } else {
-          DebugPrint("[UpdateStateOnEvent] Invalid UID.");
-        }
-      } catch (const std::out_of_range& e) {
-        DebugPrint(Printf("[UpdateStateOnEvent] std::out_of_range: '%s'", e.what()));
+              } else {
+                DebugPrint(
+                    Printf("[UpdateStateOnEvent] Not valid token '%s' found in event.", token.c_str()));
+              }
+            }).Go();  // clang-format on
+      } else {
+        DebugPrint("[UpdateStateOnEvent] Invalid UID.");
       }
-    } catch (const std::bad_cast&) {
-      // `event` is not an `iOSGenericEvent`.
-      DebugPrint("[UpdateStateOnEvent] Not an `iOSGenericEvent`: " + CerealizeJSON(event));
+    } catch (const std::out_of_range& e) {
+      DebugPrint(Printf("[UpdateStateOnEvent] std::out_of_range: '%s'", e.what()));
     }
   }
 
-  void BanUser(StorageAPI::T_DATA data, const UID uid) { data.banned_users.Insert(BannedUser(uid)); }
+  void BanUser(MutableFields<Storage> data, const UID uid) { data.banned_user.Add(BannedUser(uid)); }
 };
 }  // namespace CTFO
 

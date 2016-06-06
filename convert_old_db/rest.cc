@@ -25,7 +25,7 @@ SOFTWARE.
 #include <cassert>
 #include <fstream>
 
-#include "new_storage.h"
+#include "../storage.h"
 
 #include "../../Current/Bricks/dflags/dflags.h"
 
@@ -37,7 +37,7 @@ SOFTWARE.
 #include "../../Current/Storage/rest/advanced_hypermedia.h"
 #endif
 
-DEFINE_string(db, "new_db.json", "The name of the input DB to print the stats for.");
+DEFINE_string(db, "db.json", "The name of the input DB to print the stats for.");
 
 DEFINE_int32(port, 3000, "The port to spawn CTFO REST API on.");
 DEFINE_string(route, "", "The route to spawn CTFO REST API on.");
@@ -46,7 +46,7 @@ DEFINE_string(restful_route, "http://localhost:3000", "The hypermedia route to s
 int main(int argc, char** argv) {
   ParseDFlags(&argc, &argv);
 
-  using DB = NewCTFO<SherlockStreamPersister>;
+  using DB = CTFOStorage<SherlockStreamPersister>;
   DB db(FLAGS_db);
 
 #ifdef USE_BASIC_HYPERMEDIA

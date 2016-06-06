@@ -25,15 +25,15 @@ SOFTWARE.
 #ifndef INTERMEDIATE_TYPES_H
 #define INTERMEDIATE_TYPES_H
 
-#include "new_schema_base.h"
+#include "../schema_base.h"
 
 // Temporary struct for parsing old dictionary simple key entries.
 CURRENT_STRUCT(OldDictionarySimpleKeyEntry) { CURRENT_FIELD(data, uint64_t); };
 
 // Temporary struct for parsing old dictionary `UIDAndCID` entries.
 CURRENT_STRUCT(OldDictionaryUIDAndCIDEntry) {
-  CURRENT_FIELD(uid, UID);
-  CURRENT_FIELD(cid, CID);
+  CURRENT_FIELD(uid, CTFO::UID);
+  CURRENT_FIELD(cid, CTFO::CID);
 };
 
 #endif  // INTERMEDIATE_TYPES_H

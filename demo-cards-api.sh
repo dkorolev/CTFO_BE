@@ -39,16 +39,23 @@ echo "My cards, should be one."
 curl -s "$TEST_HOST/ctfo/my_cards?uid=$TEST_UID&token=$TEST_TOKEN" >my_cards.json
 cat my_cards.json | jq .
 
-echo "Favorires, should be one."
+echo "Favorires, should be zero."
 curl -s "$TEST_HOST/ctfo/favs?uid=$TEST_UID&token=$TEST_TOKEN" >favs.json
 cat favs.json | jq .
 
 TEST_MY_CID=$(cat my_cards.json  | jq ".my_cards.cards[0].cid" | xargs echo)
 echo "My card CID: $TEST_MY_CID"
 
+echo "FAV this card."
+cat <<EOF >fav_my_card.json
+{"iOSGenericEvent":{"customer_id":"","user_ms":0,"client_id":"","device_id":"$TEST_DID","event":"FAV","source":"Linux Terminal","fields":{"cid":"$TEST_MY_CID","token":"$TEST_TOKEN","uid":"$TEST_UID"},"unparsable_fields":[]},"":"T9202274666560225185"}
+EOF
+
+curl -X POST --data @fav_my_card.json "$TEST_HOST/ctfo/log"
+
 echo "CTFO on this card."
 cat <<EOF >ctfo_my_card.json
-{"value0":{"polymorphic_id":2147483649,"polymorphic_name":"iOSGenericEvent","ptr_wrapper":{"valid":1,"data":{"device_id":"$TEST_DID","client_id":"","description":"","event":"CTFO","source":"Linux Terminal","fields":[{"key":"cid","value":"$TEST_MY_CID"},{"key":"token","value":"$TEST_TOKEN"},{"key":"uid","value":"$TEST_UID"}],"complex_fields":[],"unparsable_fields":[]}}}}
+{"iOSGenericEvent":{"customer_id":"","user_ms":0,"client_id":"","device_id":"$TEST_DID","event":"CTFO","source":"Linux Terminal","fields":{"cid":"$TEST_MY_CID","token":"$TEST_TOKEN","uid":"$TEST_UID"},"unparsable_fields":[]},"":"T9202274666560225185"}
 EOF
 
 curl -X POST --data @ctfo_my_card.json "$TEST_HOST/ctfo/log"
@@ -57,14 +64,13 @@ echo "GET this card."
 curl -s "$TEST_HOST/ctfo/card?uid=$TEST_UID&token=$TEST_TOKEN&cid=$TEST_MY_CID" >get_card.json
 cat get_card.json | jq .
 
-curl -X POST --data @unfav_my_card.json "$TEST_HOST/ctfo/log"
-
+echo "Favorires, should be one."
 curl -s "$TEST_HOST/ctfo/favs?uid=$TEST_UID&token=$TEST_TOKEN" >favs.json
 cat favs.json | jq .
 
 echo "UNFAV this card."
 cat <<EOF >unfav_my_card.json
-{"value0":{"polymorphic_id":2147483649,"polymorphic_name":"iOSGenericEvent","ptr_wrapper":{"valid":1,"data":{"device_id":"$TEST_DID","client_id":"","description":"","event":"UNFAV","source":"Linux Terminal","fields":[{"key":"cid","value":"$TEST_MY_CID"},{"key":"token","value":"$TEST_TOKEN"},{"key":"uid","value":"$TEST_UID"}],"complex_fields":[],"unparsable_fields":[]}}}}
+{"iOSGenericEvent":{"customer_id":"","user_ms":0,"client_id":"","device_id":"$TEST_DID","event":"UNFAV","source":"Linux Terminal","fields":{"cid":"$TEST_MY_CID","token":"$TEST_TOKEN","uid":"$TEST_UID"},"unparsable_fields":[]},"":"T9202274666560225185"}
 EOF
 
 curl -X POST --data @unfav_my_card.json "$TEST_HOST/ctfo/log"
