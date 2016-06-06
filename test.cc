@@ -24,6 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *******************************************************************************/
 
+#define MUST_IMPORT_INITIAL_CTFO_CARDS
 #define BRICKS_MOCK_TIME
 
 #include "server.h"

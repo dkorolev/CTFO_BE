@@ -136,27 +136,22 @@ class CTFOServer final {
     event_log_stream_.open(event_log_file_, std::ofstream::out | std::ofstream::app);
 
     static_cast<void>(cards_file);
-    // The section below should be removed, as it mistakenly nullifies the stats on each restart of the binary.
-    /*
-#if 0
-    if (false) {
-      bricks::cerealize::CerealFileParser<Card, bricks::cerealize::CerealFormat::JSON> cf(cards_file);
-      storage_.Transaction([&cf](StorageAPI::T_DATA data) {
-        User admin_user;
-        admin_user.uid = admin_uid;
-        admin_user.level = 80;         // Superuser 80lvl.
-        admin_user.score = 999999999;  // With one short to one billion points.
-        data.users.Insert(admin_user);
-        while (cf.Next([&data](const Card& card) {
-          data.cards.Insert(card);
-          data.card_authors.Add(CardAuthor{card.cid, admin_uid});
-        })) {
-          ;
-        }
-      }).Go();
-    }
+#ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
+    bricks::cerealize::CerealFileParser<Card, bricks::cerealize::CerealFormat::JSON> cf(cards_file);
+    storage_.Transaction([&cf](StorageAPI::T_DATA data) {
+      User admin_user;
+      admin_user.uid = admin_uid;
+      admin_user.level = 80;         // Superuser 80lvl.
+      admin_user.score = 999999999;  // With one short to one billion points.
+      data.users.Insert(admin_user);
+      while (cf.Next([&data](const Card& card) {
+        data.cards.Insert(card);
+        data.card_authors.Add(CardAuthor{card.cid, admin_uid});
+      })) {
+        ;
+      }
+    }).Go();
 #endif
-    */
 
     HTTP(port_).Register("/healthz", [](Request r) { r("OK\n"); });
     HTTP(port_).Register("/ctfo/auth/ios", BindToThis(&CTFOServer::RouteAuthiOS));
