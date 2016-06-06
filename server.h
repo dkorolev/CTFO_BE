@@ -1437,9 +1437,6 @@ class CTFOServer final {
                                               50u));
                           } else if (response == LOG_EVENT::TFU) {
                             ++card.tfu_count;
-                            if (skip_to_overwrite) {
-                              --card.skip_count;
-                            }
                             DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
                                               CIDToString(cid).c_str(),
                                               card.tfu_count));
