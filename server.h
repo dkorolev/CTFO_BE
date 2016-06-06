@@ -135,6 +135,8 @@ class CTFOServer final {
         storage_("CTFO storage", storage_file) {
     event_log_stream_.open(event_log_file_, std::ofstream::out | std::ofstream::app);
 
+    static_cast<void>(cards_file);
+#ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
     bricks::cerealize::CerealFileParser<Card, bricks::cerealize::CerealFormat::JSON> cf(cards_file);
     storage_.Transaction([&cf](StorageAPI::T_DATA data) {
       User admin_user;
@@ -149,6 +151,7 @@ class CTFOServer final {
         ;
       }
     }).Go();
+#endif
 
     HTTP(port_).Register("/healthz", [](Request r) { r("OK\n"); });
     HTTP(port_).Register("/ctfo/auth/ios", BindToThis(&CTFOServer::RouteAuthiOS));
@@ -410,6 +413,8 @@ class CTFOServer final {
                         card_entry.vote = "CTFO";
                       } else if (vote == ANSWER::TFU) {
                         card_entry.vote = "TFU";
+                      } else if (vote == ANSWER::SKIP) {
+                        card_entry.vote = "SKIP";
                       }
                     }
 
@@ -528,6 +533,8 @@ class CTFOServer final {
                         card_entry.vote = "CTFO";
                       } else if (vote == ANSWER::TFU) {
                         card_entry.vote = "TFU";
+                      } else if (vote == ANSWER::SKIP) {
+                        card_entry.vote = "SKIP";
                       }
                     }
 
@@ -616,6 +623,8 @@ class CTFOServer final {
                   card_entry.vote = "CTFO";
                 } else if (vote == ANSWER::TFU) {
                   card_entry.vote = "TFU";
+                } else if (vote == ANSWER::SKIP) {
+                  card_entry.vote = "SKIP";
                 }
               }
               const auto fav = favorites.Get(uid, card.cid);
@@ -1209,6 +1218,8 @@ class CTFOServer final {
               card_entry.vote = "CTFO";
             } else if (vote == ANSWER::TFU) {
               card_entry.vote = "TFU";
+            } else if (vote == ANSWER::SKIP) {
+              card_entry.vote = "SKIP";
             }
           }
 
@@ -1276,6 +1287,8 @@ class CTFOServer final {
                 card_entry.vote = "CTFO";
               } else if (vote == ANSWER::TFU) {
                 card_entry.vote = "TFU";
+              } else if (vote == ANSWER::SKIP) {
+                card_entry.vote = "SKIP";
               }
             }
 
@@ -1429,9 +1442,6 @@ class CTFOServer final {
                                               50u));
                           } else if (response == LOG_EVENT::TFU) {
                             ++card.tfu_count;
-                            if (skip_to_overwrite) {
-                              --card.skip_count;
-                            }
                             DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
                                               CIDToString(cid).c_str(),
                                               card.tfu_count));

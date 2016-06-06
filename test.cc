@@ -24,6 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *******************************************************************************/
 
+#define MUST_IMPORT_INITIAL_CTFO_CARDS
 #define BRICKS_MOCK_TIME
 
 #include "server.h"
@@ -323,7 +324,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(0u, one_fav_response.cards[0].skip_count);
   }
 
-  // First, skip this card. This test casting the "CTFO" vote is possible after the card was skipped.
+  // First, skip this card. This tests casting the "CTFO" vote is possible after the card was skipped.
   {
     bricks::time::SetNow(static_cast<bricks::time::EPOCH_MILLISECONDS>(14001));
     iOSGenericEvent ctfo_event;
@@ -350,7 +351,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(actual_uid, skip_made_response.user.uid);
     ASSERT_EQ(1u, skip_made_response.cards.size());
     EXPECT_EQ(cid2, skip_made_response.cards[0].cid);
-    EXPECT_EQ("", skip_made_response.cards[0].vote);
+    EXPECT_EQ("SKIP", skip_made_response.cards[0].vote);
     EXPECT_EQ(0u, skip_made_response.cards[0].ctfo_count);
     EXPECT_EQ(0u, skip_made_response.cards[0].tfu_count);
     EXPECT_EQ(1u, skip_made_response.cards[0].skip_count);

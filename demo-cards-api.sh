@@ -53,6 +53,12 @@ EOF
 
 curl -X POST --data @ctfo_my_card.json "$TEST_HOST/ctfo/log"
 
+echo "GET this card."
+curl -s "$TEST_HOST/ctfo/card?uid=$TEST_UID&token=$TEST_TOKEN&cid=$TEST_MY_CID" >get_card.json
+cat get_card.json | jq .
+
+curl -X POST --data @unfav_my_card.json "$TEST_HOST/ctfo/log"
+
 curl -s "$TEST_HOST/ctfo/favs?uid=$TEST_UID&token=$TEST_TOKEN" >favs.json
 cat favs.json | jq .
 
