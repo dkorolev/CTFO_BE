@@ -1422,8 +1422,7 @@ TEST(CTFO, NotificationsSerializeWell) {
   const OID oid = static_cast<OID>(3);
   const Notification notification(
       me, std::chrono::microseconds(12345000ull), NotificationMyCardNewComment(uid, cid, oid, "foo"));
-  const std::string user_facing_json =
-      JSON<JSONFormat::Minimalistic>(notification.BuildResponseNotification());
+  const std::string user_facing_json = JSON<JSONFormat::Minimalistic>(notification.BuildResponseNotification());
   EXPECT_EQ(
       "{\"nid\":\"n05000000000012345000\",\"type\":\"MyCardNewComment\",\"ms\":12345,\"uid\":"
       "\"u00000000000000000001\",\"cid\":\"c00000000000000000002\",\"oid\":\"o00000000000000000003\",\"text\":"

@@ -148,7 +148,9 @@ class CTFOServer final {
 
   template <typename T_RESPONSE>
   Response MakeResponse(T_RESPONSE&& r) {
-    return Response(JSON<JSONFormat::Minimalistic>(Variant<T_RESPONSE>(std::forward<T_RESPONSE>(r))));
+    return Response(JSON<JSONFormat::Minimalistic>(Variant<T_RESPONSE>(std::forward<T_RESPONSE>(r))),
+                    HTTPResponseCode.OK,
+                    current::net::constants::kDefaultJSONContentType);
   }
 
   void RouteAuthiOS(Request r) {
@@ -277,13 +279,8 @@ class CTFOServer final {
   }
   void RouteInitialCards(Request r) {
     storage_.ReadOnlyTransaction([this](ImmutableFields<Storage> data) {
-      return MakeResponse(GenerateResponseFeed(
-          data,
-          ResponseUserEntry(),
-          10000u,
-          static_cast<uint64_t>(-1),
-          10000u,
-          true));
+      return MakeResponse(
+          GenerateResponseFeed(data, ResponseUserEntry(), 10000u, static_cast<uint64_t>(-1), 10000u, true));
     }, std::move(r)).Go();
   }
   void RouteFavorites(Request r) {
