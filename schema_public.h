@@ -44,24 +44,27 @@ CURRENT_STRUCT(ResponseCardEntry) {
   CURRENT_FIELD(cid, std::string, "cINVALID");         // Card id, format 'c02XXX...'.
   CURRENT_FIELD(author_uid, std::string, "uINVALID");  // The author of this comment.
   CURRENT_FIELD(text, std::string, "");                // Card text.
-  CURRENT_FIELD(ms, std::chrono::milliseconds, std::chrono::milliseconds(0));     // Card timestamp, milliseconds from epoch.
-  CURRENT_FIELD(color, Color);                         // Card color.
-  CURRENT_FIELD(relevance, double, 0.0);               // Card relevance for particular user, [0.0, 1.0].
-  CURRENT_FIELD(ctfo_score, uint32_t, 0u);             // Number of points, which user gets for "CTFO" answer.
-  CURRENT_FIELD(tfu_score, uint32_t, 0u);              // Number of points, which user gets for "TFU" answer.
-  CURRENT_FIELD(ctfo_count, uint32_t, 0u);             // Number of users, who said "CTFO" on this card.
-  CURRENT_FIELD(tfu_count, uint32_t, 0u);              // Number of users, who said "TFU" on this card.
-  CURRENT_FIELD(skip_count, uint32_t, 0u);             // Number of users, who said "SKIP" on this card.
-  CURRENT_FIELD(vote, std::string, "");                // "CTFO", "TFU", or empty string.
-  CURRENT_FIELD(favorited, bool, false);               // True if the current user has favorited this card.
-  CURRENT_FIELD(is_my_card, bool, false);              // True if this card has been created by this user.
-  CURRENT_FIELD(number_of_comments, uint32_t, 0u);     // The total number of comments left for this card.
+  CURRENT_FIELD(
+      ms, std::chrono::milliseconds, std::chrono::milliseconds(0));  // Card timestamp, milliseconds from epoch.
+  CURRENT_FIELD(color, Color);                                       // Card color.
+  CURRENT_FIELD(relevance, double, 0.0);            // Card relevance for particular user, [0.0, 1.0].
+  CURRENT_FIELD(ctfo_score, uint32_t, 0u);          // Number of points, which user gets for "CTFO" answer.
+  CURRENT_FIELD(tfu_score, uint32_t, 0u);           // Number of points, which user gets for "TFU" answer.
+  CURRENT_FIELD(ctfo_count, uint32_t, 0u);          // Number of users, who said "CTFO" on this card.
+  CURRENT_FIELD(tfu_count, uint32_t, 0u);           // Number of users, who said "TFU" on this card.
+  CURRENT_FIELD(skip_count, uint32_t, 0u);          // Number of users, who said "SKIP" on this card.
+  CURRENT_FIELD(vote, std::string, "");             // "CTFO", "TFU", or empty string.
+  CURRENT_FIELD(favorited, bool, false);            // True if the current user has favorited this card.
+  CURRENT_FIELD(is_my_card, bool, false);           // True if this card has been created by this user.
+  CURRENT_FIELD(number_of_comments, uint32_t, 0u);  // The total number of comments left for this card.
 };
 
 namespace response_card {
 // "My cards" response schema. Yes, it's the same as favorites. -- D.K.
 CURRENT_STRUCT(my_cards) {
-  CURRENT_FIELD(ms, std::chrono::milliseconds, std::chrono::milliseconds(0));       // Server timestamp, milliseconds from epoch.
+  CURRENT_FIELD(ms,
+                std::chrono::milliseconds,
+                std::chrono::milliseconds(0));           // Server timestamp, milliseconds from epoch.
   CURRENT_FIELD(user, ResponseUserEntry);                // User information.
   CURRENT_FIELD(cards, std::vector<ResponseCardEntry>);  // Cards created by this user.
 };
@@ -90,7 +93,9 @@ CURRENT_STRUCT(ResponseComment) {
   CURRENT_FIELD(flagged_inappropriate,
                 bool,
                 false);  // Whether the current user has flagged this comment as inappropriate.
-  CURRENT_FIELD(ms, std::chrono::milliseconds, std::chrono::milliseconds(0));  // Comment timestamp, milliseconds from epoch.
+  CURRENT_FIELD(ms,
+                std::chrono::milliseconds,
+                std::chrono::milliseconds(0));  // Comment timestamp, milliseconds from epoch.
   // TODO(dkorolev): User name? Tier status?
   // TODO(dkorolev): Color?
 };
@@ -98,7 +103,9 @@ CURRENT_STRUCT(ResponseComment) {
 namespace response_comment {
 
 CURRENT_STRUCT(comments) {
-  CURRENT_FIELD(ms, std::chrono::milliseconds, std::chrono::milliseconds(0));        // Server timestamp, milliseconds from epoch.
+  CURRENT_FIELD(ms,
+                std::chrono::milliseconds,
+                std::chrono::milliseconds(0));            // Server timestamp, milliseconds from epoch.
   CURRENT_FIELD(comments, std::vector<ResponseComment>);  // Comments.
 };
 
@@ -161,14 +168,18 @@ namespace response_complex {
 
 // Favorites response schema.
 CURRENT_STRUCT(favs) {
-  CURRENT_FIELD(ms, std::chrono::milliseconds, std::chrono::milliseconds(0));       // Server timestamp, milliseconds from epoch.
+  CURRENT_FIELD(ms,
+                std::chrono::milliseconds,
+                std::chrono::milliseconds(0));           // Server timestamp, milliseconds from epoch.
   CURRENT_FIELD(user, ResponseUserEntry);                // User information.
   CURRENT_FIELD(cards, std::vector<ResponseCardEntry>);  // Favorited cards.
 };
 
 // Universal response structure, combining user info & cards payload.
 CURRENT_STRUCT(feed) {
-  CURRENT_FIELD(ms, std::chrono::milliseconds, std::chrono::milliseconds(0));             // Server timestamp, milliseconds from epoch.
+  CURRENT_FIELD(ms,
+                std::chrono::milliseconds,
+                std::chrono::milliseconds(0));                 // Server timestamp, milliseconds from epoch.
   CURRENT_FIELD(user, ResponseUserEntry);                      // User information.
   CURRENT_FIELD(feed_hot, std::vector<ResponseCardEntry>);     // "Hot" cards feeds.
   CURRENT_FIELD(feed_recent, std::vector<ResponseCardEntry>);  // "Recent" cards feeds.
