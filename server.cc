@@ -36,6 +36,8 @@ DEFINE_int32(midichlorians_port, 0, "Port to spawn midichlorians server on.");  
 DEFINE_string(midichlorians_file,
               "./ctfo_events.log",
               "Log file to store events received by midichlorians server");
+DEFINE_int32(rest_port, 8384, "Port to spawn RESTfulStorage on.");  // 0 = the same as `port`.
+DEFINE_string(rest_url_prefix, "http://localhost", "Hypermedia route prefix to spawn RESTfulStorage on.");
 DEFINE_int32(rand_seed, 42, "The answer to the question of life, universe and everything.");
 DEFINE_int32(tick_interval_ms, 5 * 60 * 1000, "Maximum interval between event entries.");
 DEFINE_bool(debug_print, true, "Print debug info to stderr.");
@@ -48,6 +50,8 @@ int main(int argc, char **argv) {
              FLAGS_storage_file,
              FLAGS_midichlorians_port,
              FLAGS_midichlorians_file,
+             FLAGS_rest_port,
+             FLAGS_rest_url_prefix,
              std::chrono::milliseconds(FLAGS_tick_interval_ms),
              FLAGS_debug_print).Join();
 }
