@@ -38,6 +38,8 @@ SOFTWARE.
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
 DEFINE_int32(api_port, 8383, "Port to spawn CTFO RESTful server on.");
 DEFINE_int32(midichlorians_port, 8384, "Port to spawn midichlorians server on.");
+DEFINE_int32(rest_port, 8385, "Port to spawn RESTfulStorage on.");
+DEFINE_string(rest_url_prefix, "http://localhost", "Hypermedia route prefix to spawn RESTfulStorage on.");
 
 using namespace CTFO;
 using namespace current::midichlorians::ios;
@@ -71,6 +73,8 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
                                              db_file,
                                              FLAGS_midichlorians_port,
                                              log_file,
+                                             FLAGS_rest_port,
+                                             FLAGS_rest_url_prefix,
                                              std::chrono::milliseconds(100)
 #ifdef CTFO_DEBUG
                                              // clang-format off

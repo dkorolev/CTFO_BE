@@ -34,13 +34,18 @@ SOFTWARE.
 #include <string>
 #include <vector>
 
-#include "../Current/Blocks/HTTP/api.h"
-
 #include "../Current/Bricks/file/file.h"
 #include "../Current/Bricks/strings/strings.h"
 #include "../Current/Bricks/util/random.h"
 
 #include "../Current/Blocks/HTTP/api.h"
+
+#include "../Current/Storage/api.h"
+#ifdef USE_BASIC_HYPERMEDIA
+#include "../Current/Storage/rest/hypermedia.h"
+#else
+#include "../Current/Storage/rest/advanced_hypermedia.h"
+#endif
 
 #include "storage.h"
 #include "util.h"
@@ -58,19 +63,31 @@ class CTFOServer final {
  public:
   using Storage = CTFOStorage<SherlockStreamPersister>;
   using MidichloriansServer = current::midichlorians::server::MidichloriansHTTPServer<CTFOServer>;
+  using RESTStorage = RESTfulStorage<Storage,
+#ifdef USE_BASIC_HYPERMEDIA
+                                     current::storage::rest::Hypermedia>;
+#else
+                                     current::storage::rest::AdvancedHypermedia>;
+#endif
 
   explicit CTFOServer(const std::string& cards_file,
                       int port,
                       const std::string& storage_file,
                       int midichlorians_port,
                       const std::string& midichlorians_file,
+                      int rest_port,
+                      const std::string& rest_url_prefix,
                       const std::chrono::milliseconds tick_interval_ms,
                       const bool debug_print_to_stderr = false)
       : port_(port),
         midichlorians_server_(
             midichlorians_port ? midichlorians_port : port, *this, tick_interval_ms, "/ctfo/log", "OK\n"),
         debug_print_(debug_print_to_stderr),
-        storage_(storage_file) {
+        storage_(storage_file),
+        rest_(storage_,
+              rest_port ? rest_port : port,
+              "/ctfo/rest",
+              rest_url_prefix + ':' + current::ToString(rest_port) + "/ctfo/rest") {
     midichlorians_stream_.open(midichlorians_file, std::ofstream::out | std::ofstream::app);
 
     static_cast<void>(cards_file);
@@ -993,6 +1010,7 @@ class CTFOServer final {
   const bool debug_print_;
 
   Storage storage_;
+  RESTStorage rest_;
 
   const std::map<std::string, LOG_EVENT> valid_responses_ = {{"CTFO", LOG_EVENT::CTFO},
                                                              {"TFU", LOG_EVENT::TFU},
