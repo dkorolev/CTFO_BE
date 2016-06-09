@@ -1225,6 +1225,10 @@ class CTFOServer final {
 
   void UpdateStateOnEvent(const current::midichlorians::ios::iOSGenericEvent& ge) {
     try {
+      if (!valid_responses_.count(ge.event)) {
+        DebugPrint(Printf("[UpdateStateOnEvent] Unhandled event: '%s'", ge.event.c_str()));
+        return;
+      }
       const LOG_EVENT response = valid_responses_.at(ge.event);
       const std::string& uid_str = ge.fields.at("uid");
       const std::string token = ge.fields.at("token");
