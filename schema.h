@@ -525,9 +525,9 @@ CURRENT_STRUCT(Notification) {
   CURRENT_USE_FIELD_AS_COL(timestamp);
   CURRENT_FIELD(notification, T_NOTIFICATIONS_VARIANT);
   CURRENT_DEFAULT_CONSTRUCTOR(Notification) : timestamp(current::time::Now()) {}
-  CURRENT_CONSTRUCTOR(Notification)(
-      UID uid, std::chrono::microseconds ms, T_NOTIFICATIONS_VARIANT && notification)
-      : uid(uid), timestamp(ms), notification(std::move(notification)) {}
+  CURRENT_CONSTRUCTOR(Notification)(  // clang-format off
+      UID uid, std::chrono::microseconds ms, T_NOTIFICATIONS_VARIANT&& notification)
+      : uid(uid), timestamp(ms), notification(std::move(notification)) {}  // clang-format on
 
   ResponseNotification BuildResponseNotification() const {
     ResponseNotificationBuilder builder;

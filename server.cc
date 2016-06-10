@@ -45,13 +45,14 @@ DEFINE_bool(debug_print, true, "Print debug info to stderr.");
 int main(int argc, char **argv) {
   ParseDFlags(&argc, &argv);
   current::random::SetRandomSeed(FLAGS_rand_seed);
-  CTFOServer(FLAGS_cards_file,
-             FLAGS_port,
-             FLAGS_storage_file,
-             FLAGS_midichlorians_port,
-             FLAGS_midichlorians_file,
-             FLAGS_rest_port,
-             FLAGS_rest_url_prefix,
-             std::chrono::milliseconds(FLAGS_tick_interval_ms),
-             FLAGS_debug_print).Join();
+  CTFOServer(CTFOServerParams()
+                 .SetAPIPort(FLAGS_port)
+                 .SetRESTPort(FLAGS_rest_port)
+                 .SetMidichloriansPort(FLAGS_midichlorians_port)
+                 .SetStorageFile(FLAGS_storage_file)
+                 .SetCardsFile(FLAGS_cards_file)
+                 .SetRESTPrefixURL(FLAGS_rest_url_prefix)
+                 .SetMidichloriansFile(FLAGS_midichlorians_file)
+                 .SetTickInterval(std::chrono::milliseconds(FLAGS_tick_interval_ms))
+                 .SetDebugPrint(FLAGS_debug_print)).Join();
 }

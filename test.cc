@@ -68,21 +68,19 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
   current::time::SetNow(std::chrono::microseconds(1000));
   current::random::SetRandomSeed(42);
 
-  auto server = std::make_unique<CTFOServer>(FLAGS_cards_file,
-                                             FLAGS_api_port,
-                                             db_file,
-                                             FLAGS_midichlorians_port,
-                                             log_file,
-                                             FLAGS_rest_port,
-                                             FLAGS_rest_url_prefix,
-                                             std::chrono::milliseconds(100)
+  auto server = std::make_unique<CTFOServer>(CTFOServerParams()
+                                                 .SetAPIPort(FLAGS_api_port)
+                                                 .SetRESTPort(FLAGS_rest_port)
+                                                 .SetMidichloriansPort(FLAGS_midichlorians_port)
+                                                 .SetStorageFile(db_file)
+                                                 .SetCardsFile(FLAGS_cards_file)
+                                                 .SetRESTPrefixURL(FLAGS_rest_url_prefix)
+                                                 .SetMidichloriansFile(log_file)
+                                                 .SetTickInterval(std::chrono::milliseconds(100))
 #ifdef CTFO_DEBUG
-                                             // clang-format off
-                                             ,
-                                             true  // Debug print.
+                                                 .SetDebugPrint(true)
 #endif
-                                             // clang-format on
-                                             );
+                                                 );
 
   current::time::SetNow(std::chrono::microseconds(1001));
   return server;
