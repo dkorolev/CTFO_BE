@@ -87,7 +87,7 @@ class CTFOServer final {
         rest_(storage_,
               rest_port ? rest_port : port,
               "/ctfo/rest",
-              rest_url_prefix + ':' + current::ToString(rest_port) + "/ctfo/rest") {
+			  rest_url_prefix + ':' + current::ToString(rest_port ? rest_port : port) + "/ctfo/rest") {
     midichlorians_stream_.open(midichlorians_file, std::ofstream::out | std::ofstream::app);
 
     static_cast<void>(cards_file);
