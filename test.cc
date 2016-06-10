@@ -36,10 +36,10 @@ SOFTWARE.
 #include "../Current/Midichlorians/Server/schema.h"
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
-DEFINE_int32(api_port, 8383, "Port to spawn CTFO RESTful server on.");
+DEFINE_int32(api_port, 8383, "Port to spawn CTFO API on.");
 DEFINE_int32(midichlorians_port, 8384, "Port to spawn midichlorians server on.");
-DEFINE_int32(rest_port, 8385, "Port to spawn RESTfulStorage on.");
-DEFINE_string(rest_url_prefix, "http://localhost", "Hypermedia route prefix to spawn RESTfulStorage on.");
+DEFINE_int32(rest_port, 8385, "Port to spawn RESTful server on.");
+DEFINE_string(rest_url_prefix, "http://localhost", "Hypermedia route prefix to spawn RESTful server on.");
 
 using namespace CTFO;
 using namespace current::midichlorians::ios;
