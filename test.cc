@@ -36,10 +36,10 @@ SOFTWARE.
 #include "../Current/Midichlorians/Server/schema.h"
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
-DEFINE_int32(api_port, 8383, "Port to spawn CTFO RESTful server on.");
+DEFINE_int32(api_port, 8383, "Port to spawn CTFO API on.");
 DEFINE_int32(midichlorians_port, 8384, "Port to spawn midichlorians server on.");
-DEFINE_int32(rest_port, 8385, "Port to spawn RESTfulStorage on.");
-DEFINE_string(rest_url_prefix, "http://localhost", "Hypermedia route prefix to spawn RESTfulStorage on.");
+DEFINE_int32(rest_port, 8385, "Port to spawn RESTful server on.");
+DEFINE_string(rest_url_prefix, "http://localhost", "Hypermedia route prefix to spawn RESTful server on.");
 
 using namespace CTFO;
 using namespace current::midichlorians::ios;
@@ -68,21 +68,19 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
   current::time::SetNow(std::chrono::microseconds(1000));
   current::random::SetRandomSeed(42);
 
-  auto server = std::make_unique<CTFOServer>(FLAGS_cards_file,
-                                             FLAGS_api_port,
-                                             db_file,
-                                             FLAGS_midichlorians_port,
-                                             log_file,
-                                             FLAGS_rest_port,
-                                             FLAGS_rest_url_prefix,
-                                             std::chrono::milliseconds(100)
+  auto server = std::make_unique<CTFOServer>(CTFOServerParams()
+                                                 .SetAPIPort(FLAGS_api_port)
+                                                 .SetRESTPort(FLAGS_rest_port)
+                                                 .SetMidichloriansPort(FLAGS_midichlorians_port)
+                                                 .SetStorageFile(db_file)
+                                                 .SetCardsFile(FLAGS_cards_file)
+                                                 .SetRESTPrefixURL(FLAGS_rest_url_prefix)
+                                                 .SetMidichloriansFile(log_file)
+                                                 .SetTickInterval(std::chrono::milliseconds(100))
 #ifdef CTFO_DEBUG
-                                             // clang-format off
-                                             ,
-                                             true  // Debug print.
+                                                 .SetDebugPrint(true)
 #endif
-                                             // clang-format on
-                                             );
+                                                 );
 
   current::time::SetNow(std::chrono::microseconds(1001));
   return server;

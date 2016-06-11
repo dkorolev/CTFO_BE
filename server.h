@@ -59,6 +59,58 @@ static const size_t FLAGS_reports_to_ban = 10u;
 
 namespace CTFO {
 
+CURRENT_STRUCT(CTFOServerParams) {
+  CURRENT_FIELD(api_port, int);
+  CURRENT_FIELD(rest_port, int, 0);
+  CURRENT_FIELD(midichlorians_port, int, 0);
+  CURRENT_FIELD(storage_file, std::string);
+  CURRENT_FIELD(cards_file, std::string);
+  CURRENT_FIELD(rest_url_prefix, std::string);
+  CURRENT_FIELD(midichlorians_file, std::string);
+  CURRENT_FIELD(tick_interval_ms, std::chrono::milliseconds);
+  CURRENT_FIELD(debug_print_to_stderr, bool, false);
+  CURRENT_DEFAULT_CONSTRUCTOR(CTFOServerParams) {}
+
+  CTFOServerParams& SetAPIPort(int port) {
+    api_port = port;
+    return *this;
+  }
+  CTFOServerParams& SetRESTPort(int port) {
+    rest_port = port;
+    return *this;
+  }
+  CTFOServerParams& SetMidichloriansPort(int port) {
+    midichlorians_port = port;
+    return *this;
+  }
+  CTFOServerParams& SetStorageFile(const std::string& file) {
+    storage_file = file;
+    return *this;
+  }
+  CTFOServerParams& SetCardsFile(const std::string& file) {
+    cards_file = file;
+    return *this;
+  }
+  CTFOServerParams& SetRESTPrefixURL(const std::string& prefix) {
+    rest_url_prefix = prefix;
+    return *this;
+  }
+  CTFOServerParams& SetMidichloriansFile(const std::string& file) {
+    midichlorians_file = file;
+    return *this;
+  }
+  CTFOServerParams& SetTickInterval(std::chrono::milliseconds ms) {
+    tick_interval_ms = ms;
+    return *this;
+  }
+  CTFOServerParams& SetDebugPrint(bool enable) {
+    debug_print_to_stderr = enable;
+    return *this;
+  }
+  int GetRESTPort() const { return rest_port ? rest_port : api_port; }
+  int GetMidichloriansPort() const { return midichlorians_port ? midichlorians_port : api_port; }
+};
+
 class CTFOServer final {
  public:
   using Storage = CTFOStorage<SherlockStreamPersister>;
@@ -70,29 +122,20 @@ class CTFOServer final {
                                      current::storage::rest::AdvancedHypermedia>;
 #endif
 
-  explicit CTFOServer(const std::string& cards_file,
-                      int port,
-                      const std::string& storage_file,
-                      int midichlorians_port,
-                      const std::string& midichlorians_file,
-                      int rest_port,
-                      const std::string& rest_url_prefix,
-                      const std::chrono::milliseconds tick_interval_ms,
-                      const bool debug_print_to_stderr = false)
-      : port_(port),
+  explicit CTFOServer(const CTFOServerParams& params)
+      : port_(params.api_port),
         midichlorians_server_(
-            midichlorians_port ? midichlorians_port : port, *this, tick_interval_ms, "/ctfo/log", "OK\n"),
-        debug_print_(debug_print_to_stderr),
-        storage_(storage_file),
+            params.GetMidichloriansPort(), *this, params.tick_interval_ms, "/ctfo/log", "OK\n"),
+        debug_print_(params.debug_print_to_stderr),
+        storage_(params.storage_file),
         rest_(storage_,
-              rest_port ? rest_port : port,
+              params.GetRESTPort(),
               "/ctfo/rest",
-              rest_url_prefix + ':' + current::ToString(rest_port) + "/ctfo/rest") {
-    midichlorians_stream_.open(midichlorians_file, std::ofstream::out | std::ofstream::app);
+              params.rest_url_prefix + ':' + current::ToString(params.GetRESTPort()) + "/ctfo/rest") {
+    midichlorians_stream_.open(params.midichlorians_file, std::ofstream::out | std::ofstream::app);
 
-    static_cast<void>(cards_file);
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
-    std::ifstream cf(cards_file);
+    std::ifstream cf(params.cards_file);
     assert(cf.good());
     storage_.ReadWriteTransaction([&cf](MutableFields<Storage> data) {
       User admin_user;
