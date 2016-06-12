@@ -23,6 +23,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *******************************************************************************/
 
+// Enable "$REST/data/user?export" unconditionally.
+#define CURRENT_ALLOW_STORAGE_EXPORT_FROM_MASTER
+
 #include "server.h"
 
 #include "../Current/Bricks/dflags/dflags.h"
