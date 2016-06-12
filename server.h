@@ -128,10 +128,7 @@ class CTFOServer final {
             params.GetMidichloriansPort(), *this, params.tick_interval_ms, "/ctfo/log", "OK\n"),
         debug_print_(params.debug_print_to_stderr),
         storage_(params.storage_file),
-        rest_(storage_,
-              params.GetRESTPort(),
-              "/ctfo/rest",
-              params.rest_url_prefix + ':' + current::ToString(params.GetRESTPort()) + "/ctfo/rest") {
+        rest_(storage_, params.GetRESTPort(), "/ctfo/rest", params.rest_url_prefix) {
     midichlorians_stream_.open(params.midichlorians_file, std::ofstream::out | std::ofstream::app);
 
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS

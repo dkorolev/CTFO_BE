@@ -23,6 +23,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *******************************************************************************/
 
+// Enable "$REST/data/user?export" unconditionally.
+#define CURRENT_ALLOW_STORAGE_EXPORT_FROM_MASTER
+
 #include "server.h"
 
 #include "../Current/Bricks/dflags/dflags.h"
@@ -37,7 +40,9 @@ DEFINE_string(midichlorians_file,
               "./ctfo_events.log",
               "Log file to store events received by midichlorians server");
 DEFINE_int32(rest_port, 8384, "Port to spawn RESTful server on.");  // 0 = the same as `port`.
-DEFINE_string(rest_url_prefix, "http://localhost", "Hypermedia route prefix to spawn RESTful server on.");
+DEFINE_string(rest_url_prefix,
+              "http://localhost:8384/ctfo/rest",
+              "Hypermedia route prefix to spawn RESTful server on.");
 DEFINE_int32(rand_seed, 42, "The answer to the question of life, universe and everything.");
 DEFINE_int32(tick_interval_ms, 5 * 60 * 1000, "Maximum interval between event entries.");
 DEFINE_bool(debug_print, true, "Print debug info to stderr.");
