@@ -69,6 +69,8 @@ CURRENT_STRUCT(CTFOServerParams) {
   CURRENT_FIELD(midichlorians_file, std::string);
   CURRENT_FIELD(tick_interval_ms, std::chrono::milliseconds);
   CURRENT_FIELD(debug_print_to_stderr, bool, false);
+  CURRENT_FIELD(raw_log_path, Optional<std::string>, "/raw_log");
+
   CURRENT_DEFAULT_CONSTRUCTOR(CTFOServerParams) {}
 
   CTFOServerParams& SetAPIPort(int port) {
@@ -127,7 +129,7 @@ class CTFOServer final {
         midichlorians_server_(
             params.GetMidichloriansPort(), *this, params.tick_interval_ms, "/ctfo/log", "OK\n"),
         debug_print_(params.debug_print_to_stderr),
-        storage_(params.storage_file),
+        storage_(current::sherlock::SherlockNamespaceName("OldCTFOStorage"), params.storage_file),
         rest_(storage_, params.GetRESTPort(), "/ctfo/rest", params.rest_url_prefix) {
     midichlorians_stream_.open(params.midichlorians_file, std::ofstream::out | std::ofstream::app);
 
@@ -151,28 +153,22 @@ class CTFOServer final {
     }).Go();
 #endif
 
-    HTTP(port_).Register("/healthz", [](Request r) { r("OK\n"); });
-    HTTP(port_).Register("/ctfo/auth/ios", BindToThis(&CTFOServer::RouteAuthiOS));
-    HTTP(port_).Register("/ctfo/feed", BindToThis(&CTFOServer::RouteFeed));
-    HTTP(port_).Register("/ctfo/favs", BindToThis(&CTFOServer::RouteFavorites));
-    HTTP(port_).Register("/ctfo/my_cards", BindToThis(&CTFOServer::RouteMyCards));
-    HTTP(port_).Register("/ctfo/card", BindToThis(&CTFOServer::RouteCard));
-    HTTP(port_).Register("/ctfo/comments", BindToThis(&CTFOServer::RouteComments));
-    HTTP(port_).Register("/ctfo/comment", BindToThis(&CTFOServer::RouteComments));
-    HTTP(port_).Register("/initial_cards", BindToThis(&CTFOServer::RouteInitialCards));
-  }
+    scoped_http_routes_ += HTTP(port_).Register("/healthz", [](Request r) { r("OK\n"); }) +
+                           HTTP(port_).Register("/ctfo/auth/ios", BindToThis(&CTFOServer::RouteAuthiOS)) +
+                           HTTP(port_).Register("/ctfo/feed", BindToThis(&CTFOServer::RouteFeed)) +
+                           HTTP(port_).Register("/ctfo/favs", BindToThis(&CTFOServer::RouteFavorites)) +
+                           HTTP(port_).Register("/ctfo/my_cards", BindToThis(&CTFOServer::RouteMyCards)) +
+                           HTTP(port_).Register("/ctfo/card", BindToThis(&CTFOServer::RouteCard)) +
+                           HTTP(port_).Register("/ctfo/comments", BindToThis(&CTFOServer::RouteComments)) +
+                           HTTP(port_).Register("/ctfo/comment", BindToThis(&CTFOServer::RouteComments)) +
+                           HTTP(port_).Register("/initial_cards", BindToThis(&CTFOServer::RouteInitialCards));
 
-  ~CTFOServer() {
-    // TODO(dkorolev): Scoped registerers FTW.
-    HTTP(port_).UnRegister("/healthz");
-    HTTP(port_).UnRegister("/ctfo/auth/ios");
-    HTTP(port_).UnRegister("/ctfo/feed");
-    HTTP(port_).UnRegister("/ctfo/favs");
-    HTTP(port_).UnRegister("/ctfo/my_cards");
-    HTTP(port_).UnRegister("/ctfo/card");
-    HTTP(port_).UnRegister("/ctfo/comments");
-    HTTP(port_).UnRegister("/ctfo/comment");
-    HTTP(port_).UnRegister("/initial_cards");
+    if (Exists(params.raw_log_path)) {
+      const auto route = Value(params.raw_log_path);
+      DebugPrint("Registering raw log on: `" + route + "`.");
+      scoped_http_routes_ += HTTP(port_).Register(
+          route, URLPathArgs::CountMask::None | URLPathArgs::CountMask::One, storage_.InternalExposeStream());
+    }
   }
 
   void Join() { HTTP(port_).Join(); }
@@ -1051,6 +1047,7 @@ class CTFOServer final {
 
   Storage storage_;
   RESTStorage rest_;
+  HTTPRoutesScope scoped_http_routes_;
 
   const std::map<std::string, LOG_EVENT> valid_responses_ = {{"CTFO", LOG_EVENT::CTFO},
                                                              {"TFU", LOG_EVENT::TFU},
