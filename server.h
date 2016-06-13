@@ -129,7 +129,7 @@ class CTFOServer final {
         midichlorians_server_(
             params.GetMidichloriansPort(), *this, params.tick_interval_ms, "/ctfo/log", "OK\n"),
         debug_print_(params.debug_print_to_stderr),
-        storage_(params.storage_file),
+        storage_(current::sherlock::SherlockNamespaceName("OldCTFOStorage"), params.storage_file),
         rest_(storage_, params.GetRESTPort(), "/ctfo/rest", params.rest_url_prefix) {
     midichlorians_stream_.open(params.midichlorians_file, std::ofstream::out | std::ofstream::app);
 
