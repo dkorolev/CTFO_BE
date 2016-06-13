@@ -1250,7 +1250,7 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ(comment_to_be_notified_about_oid, feed_response.notifications[0].oid);
       EXPECT_EQ("Ding!", feed_response.notifications[0].text);
       EXPECT_EQ(1u, feed_response.notifications[0].n);
-      EXPECT_EQ("n05000000000600003000", feed_response.notifications[0].nid);
+      EXPECT_EQ("n00005000000600003000", feed_response.notifications[0].nid);
       EXPECT_EQ(600003u, feed_response.notifications[0].ms.count());
     }
     // Delete that comment.
@@ -1426,7 +1426,7 @@ TEST(CTFO, NotificationsSerializeWell) {
       me, std::chrono::microseconds(12345000ull), NotificationMyCardNewComment(uid, cid, oid, "foo"));
   const std::string user_facing_json = JSON<JSONFormat::Minimalistic>(notification.BuildResponseNotification());
   EXPECT_EQ(
-      "{\"nid\":\"n05000000000012345000\",\"type\":\"MyCardNewComment\",\"ms\":12345,\"uid\":"
+      "{\"nid\":\"n00005000000012345000\",\"type\":\"MyCardNewComment\",\"ms\":12345,\"uid\":"
       "\"u00000000000000000001\",\"cid\":\"c00000000000000000002\",\"oid\":\"o00000000000000000003\",\"text\":"
       "\"foo\",\"card\":{\"cid\":\"cINVALID\",\"author_uid\":\"uINVALID\",\"text\":\"\",\"ms\":0,"
       "\"color\":{\"red\":0,\"green\":0,\"blue\":0},\"relevance\":0.0,\"ctfo_score\":0,\"tfu_score\":0,\"ctfo_"
