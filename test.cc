@@ -1378,6 +1378,48 @@ TEST(CTFO, SmokeTest) {
     ASSERT_EQ(1u, feed_recent.size());
     EXPECT_EQ("Bar.", feed_recent[0].text);
   }
+
+  // Confirm flagging a card as inappropriate removes it from favorites.
+  {
+    // Sanity check there is one favorited card.
+    {
+      current::time::SetNow(std::chrono::microseconds(700 * 1000 * 1000));
+      const auto favs = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
+                                        FLAGS_api_port,
+                                        actual_uid.c_str(),
+                                        actual_token.c_str())));
+      EXPECT_EQ(200, static_cast<int>(favs.code));
+      const auto response = ParseResponse<ResponseFavs>(favs.body);
+      ASSERT_EQ(1u, response.cards.size());    // One card has been favorited before.
+      EXPECT_EQ(cid2, response.cards[0].cid);  // The `cid2` one.
+    }
+
+    // Flag that card.
+    {
+      current::time::SetNow(std::chrono::microseconds(701 * 1000 * 1000));
+      favorite_event.event = "FLAG_CARD";
+      favorite_event.fields["uid"] = actual_uid;
+      favorite_event.fields["token"] = actual_token;
+      favorite_event.fields["cid"] = cid2;
+      const auto post_favorite_response_1 =
+          HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port),
+                    JSON(ios_variant_t(favorite_event))));
+      EXPECT_EQ(200, static_cast<int>(post_favorite_response_1.code));
+      EXPECT_EQ("OK\n", post_favorite_response_1.body);
+    }
+
+    // Confirm it's gone.
+    {
+      current::time::SetNow(std::chrono::microseconds(702 * 1000 * 1000));
+      const auto favs = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
+                                        FLAGS_api_port,
+                                        actual_uid.c_str(),
+                                        actual_token.c_str())));
+      EXPECT_EQ(200, static_cast<int>(favs.code));
+      const auto response = ParseResponse<ResponseFavs>(favs.body);
+      ASSERT_TRUE(response.cards.empty());
+    }
+  }
 }
 
 TEST(CTFO, StrictAuth) {

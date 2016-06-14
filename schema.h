@@ -532,7 +532,8 @@ CURRENT_STRUCT(Notification) {
   ResponseNotification BuildResponseNotification() const {
     ResponseNotificationBuilder builder;
     builder.response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(timestamp);
-    builder.response.nid = NIDToString(static_cast<NID>(ID_RANGE * 5 + timestamp.count()));
+    // To play it safe, let's leave notification IDs full range for now. They are only used as strings. -- D.K.
+    builder.response.nid = NIDToString(static_cast<NID>(OLD_ID_RANGE * 5 + timestamp.count()));
     notification.Call(builder);
     return builder.response;
   }
