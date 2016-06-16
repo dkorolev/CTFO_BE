@@ -59,16 +59,51 @@ static const size_t FLAGS_reports_to_ban = 10u;
 
 namespace CTFO {
 
+struct CTFOHypermedia
+#ifdef USE_BASIC_HYPERMEDIA
+    : current::storage::rest::Hypermedia {
+  using super_t = current::storage::rest::Hypermedia;
+#else
+    : current::storage::rest::AdvancedHypermedia {
+  using super_t = current::storage::rest::AdvancedHypermedia;
+#endif
+
+  template <class HTTP_VERB, typename PARTICULAR_FIELD, typename ENTRY, typename KEY>
+  struct RESTful : super_t::RESTful<HTTP_VERB, PARTICULAR_FIELD, ENTRY, KEY> {
+    using restful_super_t = super_t::RESTful<HTTP_VERB, PARTICULAR_FIELD, ENTRY, KEY>;
+    using headers_list_t = std::vector<current::net::http::Header>;
+    headers_list_t headers;
+
+    template <typename F>
+    void Enter(Request request, F&& next) {
+      const char prefix[] = "X-";
+      for (const auto& header : request.headers) {
+        if (header.header.substr(0, sizeof(prefix) - 1) == prefix)
+          headers.push_back(header);
+      }
+      this->restful_super_t::template Enter<F>(std::move(request), std::move(next));
+    }
+
+    template <class INPUT, bool IS_GET = std::is_same<HTTP_VERB, GET>::value>
+    std::enable_if_t<!IS_GET, Response> Run(const INPUT& input) const {
+      for (const auto& header : headers) {
+        input.fields.SetTransactionMetaField(header.header, header.value);
+      }
+      return this->restful_super_t::template Run<INPUT>(input);
+    }
+
+    template <class INPUT, bool IS_GET = std::is_same<HTTP_VERB, GET>::value>
+    std::enable_if_t<IS_GET, Response> Run(const INPUT& input) const {
+      return this->restful_super_t::template Run<INPUT>(input);
+    }
+  };
+};
+
 class CTFOServer final {
  public:
   using Storage = CTFOStorage<SherlockStreamPersister>;
   using MidichloriansServer = current::midichlorians::server::MidichloriansHTTPServer<CTFOServer>;
-  using RESTStorage = RESTfulStorage<Storage,
-#ifdef USE_BASIC_HYPERMEDIA
-                                     current::storage::rest::Hypermedia>;
-#else
-                                     current::storage::rest::AdvancedHypermedia>;
-#endif
+  using RESTStorage = RESTfulStorage<Storage, CTFOHypermedia>;
 
   explicit CTFOServer(const std::string& cards_file,
                       int port,
