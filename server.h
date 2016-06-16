@@ -99,35 +99,77 @@ struct CTFOHypermedia
   };
 };
 
+CURRENT_STRUCT(CTFOServerParams) {
+  CURRENT_FIELD(api_port, int);
+  CURRENT_FIELD(rest_port, int, 0);
+  CURRENT_FIELD(midichlorians_port, int, 0);
+  CURRENT_FIELD(storage_file, std::string);
+  CURRENT_FIELD(cards_file, std::string);
+  CURRENT_FIELD(rest_url_prefix, std::string);
+  CURRENT_FIELD(midichlorians_file, std::string);
+  CURRENT_FIELD(tick_interval_ms, std::chrono::milliseconds);
+  CURRENT_FIELD(debug_print_to_stderr, bool, false);
+  CURRENT_FIELD(raw_log_path, Optional<std::string>, "/raw_log");
+
+  CURRENT_DEFAULT_CONSTRUCTOR(CTFOServerParams) {}
+
+  CTFOServerParams& SetAPIPort(int port) {
+    api_port = port;
+    return *this;
+  }
+  CTFOServerParams& SetRESTPort(int port) {
+    rest_port = port;
+    return *this;
+  }
+  CTFOServerParams& SetMidichloriansPort(int port) {
+    midichlorians_port = port;
+    return *this;
+  }
+  CTFOServerParams& SetStorageFile(const std::string& file) {
+    storage_file = file;
+    return *this;
+  }
+  CTFOServerParams& SetCardsFile(const std::string& file) {
+    cards_file = file;
+    return *this;
+  }
+  CTFOServerParams& SetRESTPrefixURL(const std::string& prefix) {
+    rest_url_prefix = prefix;
+    return *this;
+  }
+  CTFOServerParams& SetMidichloriansFile(const std::string& file) {
+    midichlorians_file = file;
+    return *this;
+  }
+  CTFOServerParams& SetTickInterval(std::chrono::milliseconds ms) {
+    tick_interval_ms = ms;
+    return *this;
+  }
+  CTFOServerParams& SetDebugPrint(bool enable) {
+    debug_print_to_stderr = enable;
+    return *this;
+  }
+  int GetRESTPort() const { return rest_port ? rest_port : api_port; }
+  int GetMidichloriansPort() const { return midichlorians_port ? midichlorians_port : api_port; }
+};
+
 class CTFOServer final {
  public:
   using Storage = CTFOStorage<SherlockStreamPersister>;
   using MidichloriansServer = current::midichlorians::server::MidichloriansHTTPServer<CTFOServer>;
   using RESTStorage = RESTfulStorage<Storage, CTFOHypermedia>;
 
-  explicit CTFOServer(const std::string& cards_file,
-                      int port,
-                      const std::string& storage_file,
-                      int midichlorians_port,
-                      const std::string& midichlorians_file,
-                      int rest_port,
-                      const std::string& rest_url_prefix,
-                      const std::chrono::milliseconds tick_interval_ms,
-                      const bool debug_print_to_stderr = false)
-      : port_(port),
+  explicit CTFOServer(const CTFOServerParams& params)
+      : port_(params.api_port),
         midichlorians_server_(
-            midichlorians_port ? midichlorians_port : port, *this, tick_interval_ms, "/ctfo/log", "OK\n"),
-        debug_print_(debug_print_to_stderr),
-        storage_(storage_file),
-        rest_(storage_,
-              rest_port ? rest_port : port,
-              "/ctfo/rest",
-              rest_url_prefix + ':' + current::ToString(rest_port) + "/ctfo/rest") {
-    midichlorians_stream_.open(midichlorians_file, std::ofstream::out | std::ofstream::app);
+            params.GetMidichloriansPort(), *this, params.tick_interval_ms, "/ctfo/log", "OK\n"),
+        debug_print_(params.debug_print_to_stderr),
+        storage_(current::sherlock::SherlockNamespaceName("OldCTFOStorage"), params.storage_file),
+        rest_(storage_, params.GetRESTPort(), "/ctfo/rest", params.rest_url_prefix) {
+    midichlorians_stream_.open(params.midichlorians_file, std::ofstream::out | std::ofstream::app);
 
-    static_cast<void>(cards_file);
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
-    std::ifstream cf(cards_file);
+    std::ifstream cf(params.cards_file);
     assert(cf.good());
     storage_.ReadWriteTransaction([&cf](MutableFields<Storage> data) {
       User admin_user;
@@ -146,28 +188,22 @@ class CTFOServer final {
     }).Go();
 #endif
 
-    HTTP(port_).Register("/healthz", [](Request r) { r("OK\n"); });
-    HTTP(port_).Register("/ctfo/auth/ios", BindToThis(&CTFOServer::RouteAuthiOS));
-    HTTP(port_).Register("/ctfo/feed", BindToThis(&CTFOServer::RouteFeed));
-    HTTP(port_).Register("/ctfo/favs", BindToThis(&CTFOServer::RouteFavorites));
-    HTTP(port_).Register("/ctfo/my_cards", BindToThis(&CTFOServer::RouteMyCards));
-    HTTP(port_).Register("/ctfo/card", BindToThis(&CTFOServer::RouteCard));
-    HTTP(port_).Register("/ctfo/comments", BindToThis(&CTFOServer::RouteComments));
-    HTTP(port_).Register("/ctfo/comment", BindToThis(&CTFOServer::RouteComments));
-    HTTP(port_).Register("/initial_cards", BindToThis(&CTFOServer::RouteInitialCards));
-  }
+    scoped_http_routes_ += HTTP(port_).Register("/healthz", [](Request r) { r("OK\n"); }) +
+                           HTTP(port_).Register("/ctfo/auth/ios", BindToThis(&CTFOServer::RouteAuthiOS)) +
+                           HTTP(port_).Register("/ctfo/feed", BindToThis(&CTFOServer::RouteFeed)) +
+                           HTTP(port_).Register("/ctfo/favs", BindToThis(&CTFOServer::RouteFavorites)) +
+                           HTTP(port_).Register("/ctfo/my_cards", BindToThis(&CTFOServer::RouteMyCards)) +
+                           HTTP(port_).Register("/ctfo/card", BindToThis(&CTFOServer::RouteCard)) +
+                           HTTP(port_).Register("/ctfo/comments", BindToThis(&CTFOServer::RouteComments)) +
+                           HTTP(port_).Register("/ctfo/comment", BindToThis(&CTFOServer::RouteComments)) +
+                           HTTP(port_).Register("/initial_cards", BindToThis(&CTFOServer::RouteInitialCards));
 
-  ~CTFOServer() {
-    // TODO(dkorolev): Scoped registerers FTW.
-    HTTP(port_).UnRegister("/healthz");
-    HTTP(port_).UnRegister("/ctfo/auth/ios");
-    HTTP(port_).UnRegister("/ctfo/feed");
-    HTTP(port_).UnRegister("/ctfo/favs");
-    HTTP(port_).UnRegister("/ctfo/my_cards");
-    HTTP(port_).UnRegister("/ctfo/card");
-    HTTP(port_).UnRegister("/ctfo/comments");
-    HTTP(port_).UnRegister("/ctfo/comment");
-    HTTP(port_).UnRegister("/initial_cards");
+    if (Exists(params.raw_log_path)) {
+      const auto route = Value(params.raw_log_path);
+      DebugPrint("Registering raw log on: `" + route + "`.");
+      scoped_http_routes_ += HTTP(port_).Register(
+          route, URLPathArgs::CountMask::None | URLPathArgs::CountMask::One, storage_.InternalExposeStream());
+    }
   }
 
   void Join() { HTTP(port_).Join(); }
@@ -373,13 +409,16 @@ class CTFOServer final {
               CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_user[uid]), rfavs.user);
 
               const auto& answers = data.answer;
+              const auto& flagged_cards = data.flagged_card;
 
               // Get favs.
               std::vector<std::pair<std::chrono::microseconds, CID>> favs;
               const auto& favorites = data.favorite;
               for (const auto& fav : favorites.Row(uid)) {
                 if (fav.favorited) {
-                  favs.emplace_back(fav.us, fav.cid);
+                  if (!Exists(flagged_cards.Get(fav.cid, uid))) {
+                    favs.emplace_back(fav.us, fav.cid);
+                  }
                 }
               }
 
@@ -1046,6 +1085,7 @@ class CTFOServer final {
 
   Storage storage_;
   RESTStorage rest_;
+  HTTPRoutesScope scoped_http_routes_;
 
   const std::map<std::string, LOG_EVENT> valid_responses_ = {{"CTFO", LOG_EVENT::CTFO},
                                                              {"TFU", LOG_EVENT::TFU},

@@ -31,8 +31,10 @@ SOFTWARE.
 #include "schema_base.h"
 
 namespace CTFO {
-static constexpr uint64_t ID_RANGE = static_cast<uint64_t>(1e18);
-static constexpr UID admin_uid = static_cast<UID>(1000000000000000001ull);
+static constexpr uint64_t OLD_ID_RANGE = static_cast<uint64_t>(1e18);
+static constexpr uint64_t ID_RANGE = static_cast<uint64_t>(1e15);
+static constexpr UID old_admin_uid = static_cast<UID>(1000000000000000ull);
+static constexpr UID admin_uid = static_cast<UID>(1000000000000ull);
 
 inline UID RandomUID() { return static_cast<UID>(RandomUInt64(1 * ID_RANGE + 1, 2 * ID_RANGE - 1)); }
 
@@ -45,6 +47,8 @@ inline std::string RandomToken() {
 inline OID RandomOID() { return static_cast<OID>(RandomUInt64(4 * ID_RANGE + 1, 5 * ID_RANGE - 1)); }
 
 // "05" followed by 18 digits <=> NID, notification ID.
+
+// TODO(dkorolev): Change string representations into the ones three characters shorter. Some day soon. Maybe.
 
 inline std::string UIDToString(const UID uid) {
   return current::strings::Printf("u%020llu", static_cast<uint64_t>(uid));

@@ -36,10 +36,10 @@ SOFTWARE.
 #include "../Current/Midichlorians/Server/schema.h"
 
 DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
-DEFINE_int32(api_port, 8383, "Port to spawn CTFO RESTful server on.");
+DEFINE_int32(api_port, 8383, "Port to spawn CTFO API on.");
 DEFINE_int32(midichlorians_port, 8384, "Port to spawn midichlorians server on.");
-DEFINE_int32(rest_port, 8385, "Port to spawn RESTfulStorage on.");
-DEFINE_string(rest_url_prefix, "http://localhost", "Hypermedia route prefix to spawn RESTfulStorage on.");
+DEFINE_int32(rest_port, 8385, "Port to spawn RESTful server on.");
+DEFINE_string(rest_url_prefix, "http://localhost", "Hypermedia route prefix to spawn RESTful server on.");
 
 using namespace CTFO;
 using namespace current::midichlorians::ios;
@@ -68,21 +68,19 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
   current::time::SetNow(std::chrono::microseconds(1000));
   current::random::SetRandomSeed(42);
 
-  auto server = std::make_unique<CTFOServer>(FLAGS_cards_file,
-                                             FLAGS_api_port,
-                                             db_file,
-                                             FLAGS_midichlorians_port,
-                                             log_file,
-                                             FLAGS_rest_port,
-                                             FLAGS_rest_url_prefix,
-                                             std::chrono::milliseconds(100)
+  auto server = std::make_unique<CTFOServer>(CTFOServerParams()
+                                                 .SetAPIPort(FLAGS_api_port)
+                                                 .SetRESTPort(FLAGS_rest_port)
+                                                 .SetMidichloriansPort(FLAGS_midichlorians_port)
+                                                 .SetStorageFile(db_file)
+                                                 .SetCardsFile(FLAGS_cards_file)
+                                                 .SetRESTPrefixURL(FLAGS_rest_url_prefix)
+                                                 .SetMidichloriansFile(log_file)
+                                                 .SetTickInterval(std::chrono::milliseconds(100))
 #ifdef CTFO_DEBUG
-                                             // clang-format off
-                                             ,
-                                             true  // Debug print.
+                                                 .SetDebugPrint(true)
 #endif
-                                             // clang-format on
-                                             );
+                                                 );
 
   current::time::SetNow(std::chrono::microseconds(1001));
   return server;
@@ -1379,6 +1377,48 @@ TEST(CTFO, SmokeTest) {
                                                  actual_token.c_str()))).body).feed_recent;
     ASSERT_EQ(1u, feed_recent.size());
     EXPECT_EQ("Bar.", feed_recent[0].text);
+  }
+
+  // Confirm flagging a card as inappropriate removes it from favorites.
+  {
+    // Sanity check there is one favorited card.
+    {
+      current::time::SetNow(std::chrono::microseconds(700 * 1000 * 1000));
+      const auto favs = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
+                                        FLAGS_api_port,
+                                        actual_uid.c_str(),
+                                        actual_token.c_str())));
+      EXPECT_EQ(200, static_cast<int>(favs.code));
+      const auto response = ParseResponse<ResponseFavs>(favs.body);
+      ASSERT_EQ(1u, response.cards.size());    // One card has been favorited before.
+      EXPECT_EQ(cid2, response.cards[0].cid);  // The `cid2` one.
+    }
+
+    // Flag that card.
+    {
+      current::time::SetNow(std::chrono::microseconds(701 * 1000 * 1000));
+      favorite_event.event = "FLAG_CARD";
+      favorite_event.fields["uid"] = actual_uid;
+      favorite_event.fields["token"] = actual_token;
+      favorite_event.fields["cid"] = cid2;
+      const auto post_favorite_response_1 =
+          HTTP(POST(Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port),
+                    JSON(ios_variant_t(favorite_event))));
+      EXPECT_EQ(200, static_cast<int>(post_favorite_response_1.code));
+      EXPECT_EQ("OK\n", post_favorite_response_1.body);
+    }
+
+    // Confirm it's gone.
+    {
+      current::time::SetNow(std::chrono::microseconds(702 * 1000 * 1000));
+      const auto favs = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
+                                        FLAGS_api_port,
+                                        actual_uid.c_str(),
+                                        actual_token.c_str())));
+      EXPECT_EQ(200, static_cast<int>(favs.code));
+      const auto response = ParseResponse<ResponseFavs>(favs.body);
+      ASSERT_TRUE(response.cards.empty());
+    }
   }
 }
 
