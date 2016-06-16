@@ -216,9 +216,9 @@ class CTFOServer final {
       const std::string device_id = r.url.query.get("id", "");
       const std::string app_key = r.url.query.get("key", "");
       const std::string& notifications_since_as_string = r.url.query["notifications_since"];
-      const uint64_t notifications_since = notifications_since_as_string.empty()
-                                               ? static_cast<uint64_t>(-1)
-                                               : current::FromString<uint64_t>(notifications_since_as_string);
+      const uint64_t notification_since_ms = notifications_since_as_string.empty()
+                                                 ? static_cast<uint64_t>(-1)
+                                                 : current::FromString<uint64_t>(notifications_since_as_string);
       if (device_id.empty() || app_key.empty()) {
         DebugPrint(Printf("[/ctfo/auth/ios] Wrong query parameters. Requested URL = '%s'",
                           r.url.ComposeURL().c_str()));
@@ -227,7 +227,7 @@ class CTFOServer final {
         const size_t feed_count = current::FromString<size_t>(r.url.query.get("feed_count", "20"));
         // Searching for users with the corresponding authentication key.
         storage_.ReadWriteTransaction(  // clang-format off
-            [this, device_id, app_key, feed_count, notifications_since](MutableFields<Storage> data) {
+            [this, device_id, app_key, feed_count, notification_since_ms](MutableFields<Storage> data) {
               AuthKey auth_key("iOS::" + device_id + "::" + app_key, AUTH_TYPE::IOS);
               UID uid = UID::INVALID_USER;
               User user;
@@ -278,7 +278,7 @@ class CTFOServer final {
               CopyUserInfoToResponseEntry(user, Exists(data.banned_user[uid]), user_entry);
               user_entry.token = token;
 
-              return MakeResponse(GenerateResponseFeed(data, user_entry, feed_count, notifications_since));
+              return MakeResponse(GenerateResponseFeed(data, user_entry, feed_count, notification_since_ms));
             }, std::move(r)).Go();  // clang-format on
       }
     }
@@ -286,9 +286,9 @@ class CTFOServer final {
   void RouteFeed(Request r) {
     const UID uid = StringToUID(r.url.query["uid"]);
     const std::string& notifications_since_as_string = r.url.query["notifications_since"];
-    const uint64_t notifications_since = notifications_since_as_string.empty()
-                                             ? static_cast<uint64_t>(-1)
-                                             : current::FromString<uint64_t>(notifications_since_as_string);
+    const uint64_t notification_since_ms = notifications_since_as_string.empty()
+                                               ? static_cast<uint64_t>(-1)
+                                               : current::FromString<uint64_t>(notifications_since_as_string);
     const std::string token = r.url.query["token"];
     if (r.method != "GET") {
       DebugPrint(Printf("[/ctfo/feed] Wrong method '%s'. Requested URL = '%s'",
@@ -303,7 +303,7 @@ class CTFOServer final {
         const size_t feed_count = current::FromString<size_t>(r.url.query.get("feed_count", "20"));
         const std::string requested_url = r.url.ComposeURL();
         storage_.ReadOnlyTransaction(  // clang-format off
-            [this, uid, token, requested_url, feed_count, notifications_since](ImmutableFields<Storage> data) {
+            [this, uid, token, requested_url, feed_count, notification_since_ms](ImmutableFields<Storage> data) {
               bool token_is_valid = false;
               const auto& auth_token_accessor = data.auth_token;
               if (auth_token_accessor.Cols().Has(token)) {
@@ -324,7 +324,7 @@ class CTFOServer final {
                 ResponseUserEntry user_entry;
                 CopyUserInfoToResponseEntry(user, Exists(data.banned_user[uid]), user_entry);
                 user_entry.token = token;
-                return MakeResponse(GenerateResponseFeed(data, user_entry, feed_count, notifications_since));
+                return MakeResponse(GenerateResponseFeed(data, user_entry, feed_count, notification_since_ms));
               }
             }, std::move(r)).Go();  // clang-format on
       }
@@ -1087,7 +1087,7 @@ class CTFOServer final {
   ResponseFeed GenerateResponseFeed(ImmutableFields<Storage> data,
                                     ResponseUserEntry user_entry,
                                     size_t feed_size,
-                                    uint64_t notifications_since,
+                                    uint64_t notifications_since_ms,
                                     size_t FEED_SIZE_LIMIT = 300ul,
                                     bool initial = false) {
     ResponseFeed response;
@@ -1203,7 +1203,7 @@ class CTFOServer final {
       }
     }
 
-    if (notifications_since != static_cast<uint64_t>(-1)) {
+    if (notifications_since_ms != static_cast<uint64_t>(-1)) {
       // Shamelessly copy-pasted from GenerateCardForFeed. -- D.K.
       const auto GenerateCardForNotification =
           [this, uid, &answers, &favorites, &comments, &author_cards](const Card& card) {
@@ -1248,8 +1248,9 @@ class CTFOServer final {
           };
       // TODO(dkorolev): `upper_bound`, not go through all notifications for this user.
       std::map<CID, ResponseCardEntry> cards_used;
+      const uint64_t notifications_since_us = notifications_since_ms * 1000;
       for (const Notification& notification : data.notification.Row(uid)) {
-        if (static_cast<uint64_t>(notification.timestamp.count()) > notifications_since) {
+        if (static_cast<uint64_t>(notification.timestamp.count()) > notifications_since_us) {
           const CID cid = notification.GetCID();
           if (cid != CID::INVALID_CARD && !cards_used.count(cid)) {
             const auto card = data.card[cid];
