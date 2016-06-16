@@ -1248,7 +1248,8 @@ class CTFOServer final {
           };
       // TODO(dkorolev): `upper_bound`, not go through all notifications for this user.
       std::map<CID, ResponseCardEntry> cards_used;
-      const uint64_t notifications_since_us = notifications_since_ms * 1000;
+      // The app expects only notifications "after", not "since".
+      const uint64_t notifications_since_us = (notifications_since_ms + 1) * 1000;
       for (const Notification& notification : data.notification.Row(uid)) {
         if (static_cast<uint64_t>(notification.timestamp.count()) > notifications_since_us) {
           const CID cid = notification.GetCID();
