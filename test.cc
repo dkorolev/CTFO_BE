@@ -27,7 +27,7 @@ SOFTWARE.
 #define MUST_IMPORT_INITIAL_CTFO_CARDS
 #define CURRENT_MOCK_TIME  // `SetNow()`.
 
-#include "server.h"
+#include "ctfo_server.h"
 
 #include "../Current/Bricks/file/file.h"
 
