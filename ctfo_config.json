@@ -1,0 +1,1 @@
+{"api_port":8383,"rest_port":8384,"midichlorians_port":0,"storage_file":"./db.json","cards_file":"cards.json","rest_url_prefix":"http://localhost:8384/ctfo/rest","midichlorians_file":"./ctfo_events.log","tick_interval_ms":300000,"debug_print_to_stderr":true,"raw_log_path":"/raw_log"}

@@ -52,8 +52,10 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
 #ifdef CTFO_DEBUG
   const std::string db_file = "unittest-db-" + suffix + ".log";
   const std::string log_file = "unittest-log-" + suffix + ".log";
+  const std::string config_file = "unittest-config-" + suffix + ".json";
   current::FileSystem::RmFile(db_file, current::FileSystem::RmFileParameters::Silent);
   current::FileSystem::RmFile(log_file, current::FileSystem::RmFileParameters::Silent);
+  current::FileSystem::RmFile(config_file, current::FileSystem::RmFileParameters::Silent);
 #else
   static_cast<void>(suffix);
 
@@ -62,25 +64,31 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
 
   const std::string log_file = current::FileSystem::GenTmpFileName();
   current::FileSystem::ScopedRmFile scoped_rm_log_file(log_file);
+
+  const std::string config_file = current::FileSystem::GenTmpFileName();
+  current::FileSystem::ScopedRmFile scoped_rm_config_file(config_file);
 #endif
 
   current::time::ResetToZero();
   current::time::SetNow(std::chrono::microseconds(1000));
   current::random::SetRandomSeed(42);
 
-  auto server = std::make_unique<CTFOServer>(CTFOServerParams()
-                                                 .SetAPIPort(FLAGS_api_port)
-                                                 .SetRESTPort(FLAGS_rest_port)
-                                                 .SetMidichloriansPort(FLAGS_midichlorians_port)
-                                                 .SetStorageFile(db_file)
-                                                 .SetCardsFile(FLAGS_cards_file)
-                                                 .SetRESTPrefixURL(FLAGS_rest_url_prefix)
-                                                 .SetMidichloriansFile(log_file)
-                                                 .SetTickInterval(std::chrono::milliseconds(100))
+  CTFOServerParams params = CTFOServerParams()
+                                .SetAPIPort(FLAGS_api_port)
+                                .SetRESTPort(FLAGS_rest_port)
+                                .SetMidichloriansPort(FLAGS_midichlorians_port)
+                                .SetStorageFile(db_file)
+                                .SetCardsFile(FLAGS_cards_file)
+                                .SetRESTPrefixURL(FLAGS_rest_url_prefix)
+                                .SetMidichloriansFile(log_file)
+                                .SetTickInterval(std::chrono::milliseconds(100))
 #ifdef CTFO_DEBUG
-                                                 .SetDebugPrint(true)
+                                .SetDebugPrint(true)
 #endif
-                                                 );
+      ;
+  current::FileSystem::WriteStringToFile(JSON(params), config_file.c_str());
+
+  auto server = std::make_unique<CTFOServer>(config_file);
 
   current::time::SetNow(std::chrono::microseconds(1001));
   return server;
