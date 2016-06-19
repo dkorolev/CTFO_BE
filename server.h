@@ -77,9 +77,11 @@ struct CTFOHypermedia
     template <typename F>
     void Enter(Request request, F&& next) {
       const char prefix[] = "X-";
+      const size_t prefix_length = ::strlen(prefix);
       for (const auto& header : request.headers) {
-        if (header.header.substr(0, sizeof(prefix) - 1) == prefix)
+        if (!header.header.compare(0, prefix_length, prefix)) {
           headers.push_back(header);
+        }
       }
       this->restful_super_t::template Enter<F>(std::move(request), std::move(next));
     }
