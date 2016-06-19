@@ -524,10 +524,17 @@ CURRENT_STRUCT(Notification) {
   CURRENT_FIELD(timestamp, std::chrono::microseconds, 0);
   CURRENT_USE_FIELD_AS_COL(timestamp);
   CURRENT_FIELD(notification, T_NOTIFICATIONS_VARIANT);
+
+  // So that there's no ambiguity with `notifications_since`, which is now in milliseconds.
+  // Will fix later. -- D.K.
+  static std::chrono::microseconds RoundToMilliseconds(std::chrono::microseconds us) {
+    return std::chrono::microseconds((static_cast<int64_t>(us.count()) / 1000ll) * 1000ll);
+  }
+
   CURRENT_DEFAULT_CONSTRUCTOR(Notification) : timestamp(current::time::Now()) {}
   CURRENT_CONSTRUCTOR(Notification)(  // clang-format off
-      UID uid, std::chrono::microseconds ms, T_NOTIFICATIONS_VARIANT&& notification)
-      : uid(uid), timestamp(ms), notification(std::move(notification)) {}  // clang-format on
+      UID uid, std::chrono::microseconds us, T_NOTIFICATIONS_VARIANT&& notification)
+      : uid(uid), timestamp(RoundToMilliseconds(us)), notification(std::move(notification)) {}  // clang-format on
 
   ResponseNotification BuildResponseNotification() const {
     ResponseNotificationBuilder builder;
