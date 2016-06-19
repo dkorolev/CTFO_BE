@@ -411,15 +411,17 @@ class CTFOServer final {
               CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_user[uid]), rfavs.user);
 
               const auto& answers = data.answer;
-              const auto& flagged_cards = data.flagged_card;
 
               // Get favs.
               std::vector<std::pair<std::chrono::microseconds, CID>> favs;
               const auto& favorites = data.favorite;
               for (const auto& fav : favorites.Row(uid)) {
                 if (fav.favorited) {
-                  if (!Exists(flagged_cards.Get(fav.cid, uid))) {
-                    favs.emplace_back(fav.us, fav.cid);
+                  if (!Exists(data.flagged_card.Get(fav.cid, uid))) {
+                    const auto& author = data.author_card.GetEntryFromCol(fav.cid);
+                    if (!Exists(author) || !Exists(data.user_blocked_user.Get(uid, Value(author).uid))) {
+                      favs.emplace_back(fav.us, fav.cid);
+                    }
                   }
                 }
               }
