@@ -100,26 +100,27 @@ struct CTFOHypermedia
 };
 
 CURRENT_STRUCT(CTFOServerParams) {
-  // Port to spawn CTFO API on.
   CURRENT_FIELD(api_port, int);
-  // Port to spawn RESTful server on (the same as api_port by default).
+  CURRENT_FIELD_DESCRIPTION(api_port, "Port to spawn CTFO API on.");
   CURRENT_FIELD(rest_port, int, 0);
-  // Port to spawn midichlorians server on  (the same as api_port by default).
+  CURRENT_FIELD_DESCRIPTION(rest_port, "Port to spawn RESTful server on (the same as api_port by default).");
   CURRENT_FIELD(midichlorians_port, int, 0);
-  // The file to store the snapshot of the database in.
+  CURRENT_FIELD_DESCRIPTION(midichlorians_port,
+                            "Port to spawn midichlorians server on (the same as api_port by default).");
   CURRENT_FIELD(storage_file, std::string);
-  // Cards data file in JSON format.
+  CURRENT_FIELD_DESCRIPTION(storage_file, "The file to store the snapshot of the database in.");
   CURRENT_FIELD(cards_file, std::string);
-  // Hypermedia route prefix to spawn RESTful server on.
+  CURRENT_FIELD_DESCRIPTION(cards_file, "Cards data file in JSON format.");
   CURRENT_FIELD(rest_url_prefix, std::string);
-  // Log file to store events received by midichlorians server.
+  CURRENT_FIELD_DESCRIPTION(rest_url_prefix, "Hypermedia route prefix to spawn RESTful server on.");
   CURRENT_FIELD(midichlorians_file, std::string);
-  // Maximum interval between event entries.
+  CURRENT_FIELD_DESCRIPTION(midichlorians_file, "Log file to store events received by midichlorians server.");
   CURRENT_FIELD(tick_interval_ms, std::chrono::milliseconds);
-  // Print debug info to stderr.
+  CURRENT_FIELD_DESCRIPTION(tick_interval_ms, "Maximum interval between event entries.");
   CURRENT_FIELD(debug_print_to_stderr, bool, false);
-  // The file to store raw HTTP log in.
+  CURRENT_FIELD_DESCRIPTION(debug_print_to_stderr, "Print debug info to stderr.");
   CURRENT_FIELD(raw_log_path, Optional<std::string>, "/raw_log");
+  CURRENT_FIELD_DESCRIPTION(raw_log_path, "The file to store raw HTTP log in.");
 
   CURRENT_DEFAULT_CONSTRUCTOR(CTFOServerParams) {}
 
