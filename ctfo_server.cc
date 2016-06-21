@@ -34,9 +34,18 @@ using namespace CTFO;
 
 DEFINE_int32(rand_seed, 42, "The answer to the question of life, universe and everything.");
 DEFINE_string(config_file, "ctfo_config.json", "The file to read CTFOServerParams in JSON format from.");
+DEFINE_bool(helpconfig, false, "Display the config format information.");
 
 int main(int argc, char **argv) {
   ParseDFlags(&argc, &argv);
-  current::random::SetRandomSeed(FLAGS_rand_seed);
-  CTFOServer(FLAGS_config_file).Join();
+  if (FLAGS_helpconfig) {
+    current::reflection::StructSchema schema;
+    schema.AddType<CTFOServerParams>();
+    printf("Config file should contain the following object, serialized to JSON:%s",
+           schema.GetSchemaInfo().Describe<current::reflection::Language::FSharp>(false).c_str());
+  } else {
+    current::random::SetRandomSeed(FLAGS_rand_seed);
+    CTFOServer(FLAGS_config_file).Join();
+  }
+  return 0;
 }
