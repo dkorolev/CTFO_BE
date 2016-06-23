@@ -79,7 +79,7 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
                                       .SetMidichloriansPort(FLAGS_midichlorians_port)
                                       .SetStorageFile(db_file)
                                       .SetCardsFile(FLAGS_cards_file)
-                                      .SetRESTPrefixURL(FLAGS_rest_url_prefix)
+                                      .SetRESTURLPrefix(FLAGS_rest_url_prefix)
                                       .SetMidichloriansFile(log_file)
                                       .SetTickInterval(std::chrono::milliseconds(100))
 #ifdef CTFO_DEBUG

@@ -4,9 +4,11 @@
 	"midichlorians_port":0,
 	"storage_file":"db.json",
 	"cards_file":"cards.json",
-	"rest_url_prefix":"http://localhost:8384/ctfo/rest",
 	"midichlorians_file":"ctfo_events.log",
+	"rest_url_prefix":"http://localhost:8384/ctfo/rest",
+	"rest_url_path":"/ctfo/rest",
+	"raw_log_url_path":"/raw_log",
+	"midichlorians_url_path":"/ctfo/log",
 	"tick_interval_ms":300000,
-	"debug_print_to_stderr":true,
-	"raw_log_path":"/raw_log"
+	"debug_print_to_stderr":true
 }

@@ -113,16 +113,21 @@ CURRENT_STRUCT(CTFOServerParams) {
   CURRENT_FIELD_DESCRIPTION(storage_file, "The file to store the snapshot of the database in.");
   CURRENT_FIELD(cards_file, std::string);
   CURRENT_FIELD_DESCRIPTION(cards_file, "Cards data file in JSON format.");
-  CURRENT_FIELD(rest_url_prefix, std::string);
-  CURRENT_FIELD_DESCRIPTION(rest_url_prefix, "Hypermedia route prefix to spawn RESTful server on.");
   CURRENT_FIELD(midichlorians_file, std::string);
   CURRENT_FIELD_DESCRIPTION(midichlorians_file, "Log file to store events received by midichlorians server.");
+  CURRENT_FIELD(rest_url_prefix, std::string);
+  CURRENT_FIELD_DESCRIPTION(rest_url_prefix, "Hypermedia route prefix to spawn RESTful server on.");
+  CURRENT_FIELD(rest_url_path, std::string, "/ctfo/rest");
+  CURRENT_FIELD_DESCRIPTION(rest_url_path, "The HTTP url path to expose RESTful server API on.")
+  CURRENT_FIELD(raw_log_url_path, Optional<std::string>, "/raw_log");
+  CURRENT_FIELD_DESCRIPTION(raw_log_url_path,
+                            "The HTTP url path to expose the storage underlying stream raw log in.");
+  CURRENT_FIELD(midichlorians_url_path, std::string, "/ctfo/log");
+  CURRENT_FIELD_DESCRIPTION(midichlorians_url_path, "The HTTP url path for the midichlorians server.");
   CURRENT_FIELD(tick_interval_ms, std::chrono::milliseconds);
   CURRENT_FIELD_DESCRIPTION(tick_interval_ms, "Maximum interval between event entries.");
   CURRENT_FIELD(debug_print_to_stderr, bool, false);
   CURRENT_FIELD_DESCRIPTION(debug_print_to_stderr, "Print debug info to stderr.");
-  CURRENT_FIELD(raw_log_path, Optional<std::string>, "/raw_log");
-  CURRENT_FIELD_DESCRIPTION(raw_log_path, "The file to store raw HTTP log in.");
 
   CURRENT_DEFAULT_CONSTRUCTOR(CTFOServerParams) {}
 
@@ -146,12 +151,24 @@ CURRENT_STRUCT(CTFOServerParams) {
     cards_file = file;
     return *this;
   }
-  CTFOServerParams& SetRESTPrefixURL(const std::string& prefix) {
+  CTFOServerParams& SetMidichloriansFile(const std::string& file) {
+    midichlorians_file = file;
+    return *this;
+  }
+  CTFOServerParams& SetRESTURLPrefix(const std::string& prefix) {
     rest_url_prefix = prefix;
     return *this;
   }
-  CTFOServerParams& SetMidichloriansFile(const std::string& file) {
-    midichlorians_file = file;
+  CTFOServerParams& SetRESTURLPath(const std::string& path) {
+    rest_url_path = path;
+    return *this;
+  }
+  CTFOServerParams& SetRawLogURLPath(const std::string& path) {
+    raw_log_url_path = path;
+    return *this;
+  }
+  CTFOServerParams& SetMidichloriansURLPath(const std::string& path) {
+    midichlorians_url_path = path;
     return *this;
   }
   CTFOServerParams& SetTickInterval(std::chrono::milliseconds ms) {
@@ -178,10 +195,13 @@ class CTFOServer final {
         midichlorians_server_(config_.Config().GetMidichloriansPort(),
                               *this,
                               config_.Config().tick_interval_ms,
-                              "/ctfo/log",
+                              config_.Config().midichlorians_url_path,
                               "OK\n"),
         storage_(current::sherlock::SherlockNamespaceName("OldCTFOStorage"), config_.Config().storage_file),
-        rest_(storage_, config_.Config().GetRESTPort(), "/ctfo/rest", config_.Config().rest_url_prefix) {
+        rest_(storage_,
+              config_.Config().GetRESTPort(),
+              config_.Config().rest_url_path,
+              config_.Config().rest_url_prefix) {
     midichlorians_stream_.open(config_.Config().midichlorians_file, std::ofstream::out | std::ofstream::app);
 
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
@@ -215,8 +235,8 @@ class CTFOServer final {
                            HTTP(port).Register("/ctfo/comment", BindToThis(&CTFOServer::RouteComments)) +
                            HTTP(port).Register("/initial_cards", BindToThis(&CTFOServer::RouteInitialCards));
 
-    if (Exists(config_.Config().raw_log_path)) {
-      const auto route = Value(config_.Config().raw_log_path);
+    if (Exists(config_.Config().raw_log_url_path)) {
+      const auto route = Value(config_.Config().raw_log_url_path);
       DebugPrint("Registering raw log on: `" + route + "`.");
       scoped_http_routes_ += HTTP(port).Register(
           route, URLPathArgs::CountMask::None | URLPathArgs::CountMask::One, storage_.InternalExposeStream());
