@@ -79,7 +79,9 @@ struct CTFOHypermedia
     void Enter(Request request, F&& next) {
       const char prefix[] = "X-";
       for (const auto& header : request.headers) {
-        if (header.header.substr(0, sizeof(prefix) - 1) == prefix) headers.push_back(header);
+        if (header.header.substr(0, sizeof(prefix) - 1) == prefix) {
+          headers.push_back(header);
+        }
       }
       this->restful_super_t::template Enter<F>(std::move(request), std::move(next));
     }

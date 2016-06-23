@@ -41,8 +41,7 @@ int main(int argc, char **argv) {
   if (FLAGS_helpconfig) {
     current::reflection::StructSchema schema;
     schema.AddType<CTFOServerParams>();
-    printf("Config file should contain the following object, serialized to JSON:%s",
-           schema.GetSchemaInfo().Describe<current::reflection::Language::FSharp>(false).c_str());
+    std::cout << schema.GetSchemaInfo().Describe<current::reflection::Language::FSharp>(false);
   } else {
     current::random::SetRandomSeed(FLAGS_rand_seed);
     CTFOServer(FLAGS_config_file).Join();

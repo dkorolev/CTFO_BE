@@ -73,17 +73,17 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
   current::time::SetNow(std::chrono::microseconds(1000));
   current::random::SetRandomSeed(42);
 
-  CTFOServerParams params = CTFOServerParams()
-                                .SetAPIPort(FLAGS_api_port)
-                                .SetRESTPort(FLAGS_rest_port)
-                                .SetMidichloriansPort(FLAGS_midichlorians_port)
-                                .SetStorageFile(db_file)
-                                .SetCardsFile(FLAGS_cards_file)
-                                .SetRESTPrefixURL(FLAGS_rest_url_prefix)
-                                .SetMidichloriansFile(log_file)
-                                .SetTickInterval(std::chrono::milliseconds(100))
+  const CTFOServerParams params = CTFOServerParams()
+                                      .SetAPIPort(FLAGS_api_port)
+                                      .SetRESTPort(FLAGS_rest_port)
+                                      .SetMidichloriansPort(FLAGS_midichlorians_port)
+                                      .SetStorageFile(db_file)
+                                      .SetCardsFile(FLAGS_cards_file)
+                                      .SetRESTPrefixURL(FLAGS_rest_url_prefix)
+                                      .SetMidichloriansFile(log_file)
+                                      .SetTickInterval(std::chrono::milliseconds(100))
 #ifdef CTFO_DEBUG
-                                .SetDebugPrint(true)
+                                      .SetDebugPrint(true)
 #endif
       ;
   current::FileSystem::WriteStringToFile(JSON(params), config_file.c_str());
