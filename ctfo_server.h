@@ -104,11 +104,11 @@ struct CTFOHypermedia
 CURRENT_STRUCT(CTFOServerParams) {
   CURRENT_FIELD(api_port, uint16_t);
   CURRENT_FIELD_DESCRIPTION(api_port, "Port to spawn CTFO API on.");
-  CURRENT_FIELD(rest_port, uint16_t, 0);
-  CURRENT_FIELD_DESCRIPTION(rest_port, "Port to spawn RESTful server on (the same as api_port by default).");
-  CURRENT_FIELD(midichlorians_port, uint16_t, 0);
+  CURRENT_FIELD(rest_port, uint16_t);
+  CURRENT_FIELD_DESCRIPTION(rest_port, "Port to spawn RESTful server on.");
+  CURRENT_FIELD(midichlorians_port, uint16_t);
   CURRENT_FIELD_DESCRIPTION(midichlorians_port,
-                            "Port to spawn midichlorians server on (the same as api_port by default).");
+                            "Port to spawn midichlorians server on.");
   CURRENT_FIELD(storage_file, std::string);
   CURRENT_FIELD_DESCRIPTION(storage_file, "The file to store the snapshot of the database in.");
   CURRENT_FIELD(cards_file, std::string);
@@ -179,8 +179,6 @@ CURRENT_STRUCT(CTFOServerParams) {
     debug_print_to_stderr = enable;
     return *this;
   }
-  uint16_t GetRESTPort() const { return rest_port ? rest_port : api_port; }
-  uint16_t GetMidichloriansPort() const { return midichlorians_port ? midichlorians_port : api_port; }
 };
 
 class CTFOServer final {
@@ -192,14 +190,14 @@ class CTFOServer final {
 
   explicit CTFOServer(const std::string& config_path)
       : config_(config_path),
-        midichlorians_server_(config_.Config().GetMidichloriansPort(),
+        midichlorians_server_(config_.Config().midichlorians_port,
                               *this,
                               config_.Config().tick_interval_ms,
                               config_.Config().midichlorians_url_path,
                               "OK\n"),
         storage_(current::sherlock::SherlockNamespaceName("OldCTFOStorage"), config_.Config().storage_file),
         rest_(storage_,
-              config_.Config().GetRESTPort(),
+              config_.Config().rest_port,
               config_.Config().rest_url_path,
               config_.Config().rest_url_prefix) {
     midichlorians_stream_.open(config_.Config().midichlorians_file, std::ofstream::out | std::ofstream::app);

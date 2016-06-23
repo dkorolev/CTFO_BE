@@ -1,7 +1,7 @@
 {
 	"api_port":8383,
 	"rest_port":8384,
-	"midichlorians_port":0,
+	"midichlorians_port":8385,
 	"storage_file":"db.json",
 	"cards_file":"cards.json",
 	"midichlorians_file":"ctfo_events.log",
