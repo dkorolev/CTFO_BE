@@ -26,38 +26,25 @@ SOFTWARE.
 // Enable "$REST/data/user?export" unconditionally.
 #define CURRENT_ALLOW_STORAGE_EXPORT_FROM_MASTER
 
-#include "server.h"
+#include "ctfo_server.h"
 
 #include "../Current/Bricks/dflags/dflags.h"
 
 using namespace CTFO;
 
-DEFINE_string(cards_file, "cards.json", "Cards data file in JSON format.");
-DEFINE_int32(port, 8383, "Port to spawn CTFO API on.");
-DEFINE_string(storage_file, "./db.json", "The file to store the snapshot of the database in.");
-DEFINE_int32(midichlorians_port, 0, "Port to spawn midichlorians server on.");  // 0 = the same as `port`.
-DEFINE_string(midichlorians_file,
-              "./ctfo_events.log",
-              "Log file to store events received by midichlorians server");
-DEFINE_int32(rest_port, 8384, "Port to spawn RESTful server on.");  // 0 = the same as `port`.
-DEFINE_string(rest_url_prefix,
-              "http://localhost:8384/ctfo/rest",
-              "Hypermedia route prefix to spawn RESTful server on.");
 DEFINE_int32(rand_seed, 42, "The answer to the question of life, universe and everything.");
-DEFINE_int32(tick_interval_ms, 5 * 60 * 1000, "Maximum interval between event entries.");
-DEFINE_bool(debug_print, true, "Print debug info to stderr.");
+DEFINE_string(config_file, "ctfo_config.json", "The file to read CTFOServerParams in JSON format from.");
+DEFINE_bool(helpconfig, false, "Display the config format information.");
 
 int main(int argc, char **argv) {
   ParseDFlags(&argc, &argv);
-  current::random::SetRandomSeed(FLAGS_rand_seed);
-  CTFOServer(CTFOServerParams()
-                 .SetAPIPort(FLAGS_port)
-                 .SetRESTPort(FLAGS_rest_port)
-                 .SetMidichloriansPort(FLAGS_midichlorians_port)
-                 .SetStorageFile(FLAGS_storage_file)
-                 .SetCardsFile(FLAGS_cards_file)
-                 .SetRESTPrefixURL(FLAGS_rest_url_prefix)
-                 .SetMidichloriansFile(FLAGS_midichlorians_file)
-                 .SetTickInterval(std::chrono::milliseconds(FLAGS_tick_interval_ms))
-                 .SetDebugPrint(FLAGS_debug_print)).Join();
+  if (FLAGS_helpconfig) {
+    current::reflection::StructSchema schema;
+    schema.AddType<CTFOServerParams>();
+    std::cout << schema.GetSchemaInfo().Describe<current::reflection::Language::FSharp>(false);
+  } else {
+    current::random::SetRandomSeed(FLAGS_rand_seed);
+    CTFOServer(FLAGS_config_file).Join();
+  }
+  return 0;
 }

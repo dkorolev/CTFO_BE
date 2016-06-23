@@ -2,5 +2,6 @@
 *.json
 *.swp
 *.log
+*.json.*
 
 core
