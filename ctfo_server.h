@@ -78,8 +78,9 @@ struct CTFOHypermedia
     template <typename F>
     void Enter(Request request, F&& next) {
       const char prefix[] = "X-";
+      const size_t prefix_length = ::strlen(prefix);
       for (const auto& header : request.headers) {
-        if (header.header.substr(0, sizeof(prefix) - 1) == prefix) {
+        if (!header.header.compare(0, prefix_length, prefix)) {
           headers.push_back(header);
         }
       }
@@ -444,15 +445,17 @@ class CTFOServer final {
               CopyUserInfoToResponseEntry(Value(user), Exists(data.banned_user[uid]), rfavs.user);
 
               const auto& answers = data.answer;
-              const auto& flagged_cards = data.flagged_card;
 
               // Get favs.
               std::vector<std::pair<std::chrono::microseconds, CID>> favs;
               const auto& favorites = data.favorite;
               for (const auto& fav : favorites.Row(uid)) {
                 if (fav.favorited) {
-                  if (!Exists(flagged_cards.Get(fav.cid, uid))) {
-                    favs.emplace_back(fav.us, fav.cid);
+                  if (!Exists(data.flagged_card.Get(fav.cid, uid))) {
+                    const auto& author = data.author_card.GetEntryFromCol(fav.cid);
+                    if (!Exists(author) || !Exists(data.user_blocked_user.Get(uid, Value(author).uid))) {
+                      favs.emplace_back(fav.us, fav.cid);
+                    }
                   }
                 }
               }
