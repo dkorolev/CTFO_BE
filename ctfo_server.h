@@ -102,11 +102,11 @@ struct CTFOHypermedia
 };
 
 CURRENT_STRUCT(CTFOServerParams) {
-  CURRENT_FIELD(api_port, int);
+  CURRENT_FIELD(api_port, uint16_t);
   CURRENT_FIELD_DESCRIPTION(api_port, "Port to spawn CTFO API on.");
-  CURRENT_FIELD(rest_port, int, 0);
+  CURRENT_FIELD(rest_port, uint16_t, 0);
   CURRENT_FIELD_DESCRIPTION(rest_port, "Port to spawn RESTful server on (the same as api_port by default).");
-  CURRENT_FIELD(midichlorians_port, int, 0);
+  CURRENT_FIELD(midichlorians_port, uint16_t, 0);
   CURRENT_FIELD_DESCRIPTION(midichlorians_port,
                             "Port to spawn midichlorians server on (the same as api_port by default).");
   CURRENT_FIELD(storage_file, std::string);
@@ -131,15 +131,15 @@ CURRENT_STRUCT(CTFOServerParams) {
 
   CURRENT_DEFAULT_CONSTRUCTOR(CTFOServerParams) {}
 
-  CTFOServerParams& SetAPIPort(int port) {
+  CTFOServerParams& SetAPIPort(uint16_t port) {
     api_port = port;
     return *this;
   }
-  CTFOServerParams& SetRESTPort(int port) {
+  CTFOServerParams& SetRESTPort(uint16_t port) {
     rest_port = port;
     return *this;
   }
-  CTFOServerParams& SetMidichloriansPort(int port) {
+  CTFOServerParams& SetMidichloriansPort(uint16_t port) {
     midichlorians_port = port;
     return *this;
   }
@@ -179,8 +179,8 @@ CURRENT_STRUCT(CTFOServerParams) {
     debug_print_to_stderr = enable;
     return *this;
   }
-  int GetRESTPort() const { return rest_port ? rest_port : api_port; }
-  int GetMidichloriansPort() const { return midichlorians_port ? midichlorians_port : api_port; }
+  uint16_t GetRESTPort() const { return rest_port ? rest_port : api_port; }
+  uint16_t GetMidichloriansPort() const { return midichlorians_port ? midichlorians_port : api_port; }
 };
 
 class CTFOServer final {
@@ -224,7 +224,7 @@ class CTFOServer final {
     }).Go();
 #endif
 
-    int port = config_.Config().api_port;
+    uint16_t port = config_.Config().api_port;
     scoped_http_routes_ += HTTP(port).Register("/healthz", [](Request r) { r("OK\n"); }) +
                            HTTP(port).Register("/ctfo/auth/ios", BindToThis(&CTFOServer::RouteAuthiOS)) +
                            HTTP(port).Register("/ctfo/feed", BindToThis(&CTFOServer::RouteFeed)) +
