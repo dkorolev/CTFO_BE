@@ -108,8 +108,7 @@ CURRENT_STRUCT(CTFOServerParams) {
   CURRENT_FIELD(rest_port, uint16_t);
   CURRENT_FIELD_DESCRIPTION(rest_port, "Port to spawn RESTful server on.");
   CURRENT_FIELD(midichlorians_port, uint16_t);
-  CURRENT_FIELD_DESCRIPTION(midichlorians_port,
-                            "Port to spawn midichlorians server on.");
+  CURRENT_FIELD_DESCRIPTION(midichlorians_port, "Port to spawn midichlorians server on.");
   CURRENT_FIELD(storage_file, std::string);
   CURRENT_FIELD_DESCRIPTION(storage_file, "The file to store the snapshot of the database in.");
   CURRENT_FIELD(cards_file, std::string);
@@ -1362,9 +1361,9 @@ class CTFOServer final {
         return;
       }
       const LOG_EVENT response = valid_responses_.at(ge.event);
-      const std::string& uid_str = ge.fields.at("uid");
+      const std::string uid_str = ge.fields.at("uid");
       const std::string token = ge.fields.at("token");
-      const std::string& whom_str = ge.fields.count("whom") ? ge.fields.at("whom") : "";
+      const std::string whom_str = ge.fields.count("whom") ? ge.fields.at("whom") : "";
       const std::string cid_str = ge.fields.count("cid") ? ge.fields.at("cid") : "";
       const std::string oid_str = ge.fields.count("oid") ? ge.fields.at("oid") : "";
       const UID uid = StringToUID(uid_str);
@@ -1404,8 +1403,7 @@ class CTFOServer final {
                                       cid_str.c_str()));
                     return;
                   }
-                  // Do not overwrite existing answers, except for CTFO/TFU can and should overwrite
-                  // SKIP.
+                  // Do not overwrite existing answers, except CTFO/TFU can and should overwrite SKIP.
                   const bool has_answer = Exists(data.answer.Get(uid, cid));
                   const bool skip_to_overwrite = response != LOG_EVENT::SKIP && has_answer &&
                                                   Value(data.answer.Get(uid, cid)).answer == ANSWER::SKIP;
@@ -1639,8 +1637,13 @@ class CTFOServer final {
     }
   }
 
-  void BanUser(MutableFields<Storage> data, const UID uid) { data.banned_user.Add(BannedUser(uid)); }
+  void BanUser(MutableFields<Storage> data, const UID uid) {
+    if (!Exists(data.banned_user[uid])) {
+      data.banned_user.Add(BannedUser(uid));
+    }
+  }
 };
+
 }  // namespace CTFO
 
 #endif  // CTFO_SERVER_H
