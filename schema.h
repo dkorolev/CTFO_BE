@@ -243,7 +243,8 @@ CURRENT_STRUCT(PushNotificationsMarker) {
 
   // If something is wrong and notifictions are frozen by a few minutes or hours, the wall time
   // until the notifications are frozen.
-  CURRENT_FIELD(notification_push_frozen_until_timestamp, std::chrono::microseconds);
+  // UNUSED NOW. -- D.K.
+  CURRENT_FIELD(notification_push_frozen_until_timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
 };
 
 CURRENT_STRUCT(Card) {
