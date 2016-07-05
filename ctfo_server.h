@@ -1123,19 +1123,21 @@ class CTFOServer final {
   RESTStorage rest_;
   HTTPRoutesScope scoped_http_routes_;
 
-  const std::map<std::string, LOG_EVENT> valid_responses_ = {{"CTFO", LOG_EVENT::CTFO},
-                                                             {"TFU", LOG_EVENT::TFU},
-                                                             {"SKIP", LOG_EVENT::SKIP},
-                                                             {"FAV", LOG_EVENT::FAV_CARD},
-                                                             {"FAV_CARD", LOG_EVENT::FAV_CARD},
-                                                             {"UNFAV", LOG_EVENT::UNFAV_CARD},
-                                                             {"UNFAV_CARD", LOG_EVENT::UNFAV_CARD},
-                                                             {"LIKE_COMMENT", LOG_EVENT::LIKE_COMMENT},
-                                                             {"UNLIKE_COMMENT", LOG_EVENT::UNLIKE_COMMENT},
-                                                             {"FLAG_COMMENT", LOG_EVENT::FLAG_COMMENT},
-                                                             {"FLAG_CARD", LOG_EVENT::FLAG_CARD},
-                                                             {"REPORT_USER", LOG_EVENT::REPORT_USER},
-                                                             {"BLOCK_USER", LOG_EVENT::BLOCK_USER}};
+  const std::map<std::string, LOG_EVENT> valid_responses_ = {
+      {"CTFO", LOG_EVENT::CTFO},
+      {"TFU", LOG_EVENT::TFU},
+      {"SKIP", LOG_EVENT::SKIP},
+      {"FAV", LOG_EVENT::FAV_CARD},
+      {"FAV_CARD", LOG_EVENT::FAV_CARD},
+      {"UNFAV", LOG_EVENT::UNFAV_CARD},
+      {"UNFAV_CARD", LOG_EVENT::UNFAV_CARD},
+      {"LIKE_COMMENT", LOG_EVENT::LIKE_COMMENT},
+      {"UNLIKE_COMMENT", LOG_EVENT::UNLIKE_COMMENT},
+      {"FLAG_COMMENT", LOG_EVENT::FLAG_COMMENT},
+      {"FLAG_CARD", LOG_EVENT::FLAG_CARD},
+      {"REPORT_USER", LOG_EVENT::REPORT_USER},
+      {"BLOCK_USER", LOG_EVENT::BLOCK_USER},
+      {"ONE_SIGNAL_USER_ID", LOG_EVENT::ONE_SIGNAL_USER_ID}};
 
   void DebugPrint(const std::string& message) {
     if (config_.Config().debug_print_to_stderr) {
@@ -1366,19 +1368,22 @@ class CTFOServer final {
       const std::string whom_str = ge.fields.count("whom") ? ge.fields.at("whom") : "";
       const std::string cid_str = ge.fields.count("cid") ? ge.fields.at("cid") : "";
       const std::string oid_str = ge.fields.count("oid") ? ge.fields.at("oid") : "";
+      const std::string user_id_str = ge.fields.count("user_id") ? ge.fields.at("user_id") : "";
       const UID uid = StringToUID(uid_str);
       const UID whom = StringToUID(whom_str);
       const CID cid = StringToCID(cid_str);
       const OID oid = StringToOID(oid_str);
-      DebugPrint(Printf("[UpdateStateOnEvent] Event='%s', uid='%s', cid='%s', oid='%s', token='%s'",
-                        ge.event.c_str(),
-                        uid_str.c_str(),
-                        cid_str.c_str(),
-                        oid_str.c_str(),
-                        token.c_str()));
+      DebugPrint(
+          Printf("[UpdateStateOnEvent] Event='%s', uid='%s', cid='%s', oid='%s', token='%s', user_id='%s'",
+                 ge.event.c_str(),
+                 uid_str.c_str(),
+                 cid_str.c_str(),
+                 oid_str.c_str(),
+                 token.c_str(),
+                 user_id_str.c_str()));
       if (uid != UID::INVALID_USER) {  // clang-format off
         storage_.ReadWriteTransaction(
-            [this, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, response](
+            [this, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, user_id_str, response](
                 MutableFields<Storage> data) {
               const auto& auth_token_accessor = data.auth_token;
               bool token_is_valid = false;
@@ -1615,6 +1620,15 @@ class CTFOServer final {
                         (Exists(reports) && Value(reports).Size() >= FLAGS_reports_to_ban)) {
                       BanUser(data, whom);
                     }
+                  }
+                } else if (response == LOG_EVENT::ONE_SIGNAL_USER_ID) {
+                  if (!user_id_str.empty()) {
+                    UserNotificationPlayerID player_id_record;
+                    player_id_record.uid = uid;
+                    player_id_record.player_id = user_id_str;
+                    data.uid_player_id.Add(player_id_record);
+                  } else {
+                    DebugPrint("[UpdateStateOnEvent] Ignoring `ONE_SIGNAL_USER_ID`, no `used_id` provided.\n");
                   }
                 } else {
                   DebugPrint(Printf(
