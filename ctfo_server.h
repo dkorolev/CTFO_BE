@@ -138,7 +138,7 @@ CURRENT_STRUCT(CTFOServerParams) {
   CURRENT_FIELD(
       onesignal_app_port, uint16_t, current::integrations::onesignal::kDefaultOneSignalIntegrationPort);
   CURRENT_FIELD_DESCRIPTION(onesignal_app_port,
-                            "The local port rounted via nginx to connect to OneSignal API.");
+                            "The local port routed via nginx to connect to OneSignal API.");
 
   CURRENT_DEFAULT_CONSTRUCTOR(CTFOServerParams) {}
 
