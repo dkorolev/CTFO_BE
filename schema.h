@@ -241,10 +241,11 @@ CURRENT_STRUCT(PushNotificationsMarker) {
   // From which point in the storage stream to send notifictaions as pushes.
   CURRENT_FIELD(last_pushed_notification_timestamp, std::chrono::microseconds);
 
-  // If something is wrong and notifictions are frozen by a few minutes or hours, the wall time
-  // until the notifications are frozen.
-  // UNUSED NOW. -- D.K.
-  CURRENT_FIELD(notification_push_frozen_until_timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
+  // WAS: If something is wrong and notifictions are frozen by a few minutes or hours,
+  // WAS: the wall time until the notifications are frozen.
+  // UNUSED NOW., but keep as part of storage schema -- D.K.
+  CURRENT_FIELD(
+      notification_push_frozen_until_timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
 };
 
 CURRENT_STRUCT(Card) {
