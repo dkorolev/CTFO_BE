@@ -212,14 +212,15 @@ class CTFOServer final {
               config_.Config().rest_url_prefix),
         pusher_(storage_,
                 [this]() {
-                  std::chrono::microseconds result(0ll);
-                  storage_.ReadOnlyTransaction([&result](ImmutableFields<Storage> fields) {
-                    const auto placeholder = fields.push_notifications_marker[""];
-                    if (Exists(placeholder)) {
-                      result = Value(placeholder).last_pushed_notification_timestamp;
-                    }
-                  }).Go();
-                  return result;
+                  return Value(storage_.ReadOnlyTransaction(
+                                            [](ImmutableFields<Storage> fields) -> std::chrono::microseconds {
+                                              const auto placeholder = fields.push_notifications_marker[""];
+                                              if (Exists(placeholder)) {
+                                                return Value(placeholder).last_pushed_notification_timestamp;
+                                              } else {
+                                                return std::chrono::microseconds(0);
+                                              }
+                                            }).Go());
                 }(),
                 config_.Config().onesignal_app_id,
                 config_.Config().onesignal_app_port),
