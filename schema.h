@@ -223,6 +223,31 @@ CURRENT_STRUCT(UIDAuthKeyPair) {
   CURRENT_CONSTRUCTOR(UIDAuthKeyPair)(const UID uid, const AuthKey& auth_key) : uid(uid), auth_key(auth_key) {}
 };
 
+CURRENT_STRUCT(UserNotificationPlayerID) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_USE_FIELD_AS_KEY(uid);
+
+  CURRENT_FIELD(player_id, std::string);
+
+  CURRENT_DEFAULT_CONSTRUCTOR(UserNotificationPlayerID) {}
+  CURRENT_CONSTRUCTOR(UserNotificationPlayerID)(const UID uid, const std::string& player_id)
+      : uid(uid), player_id(player_id) {}
+};
+
+CURRENT_STRUCT(PushNotificationsMarker) {
+  CURRENT_FIELD(dummy_key, std::string);
+  CURRENT_USE_FIELD_AS_KEY(dummy_key);
+
+  // From which point in the storage stream to send notifictaions as pushes.
+  CURRENT_FIELD(last_pushed_notification_timestamp, std::chrono::microseconds);
+
+  // WAS: If something is wrong and notifictions are frozen by a few minutes or hours,
+  // WAS: the wall time until the notifications are frozen.
+  // UNUSED NOW., but keep as part of storage schema -- D.K.
+  CURRENT_FIELD(
+      notification_push_frozen_until_timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
+};
+
 CURRENT_STRUCT(Card) {
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_KEY(cid);

@@ -54,6 +54,9 @@ SOFTWARE.
 // Structured iOS events.
 #include "../Current/Midichlorians/Server/server.h"
 
+// iOS notifications sender.
+#include "../Current/Integrations/OneSignal/ios_notifications_sender.h"
+
 // TODO(dkorolev): Make these constructor parameters of `CTFOServer`.
 static const size_t FLAGS_blocks_to_ban = 5u;
 static const size_t FLAGS_reports_to_ban = 10u;
@@ -108,8 +111,7 @@ CURRENT_STRUCT(CTFOServerParams) {
   CURRENT_FIELD(rest_port, uint16_t);
   CURRENT_FIELD_DESCRIPTION(rest_port, "Port to spawn RESTful server on.");
   CURRENT_FIELD(midichlorians_port, uint16_t);
-  CURRENT_FIELD_DESCRIPTION(midichlorians_port,
-                            "Port to spawn midichlorians server on.");
+  CURRENT_FIELD_DESCRIPTION(midichlorians_port, "Port to spawn midichlorians server on.");
   CURRENT_FIELD(storage_file, std::string);
   CURRENT_FIELD_DESCRIPTION(storage_file, "The file to store the snapshot of the database in.");
   CURRENT_FIELD(cards_file, std::string);
@@ -129,6 +131,13 @@ CURRENT_STRUCT(CTFOServerParams) {
   CURRENT_FIELD_DESCRIPTION(tick_interval_ms, "Maximum interval between event entries.");
   CURRENT_FIELD(debug_print_to_stderr, bool, false);
   CURRENT_FIELD_DESCRIPTION(debug_print_to_stderr, "Print debug info to stderr.");
+
+  CURRENT_FIELD(onesignal_app_id, std::string, "");
+  CURRENT_FIELD_DESCRIPTION(onesignal_app_id, "OneSignal AppID to send iOS push notifications.");
+
+  CURRENT_FIELD(
+      onesignal_app_port, uint16_t, current::integrations::onesignal::kDefaultOneSignalIntegrationPort);
+  CURRENT_FIELD_DESCRIPTION(onesignal_app_port, "The local port routed via nginx to connect to OneSignal API.");
 
   CURRENT_DEFAULT_CONSTRUCTOR(CTFOServerParams) {}
 
@@ -200,7 +209,22 @@ class CTFOServer final {
         rest_(storage_,
               config_.Config().rest_port,
               config_.Config().rest_url_path,
-              config_.Config().rest_url_prefix) {
+              config_.Config().rest_url_prefix),
+        pusher_(storage_,
+                [this]() {
+                  return Value(storage_.ReadOnlyTransaction(
+                                            [](ImmutableFields<Storage> fields) -> std::chrono::microseconds {
+                                              const auto placeholder = fields.push_notifications_marker[""];
+                                              if (Exists(placeholder)) {
+                                                return Value(placeholder).last_pushed_notification_timestamp;
+                                              } else {
+                                                return std::chrono::microseconds(0);
+                                              }
+                                            }).Go());
+                }(),
+                config_.Config().onesignal_app_id,
+                config_.Config().onesignal_app_port),
+        push_notifications_sender_subcriber_scope_(storage_.InternalExposeStream().Subscribe(pusher_)) {
     midichlorians_stream_.open(config_.Config().midichlorians_file, std::ofstream::out | std::ofstream::app);
 
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
@@ -1116,27 +1140,88 @@ class CTFOServer final {
   }
 
  private:
+  struct PushNotificationsSender {
+    Storage& storage;
+    const std::chrono::microseconds starting_from;
+    current::integrations::onesignal::IOSPushNotificationsSender transport;
+
+    using transaction_t = typename Storage::transaction_t;
+
+    PushNotificationsSender(Storage& storage,
+                            std::chrono::microseconds last_pushed_notification_timestamp,
+                            const std::string& onesignal_app_id,
+                            uint16_t onesignal_local_port)
+        : storage(storage),
+          starting_from(last_pushed_notification_timestamp + std::chrono::microseconds(1)),
+          transport(onesignal_app_id, onesignal_local_port) {
+      std::cerr << "Starting sending push notifications from " << starting_from.count() << " epoch us.\n";
+    }
+
+    current::ss::EntryResponse operator()(const transaction_t& entry, idxts_t current, idxts_t) const {
+      if (current.us >= starting_from) {
+        for (const auto& mutation : entry.mutations) {
+          if (Exists<Persisted_NotificationUpdated>(mutation)) {
+            const UID uid = Value<Persisted_NotificationUpdated>(mutation).data.uid;
+            const std::string player_id =
+                Value(storage.ReadOnlyTransaction([uid](ImmutableFields<Storage> fields) -> std::string {
+                  const auto rhs = fields.uid_player_id[uid];
+                  if (Exists(rhs)) {
+                    return Value(rhs).player_id;
+                  } else {
+                    return "";
+                  }
+                }).Go());
+            if (!player_id.empty()) {
+              // Hack: Update `push_starting_from` on success of one push, leave intact on failure.
+              if (transport.Push(player_id, 1)) {
+                const std::chrono::microseconds last_pushed_notification_timestamp = current.us;
+                storage.ReadWriteTransaction(
+                            [last_pushed_notification_timestamp](MutableFields<Storage> fields) {
+                              PushNotificationsMarker marker;
+                              marker.last_pushed_notification_timestamp = last_pushed_notification_timestamp;
+                              fields.push_notifications_marker.Add(marker);
+                            }).Go();
+              }
+            }
+          }
+        }
+      }
+      return current::ss::EntryResponse::More;
+    }
+
+    current::ss::TerminationResponse Terminate() const { return current::ss::TerminationResponse::Terminate; }
+
+    current::ss::EntryResponse EntryResponseIfNoMorePassTypeFilter() const {
+      return current::ss::EntryResponse::Done;
+    }
+  };
+
+ private:
   Config config_;
   std::ofstream midichlorians_stream_;
   MidichloriansServer midichlorians_server_;
 
   Storage storage_;
   RESTStorage rest_;
+  current::ss::StreamSubscriber<PushNotificationsSender, typename Storage::transaction_t> pusher_;
+  const current::sherlock::SubscriberScope push_notifications_sender_subcriber_scope_;
   HTTPRoutesScope scoped_http_routes_;
 
-  const std::map<std::string, LOG_EVENT> valid_responses_ = {{"CTFO", LOG_EVENT::CTFO},
-                                                             {"TFU", LOG_EVENT::TFU},
-                                                             {"SKIP", LOG_EVENT::SKIP},
-                                                             {"FAV", LOG_EVENT::FAV_CARD},
-                                                             {"FAV_CARD", LOG_EVENT::FAV_CARD},
-                                                             {"UNFAV", LOG_EVENT::UNFAV_CARD},
-                                                             {"UNFAV_CARD", LOG_EVENT::UNFAV_CARD},
-                                                             {"LIKE_COMMENT", LOG_EVENT::LIKE_COMMENT},
-                                                             {"UNLIKE_COMMENT", LOG_EVENT::UNLIKE_COMMENT},
-                                                             {"FLAG_COMMENT", LOG_EVENT::FLAG_COMMENT},
-                                                             {"FLAG_CARD", LOG_EVENT::FLAG_CARD},
-                                                             {"REPORT_USER", LOG_EVENT::REPORT_USER},
-                                                             {"BLOCK_USER", LOG_EVENT::BLOCK_USER}};
+  const std::map<std::string, LOG_EVENT> valid_responses_ = {
+      {"CTFO", LOG_EVENT::CTFO},
+      {"TFU", LOG_EVENT::TFU},
+      {"SKIP", LOG_EVENT::SKIP},
+      {"FAV", LOG_EVENT::FAV_CARD},
+      {"FAV_CARD", LOG_EVENT::FAV_CARD},
+      {"UNFAV", LOG_EVENT::UNFAV_CARD},
+      {"UNFAV_CARD", LOG_EVENT::UNFAV_CARD},
+      {"LIKE_COMMENT", LOG_EVENT::LIKE_COMMENT},
+      {"UNLIKE_COMMENT", LOG_EVENT::UNLIKE_COMMENT},
+      {"FLAG_COMMENT", LOG_EVENT::FLAG_COMMENT},
+      {"FLAG_CARD", LOG_EVENT::FLAG_CARD},
+      {"REPORT_USER", LOG_EVENT::REPORT_USER},
+      {"BLOCK_USER", LOG_EVENT::BLOCK_USER},
+      {"ONE_SIGNAL_USER_ID", LOG_EVENT::ONE_SIGNAL_USER_ID}};
 
   void DebugPrint(const std::string& message) {
     if (config_.Config().debug_print_to_stderr) {
@@ -1362,24 +1447,27 @@ class CTFOServer final {
         return;
       }
       const LOG_EVENT response = valid_responses_.at(ge.event);
-      const std::string& uid_str = ge.fields.at("uid");
+      const std::string uid_str = ge.fields.at("uid");
       const std::string token = ge.fields.at("token");
-      const std::string& whom_str = ge.fields.count("whom") ? ge.fields.at("whom") : "";
+      const std::string whom_str = ge.fields.count("whom") ? ge.fields.at("whom") : "";
       const std::string cid_str = ge.fields.count("cid") ? ge.fields.at("cid") : "";
       const std::string oid_str = ge.fields.count("oid") ? ge.fields.at("oid") : "";
+      const std::string user_id_str = ge.fields.count("user_id") ? ge.fields.at("user_id") : "";
       const UID uid = StringToUID(uid_str);
       const UID whom = StringToUID(whom_str);
       const CID cid = StringToCID(cid_str);
       const OID oid = StringToOID(oid_str);
-      DebugPrint(Printf("[UpdateStateOnEvent] Event='%s', uid='%s', cid='%s', oid='%s', token='%s'",
-                        ge.event.c_str(),
-                        uid_str.c_str(),
-                        cid_str.c_str(),
-                        oid_str.c_str(),
-                        token.c_str()));
+      DebugPrint(
+          Printf("[UpdateStateOnEvent] Event='%s', uid='%s', cid='%s', oid='%s', token='%s', user_id='%s'",
+                 ge.event.c_str(),
+                 uid_str.c_str(),
+                 cid_str.c_str(),
+                 oid_str.c_str(),
+                 token.c_str(),
+                 user_id_str.c_str()));
       if (uid != UID::INVALID_USER) {  // clang-format off
         storage_.ReadWriteTransaction(
-            [this, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, response](
+            [this, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, user_id_str, response](
                 MutableFields<Storage> data) {
               const auto& auth_token_accessor = data.auth_token;
               bool token_is_valid = false;
@@ -1404,8 +1492,7 @@ class CTFOServer final {
                                       cid_str.c_str()));
                     return;
                   }
-                  // Do not overwrite existing answers, except for CTFO/TFU can and should overwrite
-                  // SKIP.
+                  // Do not overwrite existing answers, except CTFO/TFU can and should overwrite SKIP.
                   const bool has_answer = Exists(data.answer.Get(uid, cid));
                   const bool skip_to_overwrite = response != LOG_EVENT::SKIP && has_answer &&
                                                   Value(data.answer.Get(uid, cid)).answer == ANSWER::SKIP;
@@ -1618,6 +1705,15 @@ class CTFOServer final {
                       BanUser(data, whom);
                     }
                   }
+                } else if (response == LOG_EVENT::ONE_SIGNAL_USER_ID) {
+                  if (!user_id_str.empty()) {
+                    UserNotificationPlayerID player_id_record;
+                    player_id_record.uid = uid;
+                    player_id_record.player_id = user_id_str;
+                    data.uid_player_id.Add(player_id_record);
+                  } else {
+                    DebugPrint("[UpdateStateOnEvent] Ignoring `ONE_SIGNAL_USER_ID`, no `used_id` provided.\n");
+                  }
                 } else {
                   DebugPrint(Printf(
                       "[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
@@ -1639,8 +1735,13 @@ class CTFOServer final {
     }
   }
 
-  void BanUser(MutableFields<Storage> data, const UID uid) { data.banned_user.Add(BannedUser(uid)); }
+  void BanUser(MutableFields<Storage> data, const UID uid) {
+    if (!Exists(data.banned_user[uid])) {
+      data.banned_user.Add(BannedUser(uid));
+    }
+  }
 };
+
 }  // namespace CTFO
 
 #endif  // CTFO_SERVER_H
