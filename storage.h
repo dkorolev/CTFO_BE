@@ -64,7 +64,8 @@ CURRENT_STORAGE(CTFOStorage) {
   CURRENT_STORAGE_FIELD(auth_token, Persisted_AuthKeyTokenPair);
   CURRENT_STORAGE_FIELD(uid_auth, Persisted_UIDAuthKeyPair);
   CURRENT_STORAGE_FIELD(uid_player_id, Persisted_UserNotificationPlayerID);
-  CURRENT_STORAGE_FIELD(push_notifications_marker, Persisted_PushNotificationsMarker);
+  CURRENT_STORAGE_FIELD(push_notifications_marker,
+                        Persisted_PushNotificationsMarker);  // Only the `""` key is used.
   CURRENT_STORAGE_FIELD(card, Persisted_Card);
   CURRENT_STORAGE_FIELD(author_card, Persisted_AuthorCard);
   CURRENT_STORAGE_FIELD(answer, Persisted_Answer);

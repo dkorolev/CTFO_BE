@@ -54,6 +54,9 @@ SOFTWARE.
 // Structured iOS events.
 #include "../Current/Midichlorians/Server/server.h"
 
+// iOS notifications sender.
+#include "../Current/Integrations/OneSignal/ios_notifications_sender.h"
+
 // TODO(dkorolev): Make these constructor parameters of `CTFOServer`.
 static const size_t FLAGS_blocks_to_ban = 5u;
 static const size_t FLAGS_reports_to_ban = 10u;
@@ -129,6 +132,14 @@ CURRENT_STRUCT(CTFOServerParams) {
   CURRENT_FIELD(debug_print_to_stderr, bool, false);
   CURRENT_FIELD_DESCRIPTION(debug_print_to_stderr, "Print debug info to stderr.");
 
+  CURRENT_FIELD(onesignal_app_id, std::string, "");
+  CURRENT_FIELD_DESCRIPTION(onesignal_app_id, "OneSignal AppID to send iOS push notifications.");
+
+  CURRENT_FIELD(
+      onesignal_app_port, uint16_t, current::integrations::onesignal::kDefaultOneSignalIntegrationPort);
+  CURRENT_FIELD_DESCRIPTION(onesignal_app_port,
+                            "The local port rounted via nginx to connect to OneSignal API.");
+
   CURRENT_DEFAULT_CONSTRUCTOR(CTFOServerParams) {}
 
   CTFOServerParams& SetAPIPort(uint16_t port) {
@@ -199,7 +210,21 @@ class CTFOServer final {
         rest_(storage_,
               config_.Config().rest_port,
               config_.Config().rest_url_path,
-              config_.Config().rest_url_prefix) {
+              config_.Config().rest_url_prefix),
+        pusher_(storage_,
+                [this]() {
+                  std::chrono::microseconds result(0ll);
+                  storage_.ReadOnlyTransaction([&result](ImmutableFields<Storage> fields) {
+                    const auto placeholder = fields.push_notifications_marker[""];
+                    if (Exists(placeholder)) {
+                      result = Value(placeholder).last_pushed_notification_timestamp;
+                    }
+                  }).Go();
+                  return result;
+                }(),
+                config_.Config().onesignal_app_id,
+                config_.Config().onesignal_app_port),
+        push_notifications_sender_subcriber_scope_(storage_.InternalExposeStream().Subscribe(pusher_)) {
     midichlorians_stream_.open(config_.Config().midichlorians_file, std::ofstream::out | std::ofstream::app);
 
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
@@ -1115,12 +1140,76 @@ class CTFOServer final {
   }
 
  private:
+  struct PushNotificationsSender {
+    Storage& storage;
+    const std::chrono::microseconds starting_from;
+    current::integrations::onesignal::IOSPushNotificationsSender transport;
+
+    using transaction_t = typename Storage::transaction_t;
+
+    PushNotificationsSender(Storage& storage,
+                            std::chrono::microseconds last_pushed_notification_timestamp,
+                            const std::string& onesignal_app_id,
+                            uint16_t onesignal_local_port)
+        : storage(storage),
+          starting_from(last_pushed_notification_timestamp + std::chrono::microseconds(1)),
+          transport(onesignal_app_id, onesignal_local_port) {
+      std::cerr << "Starting sending push notifications from " << starting_from.count() << " epoch us.\n";
+    }
+
+    current::ss::EntryResponse operator()(const transaction_t& entry, idxts_t current, idxts_t) const {
+      if (current.us >= starting_from) {
+        for (const auto& mutation : entry.mutations) {
+          if (Exists<Persisted_NotificationUpdated>(mutation)) {
+            const UID uid = Value<Persisted_NotificationUpdated>(mutation).data.uid;
+            const auto result =
+                storage.ReadOnlyTransaction([uid](ImmutableFields<Storage> fields) -> std::string {
+                  const auto rhs = fields.uid_player_id[uid];
+                  if (Exists(rhs)) {
+                    return Value(rhs).player_id;
+                  } else {
+                    return "";
+                  }
+                }).Go();
+            if (WasCommitted(result) && Exists(result)) {
+              const std::string player_id = Value(result);
+              if (!player_id.empty()) {
+                // Hack: Update `push_starting_from` on success of one push, leave intact on failure.
+                if (transport.Push(player_id, 1)) {
+                  const std::chrono::microseconds last_pushed_notification_timestamp = current.us;
+                  storage.ReadWriteTransaction(
+                              [last_pushed_notification_timestamp](MutableFields<Storage> fields) {
+                                PushNotificationsMarker marker;
+                                marker.last_pushed_notification_timestamp = last_pushed_notification_timestamp;
+                                fields.push_notifications_marker.Add(marker);
+                              }).Go();
+                }
+              }
+            }
+          }
+        }
+      }
+      return current::ss::EntryResponse::More;
+    }
+
+    current::ss::TerminationResponse Terminate() const {
+      return current::ss::TerminationResponse::Terminate;
+    }
+
+    current::ss::EntryResponse EntryResponseIfNoMorePassTypeFilter() const {
+      return current::ss::EntryResponse::Done;
+    }
+  };
+
+ private:
   Config config_;
   std::ofstream midichlorians_stream_;
   MidichloriansServer midichlorians_server_;
 
   Storage storage_;
   RESTStorage rest_;
+  current::ss::StreamSubscriber<PushNotificationsSender, typename Storage::transaction_t> pusher_;
+  const current::sherlock::SubscriberScope push_notifications_sender_subcriber_scope_;
   HTTPRoutesScope scoped_http_routes_;
 
   const std::map<std::string, LOG_EVENT> valid_responses_ = {
