@@ -137,8 +137,7 @@ CURRENT_STRUCT(CTFOServerParams) {
 
   CURRENT_FIELD(
       onesignal_app_port, uint16_t, current::integrations::onesignal::kDefaultOneSignalIntegrationPort);
-  CURRENT_FIELD_DESCRIPTION(onesignal_app_port,
-                            "The local port routed via nginx to connect to OneSignal API.");
+  CURRENT_FIELD_DESCRIPTION(onesignal_app_port, "The local port routed via nginx to connect to OneSignal API.");
 
   CURRENT_DEFAULT_CONSTRUCTOR(CTFOServerParams) {}
 
@@ -1162,28 +1161,25 @@ class CTFOServer final {
         for (const auto& mutation : entry.mutations) {
           if (Exists<Persisted_NotificationUpdated>(mutation)) {
             const UID uid = Value<Persisted_NotificationUpdated>(mutation).data.uid;
-            const auto result =
-                storage.ReadOnlyTransaction([uid](ImmutableFields<Storage> fields) -> std::string {
+            const std::string player_id =
+                Value(storage.ReadOnlyTransaction([uid](ImmutableFields<Storage> fields) -> std::string {
                   const auto rhs = fields.uid_player_id[uid];
                   if (Exists(rhs)) {
                     return Value(rhs).player_id;
                   } else {
                     return "";
                   }
-                }).Go();
-            if (WasCommitted(result) && Exists(result)) {
-              const std::string player_id = Value(result);
-              if (!player_id.empty()) {
-                // Hack: Update `push_starting_from` on success of one push, leave intact on failure.
-                if (transport.Push(player_id, 1)) {
-                  const std::chrono::microseconds last_pushed_notification_timestamp = current.us;
-                  storage.ReadWriteTransaction(
-                              [last_pushed_notification_timestamp](MutableFields<Storage> fields) {
-                                PushNotificationsMarker marker;
-                                marker.last_pushed_notification_timestamp = last_pushed_notification_timestamp;
-                                fields.push_notifications_marker.Add(marker);
-                              }).Go();
-                }
+                }).Go());
+            if (!player_id.empty()) {
+              // Hack: Update `push_starting_from` on success of one push, leave intact on failure.
+              if (transport.Push(player_id, 1)) {
+                const std::chrono::microseconds last_pushed_notification_timestamp = current.us;
+                storage.ReadWriteTransaction(
+                            [last_pushed_notification_timestamp](MutableFields<Storage> fields) {
+                              PushNotificationsMarker marker;
+                              marker.last_pushed_notification_timestamp = last_pushed_notification_timestamp;
+                              fields.push_notifications_marker.Add(marker);
+                            }).Go();
               }
             }
           }
@@ -1192,9 +1188,7 @@ class CTFOServer final {
       return current::ss::EntryResponse::More;
     }
 
-    current::ss::TerminationResponse Terminate() const {
-      return current::ss::TerminationResponse::Terminate;
-    }
+    current::ss::TerminationResponse Terminate() const { return current::ss::TerminationResponse::Terminate; }
 
     current::ss::EntryResponse EntryResponseIfNoMorePassTypeFilter() const {
       return current::ss::EntryResponse::Done;
