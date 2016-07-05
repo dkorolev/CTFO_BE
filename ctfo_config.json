@@ -11,6 +11,6 @@
 	"midichlorians_url_path":"/ctfo/log",
 	"tick_interval_ms":300000,
 	"debug_print_to_stderr":true,
-	"onesignal_app_id": "Secret!"
-	"onesignal_app_port": 24001,
+	"onesignal_app_id": "Secret!",
+	"onesignal_app_port": 24001
 }
