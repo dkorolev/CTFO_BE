@@ -218,7 +218,7 @@ class CTFOServer final {
                               config_.Config().tick_interval_ms,
                               config_.Config().midichlorians_url_path,
                               "OK\n"),
-        storage_(current::sherlock::SherlockNamespaceName("OldCTFOStorage"), config_.Config().storage_file),
+        storage_(current::sherlock::SherlockNamespaceName("NewCTFOStorage"), config_.Config().storage_file),
         rest_(storage_,
               config_.Config().rest_port,
               config_.Config().rest_url_path,
