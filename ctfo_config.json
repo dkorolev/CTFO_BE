@@ -12,5 +12,12 @@
 	"tick_interval_ms":300000,
 	"debug_print_to_stderr":true,
 	"onesignal_app_id": "Secret!",
-	"onesignal_app_port": 24001
+	"onesignal_app_port": 24001,
+	"adwords_config": {
+		"idtype": "xxx",
+		"bundleid": "xxx",
+		"label": "xxx",
+		"conversion_id": "xxx"
+	},
+	"adwords_app_port": 24002
 }

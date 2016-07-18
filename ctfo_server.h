@@ -57,6 +57,9 @@ SOFTWARE.
 // iOS notifications sender.
 #include "../Current/Integrations/OneSignal/ios_notifications_sender.h"
 
+// AdWords conversion events sender.
+#include "../Current/Integrations/AdWords/conversion_tracking.h"
+
 // TODO(dkorolev): Make these constructor parameters of `CTFOServer`.
 static const size_t FLAGS_blocks_to_ban = 5u;
 static const size_t FLAGS_reports_to_ban = 10u;
@@ -73,8 +76,8 @@ struct CTFOHypermedia
 #endif
 
   template <class HTTP_VERB, typename PARTICULAR_FIELD, typename ENTRY, typename KEY>
-  struct RESTful : super_t::RESTful<HTTP_VERB, PARTICULAR_FIELD, ENTRY, KEY> {
-    using restful_super_t = super_t::RESTful<HTTP_VERB, PARTICULAR_FIELD, ENTRY, KEY>;
+  struct RESTfulDataHandlerGenerator : super_t::RESTfulDataHandlerGenerator<HTTP_VERB, PARTICULAR_FIELD, ENTRY, KEY> {
+    using restful_super_t = super_t::RESTfulDataHandlerGenerator<HTTP_VERB, PARTICULAR_FIELD, ENTRY, KEY>;
     using headers_list_t = std::vector<current::net::http::Header>;
     headers_list_t headers;
 
@@ -138,6 +141,16 @@ CURRENT_STRUCT(CTFOServerParams) {
   CURRENT_FIELD(
       onesignal_app_port, uint16_t, current::integrations::onesignal::kDefaultOneSignalIntegrationPort);
   CURRENT_FIELD_DESCRIPTION(onesignal_app_port, "The local port routed via nginx to connect to OneSignal API.");
+
+  CURRENT_FIELD(adwords_app_port,
+               uint16_t,
+               current::integrations::adwords::conversion_tracking::kDefaultAdWordsIntegrationPort);
+  CURRENT_FIELD_DESCRIPTION(adwords_app_port, "The local port routed via nginx to connect to AdWords API.");
+
+  CURRENT_FIELD(adwords_config,
+                current::integrations::adwords::conversion_tracking::AdWordsConversionTrackingParams);
+  CURRENT_FIELD_DESCRIPTION(adwords_config,
+                            "The configuration to send local port routed via nginx to connect to AdWords API.");
 
   CURRENT_DEFAULT_CONSTRUCTOR(CTFOServerParams) {}
 
@@ -205,7 +218,7 @@ class CTFOServer final {
                               config_.Config().tick_interval_ms,
                               config_.Config().midichlorians_url_path,
                               "OK\n"),
-        storage_(current::sherlock::SherlockNamespaceName("OldCTFOStorage"), config_.Config().storage_file),
+        storage_(current::sherlock::SherlockNamespaceName("NewCTFOStorage"), config_.Config().storage_file),
         rest_(storage_,
               config_.Config().rest_port,
               config_.Config().rest_url_path,
@@ -224,7 +237,8 @@ class CTFOServer final {
                 }(),
                 config_.Config().onesignal_app_id,
                 config_.Config().onesignal_app_port),
-        push_notifications_sender_subcriber_scope_(storage_.InternalExposeStream().Subscribe(pusher_)) {
+        push_notifications_sender_subcriber_scope_(storage_.InternalExposeStream().Subscribe(pusher_)),
+        adwords_tracker_(config_.Config().adwords_config, config_.Config().adwords_app_port) {
     midichlorians_stream_.open(config_.Config().midichlorians_file, std::ofstream::out | std::ofstream::app);
 
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
@@ -281,6 +295,31 @@ class CTFOServer final {
   }
 
   void operator()(const current::midichlorians::ios::iOSGenericEvent& event) { UpdateStateOnEvent(event); }
+
+  void operator()(const current::midichlorians::ios::iOSDeviceInfo& event) {
+    if (!event.device_id.empty()) {
+      const auto& info = event.info;
+      const auto cit = event.info.find("advertisingIdentifier");
+      if (cit != info.end() && !cit->second.empty()) {
+        const std::string& rdid = cit->second;
+        DebugPrint("iOSDeviceInfo for device ID " + event.device_id + ": AdId == " + rdid);
+        storage_.ReadWriteTransaction([this, rdid](MutableFields<Storage> data) {
+          const auto value = data.ios_adwords_install_tracked[rdid];
+          if (!Exists(value) || !Exists(Value(value).tracked)) {
+            DebugPrint("SendConversionEvent(" + rdid + ")");
+            if (adwords_tracker_.SendConversionEvent(rdid)) {
+              data.ios_adwords_install_tracked.Add(IOSAdWordsInstallTracked(rdid, current::time::Now()));
+              DebugPrint("SendConversionEvent(" + rdid + "): OK");
+            } else {
+              DebugPrint("SendConversionEvent(" + rdid + "): Fail");
+            }
+          }
+        }).Wait();
+      } else {
+        DebugPrint("iOSDeviceInfo for device ID " + event.device_id + ": AdId not found.");
+      }
+    }
+  }   
 
  private:
   typedef void (CTFOServer::*CTFOServerMemberFunctionServingRequest)(Request);
@@ -1205,6 +1244,8 @@ class CTFOServer final {
   RESTStorage rest_;
   current::ss::StreamSubscriber<PushNotificationsSender, typename Storage::transaction_t> pusher_;
   const current::sherlock::SubscriberScope push_notifications_sender_subcriber_scope_;
+  const current::integrations::adwords::conversion_tracking::AdWordsMobileConversionEventsSender
+      adwords_tracker_;
   HTTPRoutesScope scoped_http_routes_;
 
   const std::map<std::string, LOG_EVENT> valid_responses_ = {
