@@ -1,0 +1,2684 @@
+// The `current.h` file is the one from `https://github.com/C5T/Current`.
+// Compile with `-std=c++11` or higher.
+
+#include "current.h"
+
+// clang-format off
+
+namespace current_userspace {
+
+#ifndef CURRENT_SCHEMA_FOR_T9206905014308449807
+#define CURRENT_SCHEMA_FOR_T9206905014308449807
+namespace t9206905014308449807 {
+CURRENT_STRUCT(TransactionMeta) {
+  CURRENT_FIELD(begin_us, std::chrono::microseconds);
+  CURRENT_FIELD(end_us, std::chrono::microseconds);
+  CURRENT_FIELD(fields, (std::map<std::string, std::string>));
+};
+}  // namespace t9206905014308449807
+#endif  // CURRENT_SCHEMA_FOR_T_9206905014308449807
+
+#ifndef CURRENT_SCHEMA_FOR_T9010000003309061260
+#define CURRENT_SCHEMA_FOR_T9010000003309061260
+namespace t9010000003309061260 {
+CURRENT_ENUM(UID, uint64_t) {};
+}  // namespace t9010000003309061260
+#endif  // CURRENT_SCHEMA_FOR_T_9010000003309061260
+
+#ifndef CURRENT_SCHEMA_FOR_T9202868187541756328
+#define CURRENT_SCHEMA_FOR_T9202868187541756328
+namespace t9202868187541756328 {
+CURRENT_STRUCT(User) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(level, uint8_t);
+  CURRENT_FIELD(score, uint64_t);
+};
+}  // namespace t9202868187541756328
+#endif  // CURRENT_SCHEMA_FOR_T_9202868187541756328
+
+#ifndef CURRENT_SCHEMA_FOR_T9208126756460151169
+#define CURRENT_SCHEMA_FOR_T9208126756460151169
+namespace t9208126756460151169 {
+CURRENT_STRUCT(Persisted_UserUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9202868187541756328::User);
+};
+}  // namespace t9208126756460151169
+#endif  // CURRENT_SCHEMA_FOR_T_9208126756460151169
+
+#ifndef CURRENT_SCHEMA_FOR_T9010000000670795382
+#define CURRENT_SCHEMA_FOR_T9010000000670795382
+namespace t9010000000670795382 {
+CURRENT_ENUM(AUTH_TYPE, uint8_t) {};
+}  // namespace t9010000000670795382
+#endif  // CURRENT_SCHEMA_FOR_T_9010000000670795382
+
+#ifndef CURRENT_SCHEMA_FOR_T9207012534981795218
+#define CURRENT_SCHEMA_FOR_T9207012534981795218
+namespace t9207012534981795218 {
+CURRENT_STRUCT(AuthKey) {
+  CURRENT_FIELD(key, std::string);
+  CURRENT_FIELD(type, t9010000000670795382::AUTH_TYPE);
+};
+}  // namespace t9207012534981795218
+#endif  // CURRENT_SCHEMA_FOR_T_9207012534981795218
+
+#ifndef CURRENT_SCHEMA_FOR_T9203642333820785279
+#define CURRENT_SCHEMA_FOR_T9203642333820785279
+namespace t9203642333820785279 {
+CURRENT_STRUCT(AuthKeyTokenPair) {
+  CURRENT_FIELD(auth_key, t9207012534981795218::AuthKey);
+  CURRENT_FIELD(token, std::string);
+  CURRENT_FIELD(valid, bool);
+};
+}  // namespace t9203642333820785279
+#endif  // CURRENT_SCHEMA_FOR_T_9203642333820785279
+
+#ifndef CURRENT_SCHEMA_FOR_T9206424609723014602
+#define CURRENT_SCHEMA_FOR_T9206424609723014602
+namespace t9206424609723014602 {
+CURRENT_STRUCT(Persisted_AuthKeyTokenPairUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9203642333820785279::AuthKeyTokenPair);
+};
+}  // namespace t9206424609723014602
+#endif  // CURRENT_SCHEMA_FOR_T_9206424609723014602
+
+#ifndef CURRENT_SCHEMA_FOR_T9201002821766233156
+#define CURRENT_SCHEMA_FOR_T9201002821766233156
+namespace t9201002821766233156 {
+CURRENT_STRUCT(UIDAuthKeyPair) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(auth_key, t9207012534981795218::AuthKey);
+};
+}  // namespace t9201002821766233156
+#endif  // CURRENT_SCHEMA_FOR_T_9201002821766233156
+
+#ifndef CURRENT_SCHEMA_FOR_T9201404791496349854
+#define CURRENT_SCHEMA_FOR_T9201404791496349854
+namespace t9201404791496349854 {
+CURRENT_STRUCT(Persisted_UIDAuthKeyPairUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9201002821766233156::UIDAuthKeyPair);
+};
+}  // namespace t9201404791496349854
+#endif  // CURRENT_SCHEMA_FOR_T_9201404791496349854
+
+#ifndef CURRENT_SCHEMA_FOR_T9207541387680683014
+#define CURRENT_SCHEMA_FOR_T9207541387680683014
+namespace t9207541387680683014 {
+CURRENT_STRUCT(UserNotificationPlayerID) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(player_id, std::string);
+};
+}  // namespace t9207541387680683014
+#endif  // CURRENT_SCHEMA_FOR_T_9207541387680683014
+
+#ifndef CURRENT_SCHEMA_FOR_T9204377525154536962
+#define CURRENT_SCHEMA_FOR_T9204377525154536962
+namespace t9204377525154536962 {
+CURRENT_STRUCT(Persisted_UserNotificationPlayerIDUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9207541387680683014::UserNotificationPlayerID);
+};
+}  // namespace t9204377525154536962
+#endif  // CURRENT_SCHEMA_FOR_T_9204377525154536962
+
+#ifndef CURRENT_SCHEMA_FOR_T9203263626333893460
+#define CURRENT_SCHEMA_FOR_T9203263626333893460
+namespace t9203263626333893460 {
+CURRENT_STRUCT(PushNotificationsMarker) {
+  CURRENT_FIELD(dummy_key, std::string);
+  CURRENT_FIELD(last_pushed_notification_timestamp, std::chrono::microseconds);
+  CURRENT_FIELD(notification_push_frozen_until_timestamp, std::chrono::microseconds);
+};
+}  // namespace t9203263626333893460
+#endif  // CURRENT_SCHEMA_FOR_T_9203263626333893460
+
+#ifndef CURRENT_SCHEMA_FOR_T9209126580169162192
+#define CURRENT_SCHEMA_FOR_T9209126580169162192
+namespace t9209126580169162192 {
+CURRENT_STRUCT(Persisted_PushNotificationsMarkerUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9203263626333893460::PushNotificationsMarker);
+};
+}  // namespace t9209126580169162192
+#endif  // CURRENT_SCHEMA_FOR_T_9209126580169162192
+
+#ifndef CURRENT_SCHEMA_FOR_T9010000003717700430
+#define CURRENT_SCHEMA_FOR_T9010000003717700430
+namespace t9010000003717700430 {
+CURRENT_ENUM(CID, uint64_t) {};
+}  // namespace t9010000003717700430
+#endif  // CURRENT_SCHEMA_FOR_T_9010000003717700430
+
+#ifndef CURRENT_SCHEMA_FOR_T9204213868853430923
+#define CURRENT_SCHEMA_FOR_T9204213868853430923
+namespace t9204213868853430923 {
+CURRENT_STRUCT(Color) {
+  CURRENT_FIELD(red, uint8_t);
+  CURRENT_FIELD(green, uint8_t);
+  CURRENT_FIELD(blue, uint8_t);
+};
+}  // namespace t9204213868853430923
+#endif  // CURRENT_SCHEMA_FOR_T_9204213868853430923
+
+#ifndef CURRENT_SCHEMA_FOR_T9203519592729350886
+#define CURRENT_SCHEMA_FOR_T9203519592729350886
+namespace t9203519592729350886 {
+CURRENT_STRUCT(Card) {
+  CURRENT_FIELD(cid, t9010000003717700430::CID);
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(text, std::string);
+  CURRENT_FIELD(color, t9204213868853430923::Color);
+  CURRENT_FIELD(ctfo_count, uint32_t);
+  CURRENT_FIELD(tfu_count, uint32_t);
+  CURRENT_FIELD(skip_count, uint32_t);
+  CURRENT_FIELD(startup_index, double);
+};
+}  // namespace t9203519592729350886
+#endif  // CURRENT_SCHEMA_FOR_T_9203519592729350886
+
+#ifndef CURRENT_SCHEMA_FOR_T9209203382401796593
+#define CURRENT_SCHEMA_FOR_T9209203382401796593
+namespace t9209203382401796593 {
+CURRENT_STRUCT(Persisted_CardUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9203519592729350886::Card);
+};
+}  // namespace t9209203382401796593
+#endif  // CURRENT_SCHEMA_FOR_T_9209203382401796593
+
+#ifndef CURRENT_SCHEMA_FOR_T9200460999453184076
+#define CURRENT_SCHEMA_FOR_T9200460999453184076
+namespace t9200460999453184076 {
+CURRENT_STRUCT(AuthorCard) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(cid, t9010000003717700430::CID);
+  CURRENT_FIELD(us, std::chrono::microseconds);
+};
+}  // namespace t9200460999453184076
+#endif  // CURRENT_SCHEMA_FOR_T_9200460999453184076
+
+#ifndef CURRENT_SCHEMA_FOR_T9206788028424307888
+#define CURRENT_SCHEMA_FOR_T9206788028424307888
+namespace t9206788028424307888 {
+CURRENT_STRUCT(Persisted_AuthorCardUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9200460999453184076::AuthorCard);
+};
+}  // namespace t9206788028424307888
+#endif  // CURRENT_SCHEMA_FOR_T_9206788028424307888
+
+#ifndef CURRENT_SCHEMA_FOR_T9010000000707104163
+#define CURRENT_SCHEMA_FOR_T9010000000707104163
+namespace t9010000000707104163 {
+CURRENT_ENUM(ANSWER, int8_t) {};
+}  // namespace t9010000000707104163
+#endif  // CURRENT_SCHEMA_FOR_T_9010000000707104163
+
+#ifndef CURRENT_SCHEMA_FOR_T9206510697173592424
+#define CURRENT_SCHEMA_FOR_T9206510697173592424
+namespace t9206510697173592424 {
+CURRENT_STRUCT(Answer) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(cid, t9010000003717700430::CID);
+  CURRENT_FIELD(answer, t9010000000707104163::ANSWER);
+};
+}  // namespace t9206510697173592424
+#endif  // CURRENT_SCHEMA_FOR_T_9206510697173592424
+
+#ifndef CURRENT_SCHEMA_FOR_T9202869881718653279
+#define CURRENT_SCHEMA_FOR_T9202869881718653279
+namespace t9202869881718653279 {
+CURRENT_STRUCT(Persisted_AnswerUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9206510697173592424::Answer);
+};
+}  // namespace t9202869881718653279
+#endif  // CURRENT_SCHEMA_FOR_T_9202869881718653279
+
+#ifndef CURRENT_SCHEMA_FOR_T9200644221968698350
+#define CURRENT_SCHEMA_FOR_T9200644221968698350
+namespace t9200644221968698350 {
+CURRENT_STRUCT(Favorite) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(cid, t9010000003717700430::CID);
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(favorited, bool);
+};
+}  // namespace t9200644221968698350
+#endif  // CURRENT_SCHEMA_FOR_T_9200644221968698350
+
+#ifndef CURRENT_SCHEMA_FOR_T9203152417234971506
+#define CURRENT_SCHEMA_FOR_T9203152417234971506
+namespace t9203152417234971506 {
+CURRENT_STRUCT(Persisted_FavoriteUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9200644221968698350::Favorite);
+};
+}  // namespace t9203152417234971506
+#endif  // CURRENT_SCHEMA_FOR_T_9203152417234971506
+
+#ifndef CURRENT_SCHEMA_FOR_T9010000003566035498
+#define CURRENT_SCHEMA_FOR_T9010000003566035498
+namespace t9010000003566035498 {
+CURRENT_ENUM(OID, uint64_t) {};
+}  // namespace t9010000003566035498
+#endif  // CURRENT_SCHEMA_FOR_T_9010000003566035498
+
+#ifndef CURRENT_SCHEMA_FOR_T9203629003584948940
+#define CURRENT_SCHEMA_FOR_T9203629003584948940
+namespace t9203629003584948940 {
+CURRENT_STRUCT(Comment) {
+  CURRENT_FIELD(cid, t9010000003717700430::CID);
+  CURRENT_FIELD(oid, t9010000003566035498::OID);
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(parent_oid, t9010000003566035498::OID);
+  CURRENT_FIELD(author_uid, t9010000003309061260::UID);
+  CURRENT_FIELD(text, std::string);
+};
+}  // namespace t9203629003584948940
+#endif  // CURRENT_SCHEMA_FOR_T_9203629003584948940
+
+#ifndef CURRENT_SCHEMA_FOR_T9205726664918690175
+#define CURRENT_SCHEMA_FOR_T9205726664918690175
+namespace t9205726664918690175 {
+CURRENT_STRUCT(Persisted_CommentUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9203629003584948940::Comment);
+};
+}  // namespace t9205726664918690175
+#endif  // CURRENT_SCHEMA_FOR_T_9205726664918690175
+
+#ifndef CURRENT_SCHEMA_FOR_T9209939847913682852
+#define CURRENT_SCHEMA_FOR_T9209939847913682852
+namespace t9209939847913682852 {
+CURRENT_STRUCT(CommentLike) {
+  CURRENT_FIELD(oid, t9010000003566035498::OID);
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+};
+}  // namespace t9209939847913682852
+#endif  // CURRENT_SCHEMA_FOR_T_9209939847913682852
+
+#ifndef CURRENT_SCHEMA_FOR_T9207245805676534356
+#define CURRENT_SCHEMA_FOR_T9207245805676534356
+namespace t9207245805676534356 {
+CURRENT_STRUCT(Persisted_CommentLikeUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9209939847913682852::CommentLike);
+};
+}  // namespace t9207245805676534356
+#endif  // CURRENT_SCHEMA_FOR_T_9207245805676534356
+
+#ifndef CURRENT_SCHEMA_FOR_T9208106292780677444
+#define CURRENT_SCHEMA_FOR_T9208106292780677444
+namespace t9208106292780677444 {
+CURRENT_STRUCT(CardFlagAsInappropriate) {
+  CURRENT_FIELD(cid, t9010000003717700430::CID);
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+};
+}  // namespace t9208106292780677444
+#endif  // CURRENT_SCHEMA_FOR_T_9208106292780677444
+
+#ifndef CURRENT_SCHEMA_FOR_T9206820196250065258
+#define CURRENT_SCHEMA_FOR_T9206820196250065258
+namespace t9206820196250065258 {
+CURRENT_STRUCT(Persisted_CardFlagAsInappropriateUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9208106292780677444::CardFlagAsInappropriate);
+};
+}  // namespace t9206820196250065258
+#endif  // CURRENT_SCHEMA_FOR_T_9206820196250065258
+
+#ifndef CURRENT_SCHEMA_FOR_T9209939848218954266
+#define CURRENT_SCHEMA_FOR_T9209939848218954266
+namespace t9209939848218954266 {
+CURRENT_STRUCT(CommentFlagAsInappropriate) {
+  CURRENT_FIELD(oid, t9010000003566035498::OID);
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+};
+}  // namespace t9209939848218954266
+#endif  // CURRENT_SCHEMA_FOR_T_9209939848218954266
+
+#ifndef CURRENT_SCHEMA_FOR_T9207308163082688082
+#define CURRENT_SCHEMA_FOR_T9207308163082688082
+namespace t9207308163082688082 {
+CURRENT_STRUCT(Persisted_CommentFlagAsInappropriateUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9209939848218954266::CommentFlagAsInappropriate);
+};
+}  // namespace t9207308163082688082
+#endif  // CURRENT_SCHEMA_FOR_T_9207308163082688082
+
+#ifndef CURRENT_SCHEMA_FOR_T9205139962535721888
+#define CURRENT_SCHEMA_FOR_T9205139962535721888
+namespace t9205139962535721888 {
+CURRENT_STRUCT(NotificationMyCardNewComment) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(cid, t9010000003717700430::CID);
+  CURRENT_FIELD(oid, t9010000003566035498::OID);
+  CURRENT_FIELD(text, std::string);
+};
+}  // namespace t9205139962535721888
+#endif  // CURRENT_SCHEMA_FOR_T_9205139962535721888
+
+#ifndef CURRENT_SCHEMA_FOR_T9205139961216784732
+#define CURRENT_SCHEMA_FOR_T9205139961216784732
+namespace t9205139961216784732 {
+CURRENT_STRUCT(NotificationNewReplyToMyComment) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(cid, t9010000003717700430::CID);
+  CURRENT_FIELD(oid, t9010000003566035498::OID);
+  CURRENT_FIELD(text, std::string);
+};
+}  // namespace t9205139961216784732
+#endif  // CURRENT_SCHEMA_FOR_T_9205139961216784732
+
+#ifndef CURRENT_SCHEMA_FOR_T9205139961216938388
+#define CURRENT_SCHEMA_FOR_T9205139961216938388
+namespace t9205139961216938388 {
+CURRENT_STRUCT(NotificationMyCommentLiked) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(cid, t9010000003717700430::CID);
+  CURRENT_FIELD(oid, t9010000003566035498::OID);
+  CURRENT_FIELD(text, std::string);
+};
+}  // namespace t9205139961216938388
+#endif  // CURRENT_SCHEMA_FOR_T_9205139961216938388
+
+#ifndef CURRENT_SCHEMA_FOR_T9205139961498515997
+#define CURRENT_SCHEMA_FOR_T9205139961498515997
+namespace t9205139961498515997 {
+CURRENT_STRUCT(NotificationNewCommentOnCardIStarred) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(cid, t9010000003717700430::CID);
+  CURRENT_FIELD(oid, t9010000003566035498::OID);
+  CURRENT_FIELD(text, std::string);
+};
+}  // namespace t9205139961498515997
+#endif  // CURRENT_SCHEMA_FOR_T_9205139961498515997
+
+#ifndef CURRENT_SCHEMA_FOR_T9206133354855243134
+#define CURRENT_SCHEMA_FOR_T9206133354855243134
+namespace t9206133354855243134 {
+CURRENT_STRUCT(NotificationMyCardStarred) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(cid, t9010000003717700430::CID);
+};
+}  // namespace t9206133354855243134
+#endif  // CURRENT_SCHEMA_FOR_T_9206133354855243134
+
+#ifndef CURRENT_SCHEMA_FOR_T9206133355116522510
+#define CURRENT_SCHEMA_FOR_T9206133355116522510
+namespace t9206133355116522510 {
+CURRENT_STRUCT(NotificationNewVotesOnMyCard) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(cid, t9010000003717700430::CID);
+};
+}  // namespace t9206133355116522510
+#endif  // CURRENT_SCHEMA_FOR_T_9206133355116522510
+
+#ifndef CURRENT_SCHEMA_FOR_T9226204898011996251
+#define CURRENT_SCHEMA_FOR_T9226204898011996251
+namespace t9226204898011996251 {
+CURRENT_VARIANT(Variant_B_NotificationMyCardNewComment_NotificationNewReplyToMyComment_NotificationMyCommentLiked_NotificationNewCommentOnCardIStarred_NotificationMyCardStarred_NotificationNewVotesOnMyCard_E, t9205139962535721888::NotificationMyCardNewComment, t9205139961216784732::NotificationNewReplyToMyComment, t9205139961216938388::NotificationMyCommentLiked, t9205139961498515997::NotificationNewCommentOnCardIStarred, t9206133354855243134::NotificationMyCardStarred, t9206133355116522510::NotificationNewVotesOnMyCard);
+}  // namespace t9226204898011996251
+#endif  // CURRENT_SCHEMA_FOR_T_9226204898011996251
+
+#ifndef CURRENT_SCHEMA_FOR_T9200800801070359784
+#define CURRENT_SCHEMA_FOR_T9200800801070359784
+namespace t9200800801070359784 {
+CURRENT_STRUCT(Notification) {
+  CURRENT_FIELD(uid, t9010000003309061260::UID);
+  CURRENT_FIELD(timestamp, std::chrono::microseconds);
+  CURRENT_FIELD(notification, t9226204898011996251::Variant_B_NotificationMyCardNewComment_NotificationNewReplyToMyComment_NotificationMyCommentLiked_NotificationNewCommentOnCardIStarred_NotificationMyCardStarred_NotificationNewVotesOnMyCard_E);
+};
+}  // namespace t9200800801070359784
+#endif  // CURRENT_SCHEMA_FOR_T_9200800801070359784
+
+#ifndef CURRENT_SCHEMA_FOR_T9202282189215953871
+#define CURRENT_SCHEMA_FOR_T9202282189215953871
+namespace t9202282189215953871 {
+CURRENT_STRUCT(Persisted_NotificationUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9200800801070359784::Notification);
+};
+}  // namespace t9202282189215953871
+#endif  // CURRENT_SCHEMA_FOR_T_9202282189215953871
+
+#ifndef CURRENT_SCHEMA_FOR_T9200021088792210898
+#define CURRENT_SCHEMA_FOR_T9200021088792210898
+namespace t9200021088792210898 {
+CURRENT_STRUCT(StarNotificationAlreadySent) {
+  CURRENT_FIELD(key, (std::pair<t9010000003309061260::UID, t9010000003717700430::CID>));
+};
+}  // namespace t9200021088792210898
+#endif  // CURRENT_SCHEMA_FOR_T_9200021088792210898
+
+#ifndef CURRENT_SCHEMA_FOR_T9200732099755365792
+#define CURRENT_SCHEMA_FOR_T9200732099755365792
+namespace t9200732099755365792 {
+CURRENT_STRUCT(Persisted_StarNotificationAlreadySentUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9200021088792210898::StarNotificationAlreadySent);
+};
+}  // namespace t9200732099755365792
+#endif  // CURRENT_SCHEMA_FOR_T_9200732099755365792
+
+#ifndef CURRENT_SCHEMA_FOR_T9204169224127870611
+#define CURRENT_SCHEMA_FOR_T9204169224127870611
+namespace t9204169224127870611 {
+CURRENT_STRUCT(UserReportedUser) {
+  CURRENT_FIELD(who, t9010000003309061260::UID);
+  CURRENT_FIELD(whom, t9010000003309061260::UID);
+};
+}  // namespace t9204169224127870611
+#endif  // CURRENT_SCHEMA_FOR_T_9204169224127870611
+
+#ifndef CURRENT_SCHEMA_FOR_T9200370528760460699
+#define CURRENT_SCHEMA_FOR_T9200370528760460699
+namespace t9200370528760460699 {
+CURRENT_STRUCT(Persisted_UserReportedUserUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9204169224127870611::UserReportedUser);
+};
+}  // namespace t9200370528760460699
+#endif  // CURRENT_SCHEMA_FOR_T_9200370528760460699
+
+#ifndef CURRENT_SCHEMA_FOR_T9204169225399823167
+#define CURRENT_SCHEMA_FOR_T9204169225399823167
+namespace t9204169225399823167 {
+CURRENT_STRUCT(UserBlockedUser) {
+  CURRENT_FIELD(who, t9010000003309061260::UID);
+  CURRENT_FIELD(whom, t9010000003309061260::UID);
+};
+}  // namespace t9204169225399823167
+#endif  // CURRENT_SCHEMA_FOR_T_9204169225399823167
+
+#ifndef CURRENT_SCHEMA_FOR_T9209578065760681677
+#define CURRENT_SCHEMA_FOR_T9209578065760681677
+namespace t9209578065760681677 {
+CURRENT_STRUCT(Persisted_UserBlockedUserUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9204169225399823167::UserBlockedUser);
+};
+}  // namespace t9209578065760681677
+#endif  // CURRENT_SCHEMA_FOR_T_9209578065760681677
+
+#ifndef CURRENT_SCHEMA_FOR_T9200350026662591521
+#define CURRENT_SCHEMA_FOR_T9200350026662591521
+namespace t9200350026662591521 {
+CURRENT_STRUCT(BannedUser) {
+  CURRENT_FIELD(banned_uid, t9010000003309061260::UID);
+};
+}  // namespace t9200350026662591521
+#endif  // CURRENT_SCHEMA_FOR_T_9200350026662591521
+
+#ifndef CURRENT_SCHEMA_FOR_T9201957969463616179
+#define CURRENT_SCHEMA_FOR_T9201957969463616179
+namespace t9201957969463616179 {
+CURRENT_STRUCT(Persisted_BannedUserUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9200350026662591521::BannedUser);
+};
+}  // namespace t9201957969463616179
+#endif  // CURRENT_SCHEMA_FOR_T_9201957969463616179
+
+#ifndef CURRENT_SCHEMA_FOR_T9203799426742738470
+#define CURRENT_SCHEMA_FOR_T9203799426742738470
+namespace t9203799426742738470 {
+CURRENT_STRUCT(IOSAdWordsInstallTracked) {
+  CURRENT_FIELD(ios_advertising_id, std::string);
+  CURRENT_FIELD(tracked, Optional<std::chrono::microseconds>);
+};
+}  // namespace t9203799426742738470
+#endif  // CURRENT_SCHEMA_FOR_T_9203799426742738470
+
+#ifndef CURRENT_SCHEMA_FOR_T9202593411485357007
+#define CURRENT_SCHEMA_FOR_T9202593411485357007
+namespace t9202593411485357007 {
+CURRENT_STRUCT(Persisted_IOSAdWordsInstallTrackedUpdated) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(data, t9203799426742738470::IOSAdWordsInstallTracked);
+};
+}  // namespace t9202593411485357007
+#endif  // CURRENT_SCHEMA_FOR_T_9202593411485357007
+
+#ifndef CURRENT_SCHEMA_FOR_T9200244113881109438
+#define CURRENT_SCHEMA_FOR_T9200244113881109438
+namespace t9200244113881109438 {
+CURRENT_STRUCT(Persisted_UserDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, t9010000003309061260::UID);
+};
+}  // namespace t9200244113881109438
+#endif  // CURRENT_SCHEMA_FOR_T_9200244113881109438
+
+#ifndef CURRENT_SCHEMA_FOR_T9201639387125546521
+#define CURRENT_SCHEMA_FOR_T9201639387125546521
+namespace t9201639387125546521 {
+CURRENT_STRUCT(Persisted_AuthKeyTokenPairDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9207012534981795218::AuthKey, std::string>));
+};
+}  // namespace t9201639387125546521
+#endif  // CURRENT_SCHEMA_FOR_T_9201639387125546521
+
+#ifndef CURRENT_SCHEMA_FOR_T9203348299841190094
+#define CURRENT_SCHEMA_FOR_T9203348299841190094
+namespace t9203348299841190094 {
+CURRENT_STRUCT(Persisted_UIDAuthKeyPairDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9010000003309061260::UID, t9207012534981795218::AuthKey>));
+};
+}  // namespace t9203348299841190094
+#endif  // CURRENT_SCHEMA_FOR_T_9203348299841190094
+
+#ifndef CURRENT_SCHEMA_FOR_T9200244115692391934
+#define CURRENT_SCHEMA_FOR_T9200244115692391934
+namespace t9200244115692391934 {
+CURRENT_STRUCT(Persisted_UserNotificationPlayerIDDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, t9010000003309061260::UID);
+};
+}  // namespace t9200244115692391934
+#endif  // CURRENT_SCHEMA_FOR_T_9200244115692391934
+
+#ifndef CURRENT_SCHEMA_FOR_T9200749444858374255
+#define CURRENT_SCHEMA_FOR_T9200749444858374255
+namespace t9200749444858374255 {
+CURRENT_STRUCT(Persisted_PushNotificationsMarkerDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, std::string);
+};
+}  // namespace t9200749444858374255
+#endif  // CURRENT_SCHEMA_FOR_T_9200749444858374255
+
+#ifndef CURRENT_SCHEMA_FOR_T9200491824645954551
+#define CURRENT_SCHEMA_FOR_T9200491824645954551
+namespace t9200491824645954551 {
+CURRENT_STRUCT(Persisted_CardDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, t9010000003717700430::CID);
+};
+}  // namespace t9200491824645954551
+#endif  // CURRENT_SCHEMA_FOR_T_9200491824645954551
+
+#ifndef CURRENT_SCHEMA_FOR_T9203264334819812593
+#define CURRENT_SCHEMA_FOR_T9203264334819812593
+namespace t9203264334819812593 {
+CURRENT_STRUCT(Persisted_AuthorCardDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9010000003309061260::UID, t9010000003717700430::CID>));
+};
+}  // namespace t9203264334819812593
+#endif  // CURRENT_SCHEMA_FOR_T_9203264334819812593
+
+#ifndef CURRENT_SCHEMA_FOR_T9203264334960943284
+#define CURRENT_SCHEMA_FOR_T9203264334960943284
+namespace t9203264334960943284 {
+CURRENT_STRUCT(Persisted_AnswerDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9010000003309061260::UID, t9010000003717700430::CID>));
+};
+}  // namespace t9203264334960943284
+#endif  // CURRENT_SCHEMA_FOR_T_9203264334960943284
+
+#ifndef CURRENT_SCHEMA_FOR_T9203264333455182644
+#define CURRENT_SCHEMA_FOR_T9203264333455182644
+namespace t9203264333455182644 {
+CURRENT_STRUCT(Persisted_FavoriteDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9010000003309061260::UID, t9010000003717700430::CID>));
+};
+}  // namespace t9203264333455182644
+#endif  // CURRENT_SCHEMA_FOR_T_9203264333455182644
+
+#ifndef CURRENT_SCHEMA_FOR_T9202616594103322979
+#define CURRENT_SCHEMA_FOR_T9202616594103322979
+namespace t9202616594103322979 {
+CURRENT_STRUCT(Persisted_CommentDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9010000003717700430::CID, t9010000003566035498::OID>));
+};
+}  // namespace t9202616594103322979
+#endif  // CURRENT_SCHEMA_FOR_T_9202616594103322979
+
+#ifndef CURRENT_SCHEMA_FOR_T9203831637526002670
+#define CURRENT_SCHEMA_FOR_T9203831637526002670
+namespace t9203831637526002670 {
+CURRENT_STRUCT(Persisted_CommentLikeDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9010000003566035498::OID, t9010000003309061260::UID>));
+};
+}  // namespace t9203831637526002670
+#endif  // CURRENT_SCHEMA_FOR_T_9203831637526002670
+
+#ifndef CURRENT_SCHEMA_FOR_T9207338306079275190
+#define CURRENT_SCHEMA_FOR_T9207338306079275190
+namespace t9207338306079275190 {
+CURRENT_STRUCT(Persisted_CardFlagAsInappropriateDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9010000003717700430::CID, t9010000003309061260::UID>));
+};
+}  // namespace t9207338306079275190
+#endif  // CURRENT_SCHEMA_FOR_T_9207338306079275190
+
+#ifndef CURRENT_SCHEMA_FOR_T9203831635148683240
+#define CURRENT_SCHEMA_FOR_T9203831635148683240
+namespace t9203831635148683240 {
+CURRENT_STRUCT(Persisted_CommentFlagAsInappropriateDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9010000003566035498::OID, t9010000003309061260::UID>));
+};
+}  // namespace t9203831635148683240
+#endif  // CURRENT_SCHEMA_FOR_T_9203831635148683240
+
+#ifndef CURRENT_SCHEMA_FOR_T9208789096931447804
+#define CURRENT_SCHEMA_FOR_T9208789096931447804
+namespace t9208789096931447804 {
+CURRENT_STRUCT(Persisted_NotificationDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9010000003309061260::UID, std::chrono::microseconds>));
+};
+}  // namespace t9208789096931447804
+#endif  // CURRENT_SCHEMA_FOR_T_9208789096931447804
+
+#ifndef CURRENT_SCHEMA_FOR_T9203264333977679343
+#define CURRENT_SCHEMA_FOR_T9203264333977679343
+namespace t9203264333977679343 {
+CURRENT_STRUCT(Persisted_StarNotificationAlreadySentDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9010000003309061260::UID, t9010000003717700430::CID>));
+};
+}  // namespace t9203264333977679343
+#endif  // CURRENT_SCHEMA_FOR_T_9203264333977679343
+
+#ifndef CURRENT_SCHEMA_FOR_T9205788704562369935
+#define CURRENT_SCHEMA_FOR_T9205788704562369935
+namespace t9205788704562369935 {
+CURRENT_STRUCT(Persisted_UserReportedUserDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9010000003309061260::UID, t9010000003309061260::UID>));
+};
+}  // namespace t9205788704562369935
+#endif  // CURRENT_SCHEMA_FOR_T_9205788704562369935
+
+#ifndef CURRENT_SCHEMA_FOR_T9205788702451752665
+#define CURRENT_SCHEMA_FOR_T9205788702451752665
+namespace t9205788702451752665 {
+CURRENT_STRUCT(Persisted_UserBlockedUserDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, (std::pair<t9010000003309061260::UID, t9010000003309061260::UID>));
+};
+}  // namespace t9205788702451752665
+#endif  // CURRENT_SCHEMA_FOR_T_9205788702451752665
+
+#ifndef CURRENT_SCHEMA_FOR_T9200244113131106536
+#define CURRENT_SCHEMA_FOR_T9200244113131106536
+namespace t9200244113131106536 {
+CURRENT_STRUCT(Persisted_BannedUserDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, t9010000003309061260::UID);
+};
+}  // namespace t9200244113131106536
+#endif  // CURRENT_SCHEMA_FOR_T_9200244113131106536
+
+#ifndef CURRENT_SCHEMA_FOR_T9200749445102405243
+#define CURRENT_SCHEMA_FOR_T9200749445102405243
+namespace t9200749445102405243 {
+CURRENT_STRUCT(Persisted_IOSAdWordsInstallTrackedDeleted) {
+  CURRENT_FIELD(us, std::chrono::microseconds);
+  CURRENT_FIELD(key, std::string);
+};
+}  // namespace t9200749445102405243
+#endif  // CURRENT_SCHEMA_FOR_T_9200749445102405243
+
+#ifndef CURRENT_SCHEMA_FOR_T9224851607491269616
+#define CURRENT_SCHEMA_FOR_T9224851607491269616
+namespace t9224851607491269616 {
+CURRENT_VARIANT(Variant_B_Persisted_UserUpdated_Persisted_AuthKeyTokenPairUpdated_Persisted_UIDAuthKeyPairUpdated_Persisted_UserNotificationPlayerIDUpdated_Persisted_PushNotificationsMarkerUpdated_Persisted_CardUpdated_Persisted_AuthorCardUpdated_Persisted_AnswerUpdated_Persisted_FavoriteUpdated_Persisted_CommentUpdated_Persisted_CommentLikeUpdated_Persisted_CardFlagAsInappropriateUpdated_Persisted_CommentFlagAsInappropriateUpdated_Persisted_NotificationUpdated_Persisted_StarNotificationAlreadySentUpdated_Persisted_UserReportedUserUpdated_Persisted_UserBlockedUserUpdated_Persisted_BannedUserUpdated_Persisted_IOSAdWordsInstallTrackedUpdated_Persisted_UserDeleted_Persisted_AuthKeyTokenPairDeleted_Persisted_UIDAuthKeyPairDeleted_Persisted_UserNotificationPlayerIDDeleted_Persisted_PushNotificationsMarkerDeleted_Persisted_CardDeleted_Persisted_AuthorCardDeleted_Persisted_AnswerDeleted_Persisted_FavoriteDeleted_Persisted_CommentDeleted_Persisted_CommentLikeDeleted_Persisted_CardFlagAsInappropriateDeleted_Persisted_CommentFlagAsInappropriateDeleted_Persisted_NotificationDeleted_Persisted_StarNotificationAlreadySentDeleted_Persisted_UserReportedUserDeleted_Persisted_UserBlockedUserDeleted_Persisted_BannedUserDeleted_Persisted_IOSAdWordsInstallTrackedDeleted_E, t9208126756460151169::Persisted_UserUpdated, t9206424609723014602::Persisted_AuthKeyTokenPairUpdated, t9201404791496349854::Persisted_UIDAuthKeyPairUpdated, t9204377525154536962::Persisted_UserNotificationPlayerIDUpdated, t9209126580169162192::Persisted_PushNotificationsMarkerUpdated, t9209203382401796593::Persisted_CardUpdated, t9206788028424307888::Persisted_AuthorCardUpdated, t9202869881718653279::Persisted_AnswerUpdated, t9203152417234971506::Persisted_FavoriteUpdated, t9205726664918690175::Persisted_CommentUpdated, t9207245805676534356::Persisted_CommentLikeUpdated, t9206820196250065258::Persisted_CardFlagAsInappropriateUpdated, t9207308163082688082::Persisted_CommentFlagAsInappropriateUpdated, t9202282189215953871::Persisted_NotificationUpdated, t9200732099755365792::Persisted_StarNotificationAlreadySentUpdated, t9200370528760460699::Persisted_UserReportedUserUpdated, t9209578065760681677::Persisted_UserBlockedUserUpdated, t9201957969463616179::Persisted_BannedUserUpdated, t9202593411485357007::Persisted_IOSAdWordsInstallTrackedUpdated, t9200244113881109438::Persisted_UserDeleted, t9201639387125546521::Persisted_AuthKeyTokenPairDeleted, t9203348299841190094::Persisted_UIDAuthKeyPairDeleted, t9200244115692391934::Persisted_UserNotificationPlayerIDDeleted, t9200749444858374255::Persisted_PushNotificationsMarkerDeleted, t9200491824645954551::Persisted_CardDeleted, t9203264334819812593::Persisted_AuthorCardDeleted, t9203264334960943284::Persisted_AnswerDeleted, t9203264333455182644::Persisted_FavoriteDeleted, t9202616594103322979::Persisted_CommentDeleted, t9203831637526002670::Persisted_CommentLikeDeleted, t9207338306079275190::Persisted_CardFlagAsInappropriateDeleted, t9203831635148683240::Persisted_CommentFlagAsInappropriateDeleted, t9208789096931447804::Persisted_NotificationDeleted, t9203264333977679343::Persisted_StarNotificationAlreadySentDeleted, t9205788704562369935::Persisted_UserReportedUserDeleted, t9205788702451752665::Persisted_UserBlockedUserDeleted, t9200244113131106536::Persisted_BannedUserDeleted, t9200749445102405243::Persisted_IOSAdWordsInstallTrackedDeleted);
+}  // namespace t9224851607491269616
+#endif  // CURRENT_SCHEMA_FOR_T_9224851607491269616
+
+#ifndef CURRENT_SCHEMA_FOR_T9205164650967336158
+#define CURRENT_SCHEMA_FOR_T9205164650967336158
+namespace t9205164650967336158 {
+CURRENT_STRUCT(Transaction_T9224851607491269616) {
+  CURRENT_FIELD(meta, t9206905014308449807::TransactionMeta);
+  CURRENT_FIELD(mutations, std::vector<t9224851607491269616::Variant_B_Persisted_UserUpdated_Persisted_AuthKeyTokenPairUpdated_Persisted_UIDAuthKeyPairUpdated_Persisted_UserNotificationPlayerIDUpdated_Persisted_PushNotificationsMarkerUpdated_Persisted_CardUpdated_Persisted_AuthorCardUpdated_Persisted_AnswerUpdated_Persisted_FavoriteUpdated_Persisted_CommentUpdated_Persisted_CommentLikeUpdated_Persisted_CardFlagAsInappropriateUpdated_Persisted_CommentFlagAsInappropriateUpdated_Persisted_NotificationUpdated_Persisted_StarNotificationAlreadySentUpdated_Persisted_UserReportedUserUpdated_Persisted_UserBlockedUserUpdated_Persisted_BannedUserUpdated_Persisted_IOSAdWordsInstallTrackedUpdated_Persisted_UserDeleted_Persisted_AuthKeyTokenPairDeleted_Persisted_UIDAuthKeyPairDeleted_Persisted_UserNotificationPlayerIDDeleted_Persisted_PushNotificationsMarkerDeleted_Persisted_CardDeleted_Persisted_AuthorCardDeleted_Persisted_AnswerDeleted_Persisted_FavoriteDeleted_Persisted_CommentDeleted_Persisted_CommentLikeDeleted_Persisted_CardFlagAsInappropriateDeleted_Persisted_CommentFlagAsInappropriateDeleted_Persisted_NotificationDeleted_Persisted_StarNotificationAlreadySentDeleted_Persisted_UserReportedUserDeleted_Persisted_UserBlockedUserDeleted_Persisted_BannedUserDeleted_Persisted_IOSAdWordsInstallTrackedDeleted_E>);
+};
+}  // namespace t9205164650967336158
+#endif  // CURRENT_SCHEMA_FOR_T_9205164650967336158
+
+}  // namespace current_userspace
+
+#ifndef CURRENT_NAMESPACE_NewCTFOStorage_DEFINED
+CURRENT_NAMESPACE(NewCTFOStorage) {
+  CURRENT_NAMESPACE_TYPE(AUTH_TYPE, current_userspace::t9010000000670795382::AUTH_TYPE);
+  CURRENT_NAMESPACE_TYPE(ANSWER, current_userspace::t9010000000707104163::ANSWER);
+  CURRENT_NAMESPACE_TYPE(UID, current_userspace::t9010000003309061260::UID);
+  CURRENT_NAMESPACE_TYPE(OID, current_userspace::t9010000003566035498::OID);
+  CURRENT_NAMESPACE_TYPE(CID, current_userspace::t9010000003717700430::CID);
+  CURRENT_NAMESPACE_TYPE(StarNotificationAlreadySent, current_userspace::t9200021088792210898::StarNotificationAlreadySent);
+  CURRENT_NAMESPACE_TYPE(Persisted_BannedUserDeleted, current_userspace::t9200244113131106536::Persisted_BannedUserDeleted);
+  CURRENT_NAMESPACE_TYPE(Persisted_UserDeleted, current_userspace::t9200244113881109438::Persisted_UserDeleted);
+  CURRENT_NAMESPACE_TYPE(Persisted_UserNotificationPlayerIDDeleted, current_userspace::t9200244115692391934::Persisted_UserNotificationPlayerIDDeleted);
+  CURRENT_NAMESPACE_TYPE(BannedUser, current_userspace::t9200350026662591521::BannedUser);
+  CURRENT_NAMESPACE_TYPE(Persisted_UserReportedUserUpdated, current_userspace::t9200370528760460699::Persisted_UserReportedUserUpdated);
+  CURRENT_NAMESPACE_TYPE(AuthorCard, current_userspace::t9200460999453184076::AuthorCard);
+  CURRENT_NAMESPACE_TYPE(Persisted_CardDeleted, current_userspace::t9200491824645954551::Persisted_CardDeleted);
+  CURRENT_NAMESPACE_TYPE(Favorite, current_userspace::t9200644221968698350::Favorite);
+  CURRENT_NAMESPACE_TYPE(Persisted_StarNotificationAlreadySentUpdated, current_userspace::t9200732099755365792::Persisted_StarNotificationAlreadySentUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_PushNotificationsMarkerDeleted, current_userspace::t9200749444858374255::Persisted_PushNotificationsMarkerDeleted);
+  CURRENT_NAMESPACE_TYPE(Persisted_IOSAdWordsInstallTrackedDeleted, current_userspace::t9200749445102405243::Persisted_IOSAdWordsInstallTrackedDeleted);
+  CURRENT_NAMESPACE_TYPE(Notification, current_userspace::t9200800801070359784::Notification);
+  CURRENT_NAMESPACE_TYPE(UIDAuthKeyPair, current_userspace::t9201002821766233156::UIDAuthKeyPair);
+  CURRENT_NAMESPACE_TYPE(Persisted_UIDAuthKeyPairUpdated, current_userspace::t9201404791496349854::Persisted_UIDAuthKeyPairUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_AuthKeyTokenPairDeleted, current_userspace::t9201639387125546521::Persisted_AuthKeyTokenPairDeleted);
+  CURRENT_NAMESPACE_TYPE(Persisted_BannedUserUpdated, current_userspace::t9201957969463616179::Persisted_BannedUserUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_NotificationUpdated, current_userspace::t9202282189215953871::Persisted_NotificationUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_IOSAdWordsInstallTrackedUpdated, current_userspace::t9202593411485357007::Persisted_IOSAdWordsInstallTrackedUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_CommentDeleted, current_userspace::t9202616594103322979::Persisted_CommentDeleted);
+  CURRENT_NAMESPACE_TYPE(User, current_userspace::t9202868187541756328::User);
+  CURRENT_NAMESPACE_TYPE(Persisted_AnswerUpdated, current_userspace::t9202869881718653279::Persisted_AnswerUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_FavoriteUpdated, current_userspace::t9203152417234971506::Persisted_FavoriteUpdated);
+  CURRENT_NAMESPACE_TYPE(PushNotificationsMarker, current_userspace::t9203263626333893460::PushNotificationsMarker);
+  CURRENT_NAMESPACE_TYPE(Persisted_FavoriteDeleted, current_userspace::t9203264333455182644::Persisted_FavoriteDeleted);
+  CURRENT_NAMESPACE_TYPE(Persisted_StarNotificationAlreadySentDeleted, current_userspace::t9203264333977679343::Persisted_StarNotificationAlreadySentDeleted);
+  CURRENT_NAMESPACE_TYPE(Persisted_AuthorCardDeleted, current_userspace::t9203264334819812593::Persisted_AuthorCardDeleted);
+  CURRENT_NAMESPACE_TYPE(Persisted_AnswerDeleted, current_userspace::t9203264334960943284::Persisted_AnswerDeleted);
+  CURRENT_NAMESPACE_TYPE(Persisted_UIDAuthKeyPairDeleted, current_userspace::t9203348299841190094::Persisted_UIDAuthKeyPairDeleted);
+  CURRENT_NAMESPACE_TYPE(Card, current_userspace::t9203519592729350886::Card);
+  CURRENT_NAMESPACE_TYPE(Comment, current_userspace::t9203629003584948940::Comment);
+  CURRENT_NAMESPACE_TYPE(AuthKeyTokenPair, current_userspace::t9203642333820785279::AuthKeyTokenPair);
+  CURRENT_NAMESPACE_TYPE(IOSAdWordsInstallTracked, current_userspace::t9203799426742738470::IOSAdWordsInstallTracked);
+  CURRENT_NAMESPACE_TYPE(Persisted_CommentFlagAsInappropriateDeleted, current_userspace::t9203831635148683240::Persisted_CommentFlagAsInappropriateDeleted);
+  CURRENT_NAMESPACE_TYPE(Persisted_CommentLikeDeleted, current_userspace::t9203831637526002670::Persisted_CommentLikeDeleted);
+  CURRENT_NAMESPACE_TYPE(UserReportedUser, current_userspace::t9204169224127870611::UserReportedUser);
+  CURRENT_NAMESPACE_TYPE(UserBlockedUser, current_userspace::t9204169225399823167::UserBlockedUser);
+  CURRENT_NAMESPACE_TYPE(Color, current_userspace::t9204213868853430923::Color);
+  CURRENT_NAMESPACE_TYPE(Persisted_UserNotificationPlayerIDUpdated, current_userspace::t9204377525154536962::Persisted_UserNotificationPlayerIDUpdated);
+  CURRENT_NAMESPACE_TYPE(NotificationNewReplyToMyComment, current_userspace::t9205139961216784732::NotificationNewReplyToMyComment);
+  CURRENT_NAMESPACE_TYPE(NotificationMyCommentLiked, current_userspace::t9205139961216938388::NotificationMyCommentLiked);
+  CURRENT_NAMESPACE_TYPE(NotificationNewCommentOnCardIStarred, current_userspace::t9205139961498515997::NotificationNewCommentOnCardIStarred);
+  CURRENT_NAMESPACE_TYPE(NotificationMyCardNewComment, current_userspace::t9205139962535721888::NotificationMyCardNewComment);
+  CURRENT_NAMESPACE_TYPE(Transaction_T9224851607491269616, current_userspace::t9205164650967336158::Transaction_T9224851607491269616);
+  CURRENT_NAMESPACE_TYPE(Persisted_CommentUpdated, current_userspace::t9205726664918690175::Persisted_CommentUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_UserBlockedUserDeleted, current_userspace::t9205788702451752665::Persisted_UserBlockedUserDeleted);
+  CURRENT_NAMESPACE_TYPE(Persisted_UserReportedUserDeleted, current_userspace::t9205788704562369935::Persisted_UserReportedUserDeleted);
+  CURRENT_NAMESPACE_TYPE(NotificationMyCardStarred, current_userspace::t9206133354855243134::NotificationMyCardStarred);
+  CURRENT_NAMESPACE_TYPE(NotificationNewVotesOnMyCard, current_userspace::t9206133355116522510::NotificationNewVotesOnMyCard);
+  CURRENT_NAMESPACE_TYPE(Persisted_AuthKeyTokenPairUpdated, current_userspace::t9206424609723014602::Persisted_AuthKeyTokenPairUpdated);
+  CURRENT_NAMESPACE_TYPE(Answer, current_userspace::t9206510697173592424::Answer);
+  CURRENT_NAMESPACE_TYPE(Persisted_AuthorCardUpdated, current_userspace::t9206788028424307888::Persisted_AuthorCardUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_CardFlagAsInappropriateUpdated, current_userspace::t9206820196250065258::Persisted_CardFlagAsInappropriateUpdated);
+  CURRENT_NAMESPACE_TYPE(TransactionMeta, current_userspace::t9206905014308449807::TransactionMeta);
+  CURRENT_NAMESPACE_TYPE(AuthKey, current_userspace::t9207012534981795218::AuthKey);
+  CURRENT_NAMESPACE_TYPE(Persisted_CommentLikeUpdated, current_userspace::t9207245805676534356::Persisted_CommentLikeUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_CommentFlagAsInappropriateUpdated, current_userspace::t9207308163082688082::Persisted_CommentFlagAsInappropriateUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_CardFlagAsInappropriateDeleted, current_userspace::t9207338306079275190::Persisted_CardFlagAsInappropriateDeleted);
+  CURRENT_NAMESPACE_TYPE(UserNotificationPlayerID, current_userspace::t9207541387680683014::UserNotificationPlayerID);
+  CURRENT_NAMESPACE_TYPE(CardFlagAsInappropriate, current_userspace::t9208106292780677444::CardFlagAsInappropriate);
+  CURRENT_NAMESPACE_TYPE(Persisted_UserUpdated, current_userspace::t9208126756460151169::Persisted_UserUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_NotificationDeleted, current_userspace::t9208789096931447804::Persisted_NotificationDeleted);
+  CURRENT_NAMESPACE_TYPE(Persisted_PushNotificationsMarkerUpdated, current_userspace::t9209126580169162192::Persisted_PushNotificationsMarkerUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_CardUpdated, current_userspace::t9209203382401796593::Persisted_CardUpdated);
+  CURRENT_NAMESPACE_TYPE(Persisted_UserBlockedUserUpdated, current_userspace::t9209578065760681677::Persisted_UserBlockedUserUpdated);
+  CURRENT_NAMESPACE_TYPE(CommentLike, current_userspace::t9209939847913682852::CommentLike);
+  CURRENT_NAMESPACE_TYPE(CommentFlagAsInappropriate, current_userspace::t9209939848218954266::CommentFlagAsInappropriate);
+  CURRENT_NAMESPACE_TYPE(Variant_B_Persisted_UserUpdated_Persisted_AuthKeyTokenPairUpdated_Persisted_UIDAuthKeyPairUpdated_Persisted_UserNotificationPlayerIDUpdated_Persisted_PushNotificationsMarkerUpdated_Persisted_CardUpdated_Persisted_AuthorCardUpdated_Persisted_AnswerUpdated_Persisted_FavoriteUpdated_Persisted_CommentUpdated_Persisted_CommentLikeUpdated_Persisted_CardFlagAsInappropriateUpdated_Persisted_CommentFlagAsInappropriateUpdated_Persisted_NotificationUpdated_Persisted_StarNotificationAlreadySentUpdated_Persisted_UserReportedUserUpdated_Persisted_UserBlockedUserUpdated_Persisted_BannedUserUpdated_Persisted_IOSAdWordsInstallTrackedUpdated_Persisted_UserDeleted_Persisted_AuthKeyTokenPairDeleted_Persisted_UIDAuthKeyPairDeleted_Persisted_UserNotificationPlayerIDDeleted_Persisted_PushNotificationsMarkerDeleted_Persisted_CardDeleted_Persisted_AuthorCardDeleted_Persisted_AnswerDeleted_Persisted_FavoriteDeleted_Persisted_CommentDeleted_Persisted_CommentLikeDeleted_Persisted_CardFlagAsInappropriateDeleted_Persisted_CommentFlagAsInappropriateDeleted_Persisted_NotificationDeleted_Persisted_StarNotificationAlreadySentDeleted_Persisted_UserReportedUserDeleted_Persisted_UserBlockedUserDeleted_Persisted_BannedUserDeleted_Persisted_IOSAdWordsInstallTrackedDeleted_E, current_userspace::t9224851607491269616::Variant_B_Persisted_UserUpdated_Persisted_AuthKeyTokenPairUpdated_Persisted_UIDAuthKeyPairUpdated_Persisted_UserNotificationPlayerIDUpdated_Persisted_PushNotificationsMarkerUpdated_Persisted_CardUpdated_Persisted_AuthorCardUpdated_Persisted_AnswerUpdated_Persisted_FavoriteUpdated_Persisted_CommentUpdated_Persisted_CommentLikeUpdated_Persisted_CardFlagAsInappropriateUpdated_Persisted_CommentFlagAsInappropriateUpdated_Persisted_NotificationUpdated_Persisted_StarNotificationAlreadySentUpdated_Persisted_UserReportedUserUpdated_Persisted_UserBlockedUserUpdated_Persisted_BannedUserUpdated_Persisted_IOSAdWordsInstallTrackedUpdated_Persisted_UserDeleted_Persisted_AuthKeyTokenPairDeleted_Persisted_UIDAuthKeyPairDeleted_Persisted_UserNotificationPlayerIDDeleted_Persisted_PushNotificationsMarkerDeleted_Persisted_CardDeleted_Persisted_AuthorCardDeleted_Persisted_AnswerDeleted_Persisted_FavoriteDeleted_Persisted_CommentDeleted_Persisted_CommentLikeDeleted_Persisted_CardFlagAsInappropriateDeleted_Persisted_CommentFlagAsInappropriateDeleted_Persisted_NotificationDeleted_Persisted_StarNotificationAlreadySentDeleted_Persisted_UserReportedUserDeleted_Persisted_UserBlockedUserDeleted_Persisted_BannedUserDeleted_Persisted_IOSAdWordsInstallTrackedDeleted_E);
+  CURRENT_NAMESPACE_TYPE(Variant_B_NotificationMyCardNewComment_NotificationNewReplyToMyComment_NotificationMyCommentLiked_NotificationNewCommentOnCardIStarred_NotificationMyCardStarred_NotificationNewVotesOnMyCard_E, current_userspace::t9226204898011996251::Variant_B_NotificationMyCardNewComment_NotificationNewReplyToMyComment_NotificationMyCommentLiked_NotificationNewCommentOnCardIStarred_NotificationMyCardStarred_NotificationNewVotesOnMyCard_E);
+
+  // Privileged types.
+  CURRENT_NAMESPACE_TYPE(TopLevelTransaction, current_userspace::t9205164650967336158::Transaction_T9224851607491269616);
+};  // CURRENT_NAMESPACE(NewCTFOStorage)
+#endif  // CURRENT_NAMESPACE_NewCTFOStorage_DEFINED
+
+namespace current {
+namespace type_evolution {
+
+// Default evolution for `CURRENT_ENUM(AUTH_TYPE)`.
+#ifndef DEFAULT_EVOLUTION_C95F1C9EE7341F78BC1AF986A3E3F0F0DFC5BC40FBA55FCB44D82872DE309A5B  // NewCTFOStorage::AUTH_TYPE
+#define DEFAULT_EVOLUTION_C95F1C9EE7341F78BC1AF986A3E3F0F0DFC5BC40FBA55FCB44D82872DE309A5B  // NewCTFOStorage::AUTH_TYPE
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, NewCTFOStorage::AUTH_TYPE, EVOLVER> {
+  template <typename INTO>
+  static void Go(NewCTFOStorage::AUTH_TYPE from,
+                 typename INTO::AUTH_TYPE& into) {
+    into = static_cast<typename INTO::AUTH_TYPE>(from);
+  }
+};
+#endif
+
+// Default evolution for `CURRENT_ENUM(ANSWER)`.
+#ifndef DEFAULT_EVOLUTION_BF7F4E74CCB3D5B11FC4EF0377C01A632AB82B1B4310237BB8A10E7E5D5EDC6D  // NewCTFOStorage::ANSWER
+#define DEFAULT_EVOLUTION_BF7F4E74CCB3D5B11FC4EF0377C01A632AB82B1B4310237BB8A10E7E5D5EDC6D  // NewCTFOStorage::ANSWER
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, NewCTFOStorage::ANSWER, EVOLVER> {
+  template <typename INTO>
+  static void Go(NewCTFOStorage::ANSWER from,
+                 typename INTO::ANSWER& into) {
+    into = static_cast<typename INTO::ANSWER>(from);
+  }
+};
+#endif
+
+// Default evolution for `CURRENT_ENUM(UID)`.
+#ifndef DEFAULT_EVOLUTION_403A09922F794008B0736F492E2A5910D9C69FC1388590894C4CD84D07E349F0  // NewCTFOStorage::UID
+#define DEFAULT_EVOLUTION_403A09922F794008B0736F492E2A5910D9C69FC1388590894C4CD84D07E349F0  // NewCTFOStorage::UID
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, NewCTFOStorage::UID, EVOLVER> {
+  template <typename INTO>
+  static void Go(NewCTFOStorage::UID from,
+                 typename INTO::UID& into) {
+    into = static_cast<typename INTO::UID>(from);
+  }
+};
+#endif
+
+// Default evolution for `CURRENT_ENUM(OID)`.
+#ifndef DEFAULT_EVOLUTION_351D3793D086C3F76876290D3F48AFCF8A8FEE22A19341C4BFD746C2AFF35782  // NewCTFOStorage::OID
+#define DEFAULT_EVOLUTION_351D3793D086C3F76876290D3F48AFCF8A8FEE22A19341C4BFD746C2AFF35782  // NewCTFOStorage::OID
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, NewCTFOStorage::OID, EVOLVER> {
+  template <typename INTO>
+  static void Go(NewCTFOStorage::OID from,
+                 typename INTO::OID& into) {
+    into = static_cast<typename INTO::OID>(from);
+  }
+};
+#endif
+
+// Default evolution for `CURRENT_ENUM(CID)`.
+#ifndef DEFAULT_EVOLUTION_977191122819009C5D9666DB13530DB38D407C19A96DEA85FFF2AA5A8D95A521  // NewCTFOStorage::CID
+#define DEFAULT_EVOLUTION_977191122819009C5D9666DB13530DB38D407C19A96DEA85FFF2AA5A8D95A521  // NewCTFOStorage::CID
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, NewCTFOStorage::CID, EVOLVER> {
+  template <typename INTO>
+  static void Go(NewCTFOStorage::CID from,
+                 typename INTO::CID& into) {
+    into = static_cast<typename INTO::CID>(from);
+  }
+};
+#endif
+
+// Default evolution for struct `StarNotificationAlreadySent`.
+#ifndef DEFAULT_EVOLUTION_CB832F19F34E050945654F08B4294170069C1B1B4724972AA2CCAA8390F20B98  // typename NewCTFOStorage::StarNotificationAlreadySent
+#define DEFAULT_EVOLUTION_CB832F19F34E050945654F08B4294170069C1B1B4724972AA2CCAA8390F20B98  // typename NewCTFOStorage::StarNotificationAlreadySent
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::StarNotificationAlreadySent, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::StarNotificationAlreadySent& from,
+                 typename INTO::StarNotificationAlreadySent& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::StarNotificationAlreadySent>::value == 1,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_BannedUserDeleted`.
+#ifndef DEFAULT_EVOLUTION_AD14DDDF10BBD5023C96703258474918E4FA4BCA282C029CE6BEE2DF8BBE8327  // typename NewCTFOStorage::Persisted_BannedUserDeleted
+#define DEFAULT_EVOLUTION_AD14DDDF10BBD5023C96703258474918E4FA4BCA282C029CE6BEE2DF8BBE8327  // typename NewCTFOStorage::Persisted_BannedUserDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_BannedUserDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_BannedUserDeleted& from,
+                 typename INTO::Persisted_BannedUserDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_BannedUserDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_UserDeleted`.
+#ifndef DEFAULT_EVOLUTION_5E2822EC6E6CE11DBFFD7C695B7A59F87C3CFAF437F8A09FC2B8BD03467808D8  // typename NewCTFOStorage::Persisted_UserDeleted
+#define DEFAULT_EVOLUTION_5E2822EC6E6CE11DBFFD7C695B7A59F87C3CFAF437F8A09FC2B8BD03467808D8  // typename NewCTFOStorage::Persisted_UserDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_UserDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_UserDeleted& from,
+                 typename INTO::Persisted_UserDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_UserDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_UserNotificationPlayerIDDeleted`.
+#ifndef DEFAULT_EVOLUTION_ACCA66B64C6A9213C9269F08C95B987839202B39F89B60AF53935132F5B42B69  // typename NewCTFOStorage::Persisted_UserNotificationPlayerIDDeleted
+#define DEFAULT_EVOLUTION_ACCA66B64C6A9213C9269F08C95B987839202B39F89B60AF53935132F5B42B69  // typename NewCTFOStorage::Persisted_UserNotificationPlayerIDDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_UserNotificationPlayerIDDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_UserNotificationPlayerIDDeleted& from,
+                 typename INTO::Persisted_UserNotificationPlayerIDDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_UserNotificationPlayerIDDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `BannedUser`.
+#ifndef DEFAULT_EVOLUTION_CC7907E7966F45749163804B2D503BE1D4BE90D9BA90EDD78358A43DA05F8ED0  // typename NewCTFOStorage::BannedUser
+#define DEFAULT_EVOLUTION_CC7907E7966F45749163804B2D503BE1D4BE90D9BA90EDD78358A43DA05F8ED0  // typename NewCTFOStorage::BannedUser
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::BannedUser, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::BannedUser& from,
+                 typename INTO::BannedUser& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::BannedUser>::value == 1,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.banned_uid), EVOLVER>::template Go<INTO>(from.banned_uid, into.banned_uid);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_UserReportedUserUpdated`.
+#ifndef DEFAULT_EVOLUTION_216C070455CE2499E1959F2448C5A31016C20CFE811949F604809DA652AE452B  // typename NewCTFOStorage::Persisted_UserReportedUserUpdated
+#define DEFAULT_EVOLUTION_216C070455CE2499E1959F2448C5A31016C20CFE811949F604809DA652AE452B  // typename NewCTFOStorage::Persisted_UserReportedUserUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_UserReportedUserUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_UserReportedUserUpdated& from,
+                 typename INTO::Persisted_UserReportedUserUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_UserReportedUserUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `AuthorCard`.
+#ifndef DEFAULT_EVOLUTION_23FB59670E43156E4226F77B2940876F9FC0D49F58628A40CD2E6B5EBA81D522  // typename NewCTFOStorage::AuthorCard
+#define DEFAULT_EVOLUTION_23FB59670E43156E4226F77B2940876F9FC0D49F58628A40CD2E6B5EBA81D522  // typename NewCTFOStorage::AuthorCard
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::AuthorCard, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::AuthorCard& from,
+                 typename INTO::AuthorCard& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::AuthorCard>::value == 3,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_CardDeleted`.
+#ifndef DEFAULT_EVOLUTION_37828B1CF96EAF0260DC70FBB664FEBB910DC7D949E00A1A43385A1EBDF66751  // typename NewCTFOStorage::Persisted_CardDeleted
+#define DEFAULT_EVOLUTION_37828B1CF96EAF0260DC70FBB664FEBB910DC7D949E00A1A43385A1EBDF66751  // typename NewCTFOStorage::Persisted_CardDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_CardDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_CardDeleted& from,
+                 typename INTO::Persisted_CardDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_CardDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Favorite`.
+#ifndef DEFAULT_EVOLUTION_B29F4CEDB93B3243F1E24DA95C0E10F8B3BDA402F244A2FBE3EA8BB4F81768AC  // typename NewCTFOStorage::Favorite
+#define DEFAULT_EVOLUTION_B29F4CEDB93B3243F1E24DA95C0E10F8B3BDA402F244A2FBE3EA8BB4F81768AC  // typename NewCTFOStorage::Favorite
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Favorite, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Favorite& from,
+                 typename INTO::Favorite& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Favorite>::value == 4,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.favorited), EVOLVER>::template Go<INTO>(from.favorited, into.favorited);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_StarNotificationAlreadySentUpdated`.
+#ifndef DEFAULT_EVOLUTION_6BAD39E654ECE821928827F48E421B7BCC15B0B5401A0BBF7FFB186DBA191D79  // typename NewCTFOStorage::Persisted_StarNotificationAlreadySentUpdated
+#define DEFAULT_EVOLUTION_6BAD39E654ECE821928827F48E421B7BCC15B0B5401A0BBF7FFB186DBA191D79  // typename NewCTFOStorage::Persisted_StarNotificationAlreadySentUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_StarNotificationAlreadySentUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_StarNotificationAlreadySentUpdated& from,
+                 typename INTO::Persisted_StarNotificationAlreadySentUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_StarNotificationAlreadySentUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_PushNotificationsMarkerDeleted`.
+#ifndef DEFAULT_EVOLUTION_2BB7A3691F5FCDE4362D163928ED733D6BC417782700B6569C914B80A8EB5E71  // typename NewCTFOStorage::Persisted_PushNotificationsMarkerDeleted
+#define DEFAULT_EVOLUTION_2BB7A3691F5FCDE4362D163928ED733D6BC417782700B6569C914B80A8EB5E71  // typename NewCTFOStorage::Persisted_PushNotificationsMarkerDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_PushNotificationsMarkerDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_PushNotificationsMarkerDeleted& from,
+                 typename INTO::Persisted_PushNotificationsMarkerDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_PushNotificationsMarkerDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_IOSAdWordsInstallTrackedDeleted`.
+#ifndef DEFAULT_EVOLUTION_1D86743D11F6E3D3A834E2A621676B848FBBF32C7B05B89EE2F9FE6377FD521B  // typename NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedDeleted
+#define DEFAULT_EVOLUTION_1D86743D11F6E3D3A834E2A621676B848FBBF32C7B05B89EE2F9FE6377FD521B  // typename NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedDeleted& from,
+                 typename INTO::Persisted_IOSAdWordsInstallTrackedDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_IOSAdWordsInstallTrackedDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Notification`.
+#ifndef DEFAULT_EVOLUTION_88FCA371D54BE0943D8C4F02EB2256F90D8BABF969CC6F58AAA2E09F88D1AA5F  // typename NewCTFOStorage::Notification
+#define DEFAULT_EVOLUTION_88FCA371D54BE0943D8C4F02EB2256F90D8BABF969CC6F58AAA2E09F88D1AA5F  // typename NewCTFOStorage::Notification
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Notification, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Notification& from,
+                 typename INTO::Notification& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Notification>::value == 3,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.timestamp), EVOLVER>::template Go<INTO>(from.timestamp, into.timestamp);
+      Evolve<NewCTFOStorage, decltype(from.notification), EVOLVER>::template Go<INTO>(from.notification, into.notification);
+  }
+};
+#endif
+
+// Default evolution for struct `UIDAuthKeyPair`.
+#ifndef DEFAULT_EVOLUTION_B805D5F834A0AD10C9F629142BF63170E9547A392D63F8B5B9165650DB69DC03  // typename NewCTFOStorage::UIDAuthKeyPair
+#define DEFAULT_EVOLUTION_B805D5F834A0AD10C9F629142BF63170E9547A392D63F8B5B9165650DB69DC03  // typename NewCTFOStorage::UIDAuthKeyPair
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::UIDAuthKeyPair, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::UIDAuthKeyPair& from,
+                 typename INTO::UIDAuthKeyPair& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::UIDAuthKeyPair>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.auth_key), EVOLVER>::template Go<INTO>(from.auth_key, into.auth_key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_UIDAuthKeyPairUpdated`.
+#ifndef DEFAULT_EVOLUTION_E6C9B5399521002F305515F8A91B092FB769EC54A7107D860616175596B12683  // typename NewCTFOStorage::Persisted_UIDAuthKeyPairUpdated
+#define DEFAULT_EVOLUTION_E6C9B5399521002F305515F8A91B092FB769EC54A7107D860616175596B12683  // typename NewCTFOStorage::Persisted_UIDAuthKeyPairUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_UIDAuthKeyPairUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_UIDAuthKeyPairUpdated& from,
+                 typename INTO::Persisted_UIDAuthKeyPairUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_UIDAuthKeyPairUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_AuthKeyTokenPairDeleted`.
+#ifndef DEFAULT_EVOLUTION_B015D01AFE8B9661F11CB31EF3F09CDFA7BB4FFE2E11AC791096B343CD3B37DC  // typename NewCTFOStorage::Persisted_AuthKeyTokenPairDeleted
+#define DEFAULT_EVOLUTION_B015D01AFE8B9661F11CB31EF3F09CDFA7BB4FFE2E11AC791096B343CD3B37DC  // typename NewCTFOStorage::Persisted_AuthKeyTokenPairDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_AuthKeyTokenPairDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_AuthKeyTokenPairDeleted& from,
+                 typename INTO::Persisted_AuthKeyTokenPairDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_AuthKeyTokenPairDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_BannedUserUpdated`.
+#ifndef DEFAULT_EVOLUTION_D70EE01FD5C20C06822F529E8111B9655AC7727D9C805A81E66BF9CBEB5F5AB2  // typename NewCTFOStorage::Persisted_BannedUserUpdated
+#define DEFAULT_EVOLUTION_D70EE01FD5C20C06822F529E8111B9655AC7727D9C805A81E66BF9CBEB5F5AB2  // typename NewCTFOStorage::Persisted_BannedUserUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_BannedUserUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_BannedUserUpdated& from,
+                 typename INTO::Persisted_BannedUserUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_BannedUserUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_NotificationUpdated`.
+#ifndef DEFAULT_EVOLUTION_6ACB8CD625217587763E87D9556C8729BAA147FC5956417A24A8D65FEA36C737  // typename NewCTFOStorage::Persisted_NotificationUpdated
+#define DEFAULT_EVOLUTION_6ACB8CD625217587763E87D9556C8729BAA147FC5956417A24A8D65FEA36C737  // typename NewCTFOStorage::Persisted_NotificationUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_NotificationUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_NotificationUpdated& from,
+                 typename INTO::Persisted_NotificationUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_NotificationUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_IOSAdWordsInstallTrackedUpdated`.
+#ifndef DEFAULT_EVOLUTION_21479972CF1C9F92DDC4D88A8B30B93DE273DFC9A85D149F7573762A2594B10F  // typename NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedUpdated
+#define DEFAULT_EVOLUTION_21479972CF1C9F92DDC4D88A8B30B93DE273DFC9A85D149F7573762A2594B10F  // typename NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedUpdated& from,
+                 typename INTO::Persisted_IOSAdWordsInstallTrackedUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_IOSAdWordsInstallTrackedUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_CommentDeleted`.
+#ifndef DEFAULT_EVOLUTION_B1BE96609B1F30535AFD2F259FD8A603FF960FEADD8354111D21C8036CF23B88  // typename NewCTFOStorage::Persisted_CommentDeleted
+#define DEFAULT_EVOLUTION_B1BE96609B1F30535AFD2F259FD8A603FF960FEADD8354111D21C8036CF23B88  // typename NewCTFOStorage::Persisted_CommentDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_CommentDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_CommentDeleted& from,
+                 typename INTO::Persisted_CommentDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_CommentDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `User`.
+#ifndef DEFAULT_EVOLUTION_356C1E8877F00B58F89F9E6442CCDEFE1DD41D3718A1ED4843B6AEAE3EFE8E83  // typename NewCTFOStorage::User
+#define DEFAULT_EVOLUTION_356C1E8877F00B58F89F9E6442CCDEFE1DD41D3718A1ED4843B6AEAE3EFE8E83  // typename NewCTFOStorage::User
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::User, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::User& from,
+                 typename INTO::User& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::User>::value == 4,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.level), EVOLVER>::template Go<INTO>(from.level, into.level);
+      Evolve<NewCTFOStorage, decltype(from.score), EVOLVER>::template Go<INTO>(from.score, into.score);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_AnswerUpdated`.
+#ifndef DEFAULT_EVOLUTION_4FADA33B47EA1F76273FFD203DC5ED4D0566FC21390CA0D80A3091986987C8EB  // typename NewCTFOStorage::Persisted_AnswerUpdated
+#define DEFAULT_EVOLUTION_4FADA33B47EA1F76273FFD203DC5ED4D0566FC21390CA0D80A3091986987C8EB  // typename NewCTFOStorage::Persisted_AnswerUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_AnswerUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_AnswerUpdated& from,
+                 typename INTO::Persisted_AnswerUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_AnswerUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_FavoriteUpdated`.
+#ifndef DEFAULT_EVOLUTION_64436125C7936E42F0EE68ADA7D991E8C59CA4B2ED7EC67AD7ADBEBB8F716B37  // typename NewCTFOStorage::Persisted_FavoriteUpdated
+#define DEFAULT_EVOLUTION_64436125C7936E42F0EE68ADA7D991E8C59CA4B2ED7EC67AD7ADBEBB8F716B37  // typename NewCTFOStorage::Persisted_FavoriteUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_FavoriteUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_FavoriteUpdated& from,
+                 typename INTO::Persisted_FavoriteUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_FavoriteUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `PushNotificationsMarker`.
+#ifndef DEFAULT_EVOLUTION_9C345BCBB2F6E20241F15939B03906FBE049B03FC32F2D0F5D9ADA2C8C02B223  // typename NewCTFOStorage::PushNotificationsMarker
+#define DEFAULT_EVOLUTION_9C345BCBB2F6E20241F15939B03906FBE049B03FC32F2D0F5D9ADA2C8C02B223  // typename NewCTFOStorage::PushNotificationsMarker
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::PushNotificationsMarker, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::PushNotificationsMarker& from,
+                 typename INTO::PushNotificationsMarker& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::PushNotificationsMarker>::value == 3,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.dummy_key), EVOLVER>::template Go<INTO>(from.dummy_key, into.dummy_key);
+      Evolve<NewCTFOStorage, decltype(from.last_pushed_notification_timestamp), EVOLVER>::template Go<INTO>(from.last_pushed_notification_timestamp, into.last_pushed_notification_timestamp);
+      Evolve<NewCTFOStorage, decltype(from.notification_push_frozen_until_timestamp), EVOLVER>::template Go<INTO>(from.notification_push_frozen_until_timestamp, into.notification_push_frozen_until_timestamp);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_FavoriteDeleted`.
+#ifndef DEFAULT_EVOLUTION_F8D6C4FC26FBA2E051A8B11A7BB288EC6A5658F2687E1D505AB2BB88C2DD275D  // typename NewCTFOStorage::Persisted_FavoriteDeleted
+#define DEFAULT_EVOLUTION_F8D6C4FC26FBA2E051A8B11A7BB288EC6A5658F2687E1D505AB2BB88C2DD275D  // typename NewCTFOStorage::Persisted_FavoriteDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_FavoriteDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_FavoriteDeleted& from,
+                 typename INTO::Persisted_FavoriteDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_FavoriteDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_StarNotificationAlreadySentDeleted`.
+#ifndef DEFAULT_EVOLUTION_7201BC31BB8E778FDF0C7B14571B142736782BDC9393ABF3337736C72E3A48B9  // typename NewCTFOStorage::Persisted_StarNotificationAlreadySentDeleted
+#define DEFAULT_EVOLUTION_7201BC31BB8E778FDF0C7B14571B142736782BDC9393ABF3337736C72E3A48B9  // typename NewCTFOStorage::Persisted_StarNotificationAlreadySentDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_StarNotificationAlreadySentDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_StarNotificationAlreadySentDeleted& from,
+                 typename INTO::Persisted_StarNotificationAlreadySentDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_StarNotificationAlreadySentDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_AuthorCardDeleted`.
+#ifndef DEFAULT_EVOLUTION_9FFB8B10C35F919921ADF9834B9E5B850D30A463BD88D2791B93C8F0646FCD37  // typename NewCTFOStorage::Persisted_AuthorCardDeleted
+#define DEFAULT_EVOLUTION_9FFB8B10C35F919921ADF9834B9E5B850D30A463BD88D2791B93C8F0646FCD37  // typename NewCTFOStorage::Persisted_AuthorCardDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_AuthorCardDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_AuthorCardDeleted& from,
+                 typename INTO::Persisted_AuthorCardDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_AuthorCardDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_AnswerDeleted`.
+#ifndef DEFAULT_EVOLUTION_4C0AAD9C8C96276E1827A20E1EB7E1ED146F0AE83F99DF3E7805CF3269668E6A  // typename NewCTFOStorage::Persisted_AnswerDeleted
+#define DEFAULT_EVOLUTION_4C0AAD9C8C96276E1827A20E1EB7E1ED146F0AE83F99DF3E7805CF3269668E6A  // typename NewCTFOStorage::Persisted_AnswerDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_AnswerDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_AnswerDeleted& from,
+                 typename INTO::Persisted_AnswerDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_AnswerDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_UIDAuthKeyPairDeleted`.
+#ifndef DEFAULT_EVOLUTION_E4681C54E8CCF352A7340AFF86912AB77D3624406799F388301EE8AED0BFCA22  // typename NewCTFOStorage::Persisted_UIDAuthKeyPairDeleted
+#define DEFAULT_EVOLUTION_E4681C54E8CCF352A7340AFF86912AB77D3624406799F388301EE8AED0BFCA22  // typename NewCTFOStorage::Persisted_UIDAuthKeyPairDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_UIDAuthKeyPairDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_UIDAuthKeyPairDeleted& from,
+                 typename INTO::Persisted_UIDAuthKeyPairDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_UIDAuthKeyPairDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Card`.
+#ifndef DEFAULT_EVOLUTION_0209EBA268C12FED527F3CB9B22545327AB770A42519DCA981B3C55DEF0678E8  // typename NewCTFOStorage::Card
+#define DEFAULT_EVOLUTION_0209EBA268C12FED527F3CB9B22545327AB770A42519DCA981B3C55DEF0678E8  // typename NewCTFOStorage::Card
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Card, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Card& from,
+                 typename INTO::Card& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Card>::value == 8,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.text), EVOLVER>::template Go<INTO>(from.text, into.text);
+      Evolve<NewCTFOStorage, decltype(from.color), EVOLVER>::template Go<INTO>(from.color, into.color);
+      Evolve<NewCTFOStorage, decltype(from.ctfo_count), EVOLVER>::template Go<INTO>(from.ctfo_count, into.ctfo_count);
+      Evolve<NewCTFOStorage, decltype(from.tfu_count), EVOLVER>::template Go<INTO>(from.tfu_count, into.tfu_count);
+      Evolve<NewCTFOStorage, decltype(from.skip_count), EVOLVER>::template Go<INTO>(from.skip_count, into.skip_count);
+      Evolve<NewCTFOStorage, decltype(from.startup_index), EVOLVER>::template Go<INTO>(from.startup_index, into.startup_index);
+  }
+};
+#endif
+
+// Default evolution for struct `Comment`.
+#ifndef DEFAULT_EVOLUTION_0CA8A231734AAC8EADBE86B30C600F9FCF3FAD67DA5D50CA76F5358A0F45D151  // typename NewCTFOStorage::Comment
+#define DEFAULT_EVOLUTION_0CA8A231734AAC8EADBE86B30C600F9FCF3FAD67DA5D50CA76F5358A0F45D151  // typename NewCTFOStorage::Comment
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Comment, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Comment& from,
+                 typename INTO::Comment& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Comment>::value == 6,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
+      Evolve<NewCTFOStorage, decltype(from.oid), EVOLVER>::template Go<INTO>(from.oid, into.oid);
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.parent_oid), EVOLVER>::template Go<INTO>(from.parent_oid, into.parent_oid);
+      Evolve<NewCTFOStorage, decltype(from.author_uid), EVOLVER>::template Go<INTO>(from.author_uid, into.author_uid);
+      Evolve<NewCTFOStorage, decltype(from.text), EVOLVER>::template Go<INTO>(from.text, into.text);
+  }
+};
+#endif
+
+// Default evolution for struct `AuthKeyTokenPair`.
+#ifndef DEFAULT_EVOLUTION_05B67B76D007A5AA77C6CDDF27D9E8083EA4D2F461A18E06153F0A78DB569B62  // typename NewCTFOStorage::AuthKeyTokenPair
+#define DEFAULT_EVOLUTION_05B67B76D007A5AA77C6CDDF27D9E8083EA4D2F461A18E06153F0A78DB569B62  // typename NewCTFOStorage::AuthKeyTokenPair
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::AuthKeyTokenPair, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::AuthKeyTokenPair& from,
+                 typename INTO::AuthKeyTokenPair& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::AuthKeyTokenPair>::value == 3,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.auth_key), EVOLVER>::template Go<INTO>(from.auth_key, into.auth_key);
+      Evolve<NewCTFOStorage, decltype(from.token), EVOLVER>::template Go<INTO>(from.token, into.token);
+      Evolve<NewCTFOStorage, decltype(from.valid), EVOLVER>::template Go<INTO>(from.valid, into.valid);
+  }
+};
+#endif
+
+// Default evolution for struct `IOSAdWordsInstallTracked`.
+#ifndef DEFAULT_EVOLUTION_A268DE7B4812B946CAE2E38952A585AB4B43A6EAC4C07FD66AEE84019B95EF1E  // typename NewCTFOStorage::IOSAdWordsInstallTracked
+#define DEFAULT_EVOLUTION_A268DE7B4812B946CAE2E38952A585AB4B43A6EAC4C07FD66AEE84019B95EF1E  // typename NewCTFOStorage::IOSAdWordsInstallTracked
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::IOSAdWordsInstallTracked, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::IOSAdWordsInstallTracked& from,
+                 typename INTO::IOSAdWordsInstallTracked& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::IOSAdWordsInstallTracked>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.ios_advertising_id), EVOLVER>::template Go<INTO>(from.ios_advertising_id, into.ios_advertising_id);
+      Evolve<NewCTFOStorage, decltype(from.tracked), EVOLVER>::template Go<INTO>(from.tracked, into.tracked);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_CommentFlagAsInappropriateDeleted`.
+#ifndef DEFAULT_EVOLUTION_E2CA1E1A764DB8B5A95B5EB3EE0D9B9566E92A257C712FACD99947F8716B7B75  // typename NewCTFOStorage::Persisted_CommentFlagAsInappropriateDeleted
+#define DEFAULT_EVOLUTION_E2CA1E1A764DB8B5A95B5EB3EE0D9B9566E92A257C712FACD99947F8716B7B75  // typename NewCTFOStorage::Persisted_CommentFlagAsInappropriateDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_CommentFlagAsInappropriateDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_CommentFlagAsInappropriateDeleted& from,
+                 typename INTO::Persisted_CommentFlagAsInappropriateDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_CommentFlagAsInappropriateDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_CommentLikeDeleted`.
+#ifndef DEFAULT_EVOLUTION_99B1352B89F51CE356479D37203D9BC6767A3B6D042428F21B2C52591A797193  // typename NewCTFOStorage::Persisted_CommentLikeDeleted
+#define DEFAULT_EVOLUTION_99B1352B89F51CE356479D37203D9BC6767A3B6D042428F21B2C52591A797193  // typename NewCTFOStorage::Persisted_CommentLikeDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_CommentLikeDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_CommentLikeDeleted& from,
+                 typename INTO::Persisted_CommentLikeDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_CommentLikeDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `UserReportedUser`.
+#ifndef DEFAULT_EVOLUTION_4C6F449497CBD0548C90FEDED34F1F6721F087CECB4D837770A0B4C0CF19186F  // typename NewCTFOStorage::UserReportedUser
+#define DEFAULT_EVOLUTION_4C6F449497CBD0548C90FEDED34F1F6721F087CECB4D837770A0B4C0CF19186F  // typename NewCTFOStorage::UserReportedUser
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::UserReportedUser, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::UserReportedUser& from,
+                 typename INTO::UserReportedUser& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::UserReportedUser>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.who), EVOLVER>::template Go<INTO>(from.who, into.who);
+      Evolve<NewCTFOStorage, decltype(from.whom), EVOLVER>::template Go<INTO>(from.whom, into.whom);
+  }
+};
+#endif
+
+// Default evolution for struct `UserBlockedUser`.
+#ifndef DEFAULT_EVOLUTION_0C442476DBA04FD78EC7ACA5A0CB6DBDA358C061B6ECAFD1C037020F5B79936A  // typename NewCTFOStorage::UserBlockedUser
+#define DEFAULT_EVOLUTION_0C442476DBA04FD78EC7ACA5A0CB6DBDA358C061B6ECAFD1C037020F5B79936A  // typename NewCTFOStorage::UserBlockedUser
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::UserBlockedUser, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::UserBlockedUser& from,
+                 typename INTO::UserBlockedUser& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::UserBlockedUser>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.who), EVOLVER>::template Go<INTO>(from.who, into.who);
+      Evolve<NewCTFOStorage, decltype(from.whom), EVOLVER>::template Go<INTO>(from.whom, into.whom);
+  }
+};
+#endif
+
+// Default evolution for struct `Color`.
+#ifndef DEFAULT_EVOLUTION_705367FF7D861A399C14777DAF070525A4F39257E753D7102F61EECBC57660F1  // typename NewCTFOStorage::Color
+#define DEFAULT_EVOLUTION_705367FF7D861A399C14777DAF070525A4F39257E753D7102F61EECBC57660F1  // typename NewCTFOStorage::Color
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Color, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Color& from,
+                 typename INTO::Color& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Color>::value == 3,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.red), EVOLVER>::template Go<INTO>(from.red, into.red);
+      Evolve<NewCTFOStorage, decltype(from.green), EVOLVER>::template Go<INTO>(from.green, into.green);
+      Evolve<NewCTFOStorage, decltype(from.blue), EVOLVER>::template Go<INTO>(from.blue, into.blue);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_UserNotificationPlayerIDUpdated`.
+#ifndef DEFAULT_EVOLUTION_89D2874E2940716974EDBC5151F312ABAC5C6A28BC2EBB130EB8AB3E0C2C23FC  // typename NewCTFOStorage::Persisted_UserNotificationPlayerIDUpdated
+#define DEFAULT_EVOLUTION_89D2874E2940716974EDBC5151F312ABAC5C6A28BC2EBB130EB8AB3E0C2C23FC  // typename NewCTFOStorage::Persisted_UserNotificationPlayerIDUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_UserNotificationPlayerIDUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_UserNotificationPlayerIDUpdated& from,
+                 typename INTO::Persisted_UserNotificationPlayerIDUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_UserNotificationPlayerIDUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `NotificationNewReplyToMyComment`.
+#ifndef DEFAULT_EVOLUTION_CB29B2ED8380B0275FFCA4A4347869DAEE063FAA6FC77762730608F313B24A0E  // typename NewCTFOStorage::NotificationNewReplyToMyComment
+#define DEFAULT_EVOLUTION_CB29B2ED8380B0275FFCA4A4347869DAEE063FAA6FC77762730608F313B24A0E  // typename NewCTFOStorage::NotificationNewReplyToMyComment
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::NotificationNewReplyToMyComment, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::NotificationNewReplyToMyComment& from,
+                 typename INTO::NotificationNewReplyToMyComment& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::NotificationNewReplyToMyComment>::value == 4,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
+      Evolve<NewCTFOStorage, decltype(from.oid), EVOLVER>::template Go<INTO>(from.oid, into.oid);
+      Evolve<NewCTFOStorage, decltype(from.text), EVOLVER>::template Go<INTO>(from.text, into.text);
+  }
+};
+#endif
+
+// Default evolution for struct `NotificationMyCommentLiked`.
+#ifndef DEFAULT_EVOLUTION_8E47A79B2ED83B9D2714FBE10B977DFAD23E62E43361B7C6409902D9ED72CFC8  // typename NewCTFOStorage::NotificationMyCommentLiked
+#define DEFAULT_EVOLUTION_8E47A79B2ED83B9D2714FBE10B977DFAD23E62E43361B7C6409902D9ED72CFC8  // typename NewCTFOStorage::NotificationMyCommentLiked
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::NotificationMyCommentLiked, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::NotificationMyCommentLiked& from,
+                 typename INTO::NotificationMyCommentLiked& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::NotificationMyCommentLiked>::value == 4,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
+      Evolve<NewCTFOStorage, decltype(from.oid), EVOLVER>::template Go<INTO>(from.oid, into.oid);
+      Evolve<NewCTFOStorage, decltype(from.text), EVOLVER>::template Go<INTO>(from.text, into.text);
+  }
+};
+#endif
+
+// Default evolution for struct `NotificationNewCommentOnCardIStarred`.
+#ifndef DEFAULT_EVOLUTION_A01DB473287F02B0FC516FDF9FA2DC743492B4FFCBB5D8FF1F587391A6D58688  // typename NewCTFOStorage::NotificationNewCommentOnCardIStarred
+#define DEFAULT_EVOLUTION_A01DB473287F02B0FC516FDF9FA2DC743492B4FFCBB5D8FF1F587391A6D58688  // typename NewCTFOStorage::NotificationNewCommentOnCardIStarred
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::NotificationNewCommentOnCardIStarred, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::NotificationNewCommentOnCardIStarred& from,
+                 typename INTO::NotificationNewCommentOnCardIStarred& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::NotificationNewCommentOnCardIStarred>::value == 4,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
+      Evolve<NewCTFOStorage, decltype(from.oid), EVOLVER>::template Go<INTO>(from.oid, into.oid);
+      Evolve<NewCTFOStorage, decltype(from.text), EVOLVER>::template Go<INTO>(from.text, into.text);
+  }
+};
+#endif
+
+// Default evolution for struct `NotificationMyCardNewComment`.
+#ifndef DEFAULT_EVOLUTION_8F9F91FE244CEAE47C0D0D6D626AB88E1EA1D52487F5EB2943E03C15AA96623F  // typename NewCTFOStorage::NotificationMyCardNewComment
+#define DEFAULT_EVOLUTION_8F9F91FE244CEAE47C0D0D6D626AB88E1EA1D52487F5EB2943E03C15AA96623F  // typename NewCTFOStorage::NotificationMyCardNewComment
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::NotificationMyCardNewComment, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::NotificationMyCardNewComment& from,
+                 typename INTO::NotificationMyCardNewComment& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::NotificationMyCardNewComment>::value == 4,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
+      Evolve<NewCTFOStorage, decltype(from.oid), EVOLVER>::template Go<INTO>(from.oid, into.oid);
+      Evolve<NewCTFOStorage, decltype(from.text), EVOLVER>::template Go<INTO>(from.text, into.text);
+  }
+};
+#endif
+
+// Default evolution for struct `Transaction_T9224851607491269616`.
+#ifndef DEFAULT_EVOLUTION_DEAC9AA2EAC5D47A1367570EA3BE4A5089694E876C0C3C63E8BD4F734384DBFB  // typename NewCTFOStorage::Transaction_T9224851607491269616
+#define DEFAULT_EVOLUTION_DEAC9AA2EAC5D47A1367570EA3BE4A5089694E876C0C3C63E8BD4F734384DBFB  // typename NewCTFOStorage::Transaction_T9224851607491269616
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Transaction_T9224851607491269616, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Transaction_T9224851607491269616& from,
+                 typename INTO::Transaction_T9224851607491269616& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Transaction_T9224851607491269616>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.meta), EVOLVER>::template Go<INTO>(from.meta, into.meta);
+      Evolve<NewCTFOStorage, decltype(from.mutations), EVOLVER>::template Go<INTO>(from.mutations, into.mutations);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_CommentUpdated`.
+#ifndef DEFAULT_EVOLUTION_68755ED2936E53F9A7517500244EE45BE835F9FF41CC31339D769927D64A3795  // typename NewCTFOStorage::Persisted_CommentUpdated
+#define DEFAULT_EVOLUTION_68755ED2936E53F9A7517500244EE45BE835F9FF41CC31339D769927D64A3795  // typename NewCTFOStorage::Persisted_CommentUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_CommentUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_CommentUpdated& from,
+                 typename INTO::Persisted_CommentUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_CommentUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_UserBlockedUserDeleted`.
+#ifndef DEFAULT_EVOLUTION_A9348F3D2A635F7A7A8E1803854CDC111BBAC55560787CF221191ECAF1870126  // typename NewCTFOStorage::Persisted_UserBlockedUserDeleted
+#define DEFAULT_EVOLUTION_A9348F3D2A635F7A7A8E1803854CDC111BBAC55560787CF221191ECAF1870126  // typename NewCTFOStorage::Persisted_UserBlockedUserDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_UserBlockedUserDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_UserBlockedUserDeleted& from,
+                 typename INTO::Persisted_UserBlockedUserDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_UserBlockedUserDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_UserReportedUserDeleted`.
+#ifndef DEFAULT_EVOLUTION_D6146CC2C12D39C0BAE25877EAC540B6DDB582CB6A6993D628F7C15DD5FFC396  // typename NewCTFOStorage::Persisted_UserReportedUserDeleted
+#define DEFAULT_EVOLUTION_D6146CC2C12D39C0BAE25877EAC540B6DDB582CB6A6993D628F7C15DD5FFC396  // typename NewCTFOStorage::Persisted_UserReportedUserDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_UserReportedUserDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_UserReportedUserDeleted& from,
+                 typename INTO::Persisted_UserReportedUserDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_UserReportedUserDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `NotificationMyCardStarred`.
+#ifndef DEFAULT_EVOLUTION_3D220BE572FA2E7DDEA1B66F7C1A78B9E6CBF50811B2BA97093AC19CC475E912  // typename NewCTFOStorage::NotificationMyCardStarred
+#define DEFAULT_EVOLUTION_3D220BE572FA2E7DDEA1B66F7C1A78B9E6CBF50811B2BA97093AC19CC475E912  // typename NewCTFOStorage::NotificationMyCardStarred
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::NotificationMyCardStarred, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::NotificationMyCardStarred& from,
+                 typename INTO::NotificationMyCardStarred& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::NotificationMyCardStarred>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
+  }
+};
+#endif
+
+// Default evolution for struct `NotificationNewVotesOnMyCard`.
+#ifndef DEFAULT_EVOLUTION_75BAA800731DC96853EADAD49CFECA9862880A6FD2E10BD11E07FDADAA14D417  // typename NewCTFOStorage::NotificationNewVotesOnMyCard
+#define DEFAULT_EVOLUTION_75BAA800731DC96853EADAD49CFECA9862880A6FD2E10BD11E07FDADAA14D417  // typename NewCTFOStorage::NotificationNewVotesOnMyCard
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::NotificationNewVotesOnMyCard, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::NotificationNewVotesOnMyCard& from,
+                 typename INTO::NotificationNewVotesOnMyCard& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::NotificationNewVotesOnMyCard>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_AuthKeyTokenPairUpdated`.
+#ifndef DEFAULT_EVOLUTION_BB336466D9E3E873D6186D4904219DE8E180F7ED4C37BE061303BEEC25515623  // typename NewCTFOStorage::Persisted_AuthKeyTokenPairUpdated
+#define DEFAULT_EVOLUTION_BB336466D9E3E873D6186D4904219DE8E180F7ED4C37BE061303BEEC25515623  // typename NewCTFOStorage::Persisted_AuthKeyTokenPairUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_AuthKeyTokenPairUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_AuthKeyTokenPairUpdated& from,
+                 typename INTO::Persisted_AuthKeyTokenPairUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_AuthKeyTokenPairUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Answer`.
+#ifndef DEFAULT_EVOLUTION_2E4EE98BCF3FC8CA9992B9FE236996FF7052C65A807EDABBFDF41AE32764CCED  // typename NewCTFOStorage::Answer
+#define DEFAULT_EVOLUTION_2E4EE98BCF3FC8CA9992B9FE236996FF7052C65A807EDABBFDF41AE32764CCED  // typename NewCTFOStorage::Answer
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Answer, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Answer& from,
+                 typename INTO::Answer& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Answer>::value == 3,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
+      Evolve<NewCTFOStorage, decltype(from.answer), EVOLVER>::template Go<INTO>(from.answer, into.answer);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_AuthorCardUpdated`.
+#ifndef DEFAULT_EVOLUTION_C31C617184EE9B54A030EE755B87E3C65E7AE724943AA2E3EF905E3641D6529F  // typename NewCTFOStorage::Persisted_AuthorCardUpdated
+#define DEFAULT_EVOLUTION_C31C617184EE9B54A030EE755B87E3C65E7AE724943AA2E3EF905E3641D6529F  // typename NewCTFOStorage::Persisted_AuthorCardUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_AuthorCardUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_AuthorCardUpdated& from,
+                 typename INTO::Persisted_AuthorCardUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_AuthorCardUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_CardFlagAsInappropriateUpdated`.
+#ifndef DEFAULT_EVOLUTION_34D59FF306EEA5B1C5FBDADF77AEA07A4AFE55EB4E81B38707FD36B3BFEDC0A2  // typename NewCTFOStorage::Persisted_CardFlagAsInappropriateUpdated
+#define DEFAULT_EVOLUTION_34D59FF306EEA5B1C5FBDADF77AEA07A4AFE55EB4E81B38707FD36B3BFEDC0A2  // typename NewCTFOStorage::Persisted_CardFlagAsInappropriateUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_CardFlagAsInappropriateUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_CardFlagAsInappropriateUpdated& from,
+                 typename INTO::Persisted_CardFlagAsInappropriateUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_CardFlagAsInappropriateUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `TransactionMeta`.
+#ifndef DEFAULT_EVOLUTION_D13B02F02DDCB16EC87B0719B820E03274DAE2488423314713687F6557A3876D  // typename NewCTFOStorage::TransactionMeta
+#define DEFAULT_EVOLUTION_D13B02F02DDCB16EC87B0719B820E03274DAE2488423314713687F6557A3876D  // typename NewCTFOStorage::TransactionMeta
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::TransactionMeta, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::TransactionMeta& from,
+                 typename INTO::TransactionMeta& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::TransactionMeta>::value == 3,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.begin_us), EVOLVER>::template Go<INTO>(from.begin_us, into.begin_us);
+      Evolve<NewCTFOStorage, decltype(from.end_us), EVOLVER>::template Go<INTO>(from.end_us, into.end_us);
+      Evolve<NewCTFOStorage, decltype(from.fields), EVOLVER>::template Go<INTO>(from.fields, into.fields);
+  }
+};
+#endif
+
+// Default evolution for struct `AuthKey`.
+#ifndef DEFAULT_EVOLUTION_4B045CE3F4C828BB95C6DEC66E6BA84585AB0434EE345CDD351523D1FDC296DD  // typename NewCTFOStorage::AuthKey
+#define DEFAULT_EVOLUTION_4B045CE3F4C828BB95C6DEC66E6BA84585AB0434EE345CDD351523D1FDC296DD  // typename NewCTFOStorage::AuthKey
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::AuthKey, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::AuthKey& from,
+                 typename INTO::AuthKey& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::AuthKey>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+      Evolve<NewCTFOStorage, decltype(from.type), EVOLVER>::template Go<INTO>(from.type, into.type);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_CommentLikeUpdated`.
+#ifndef DEFAULT_EVOLUTION_C8CBA1802F2F7AE6BDDF879D726893B2A40018E415F98C4FCDB530647F4D1E23  // typename NewCTFOStorage::Persisted_CommentLikeUpdated
+#define DEFAULT_EVOLUTION_C8CBA1802F2F7AE6BDDF879D726893B2A40018E415F98C4FCDB530647F4D1E23  // typename NewCTFOStorage::Persisted_CommentLikeUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_CommentLikeUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_CommentLikeUpdated& from,
+                 typename INTO::Persisted_CommentLikeUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_CommentLikeUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_CommentFlagAsInappropriateUpdated`.
+#ifndef DEFAULT_EVOLUTION_D854CE5D316D286EFE40A292EBB981E0F194E62A8830B728C6D821D46C5AAF2F  // typename NewCTFOStorage::Persisted_CommentFlagAsInappropriateUpdated
+#define DEFAULT_EVOLUTION_D854CE5D316D286EFE40A292EBB981E0F194E62A8830B728C6D821D46C5AAF2F  // typename NewCTFOStorage::Persisted_CommentFlagAsInappropriateUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_CommentFlagAsInappropriateUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_CommentFlagAsInappropriateUpdated& from,
+                 typename INTO::Persisted_CommentFlagAsInappropriateUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_CommentFlagAsInappropriateUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_CardFlagAsInappropriateDeleted`.
+#ifndef DEFAULT_EVOLUTION_479044D8F2DB1BF50460125481569328CFEF9C5A615FBD24185062053AFBB298  // typename NewCTFOStorage::Persisted_CardFlagAsInappropriateDeleted
+#define DEFAULT_EVOLUTION_479044D8F2DB1BF50460125481569328CFEF9C5A615FBD24185062053AFBB298  // typename NewCTFOStorage::Persisted_CardFlagAsInappropriateDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_CardFlagAsInappropriateDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_CardFlagAsInappropriateDeleted& from,
+                 typename INTO::Persisted_CardFlagAsInappropriateDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_CardFlagAsInappropriateDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `UserNotificationPlayerID`.
+#ifndef DEFAULT_EVOLUTION_6C13BC0A2B81C235224A4F40A876B5145428A52EC2FE18E136B39B4614B11DFD  // typename NewCTFOStorage::UserNotificationPlayerID
+#define DEFAULT_EVOLUTION_6C13BC0A2B81C235224A4F40A876B5145428A52EC2FE18E136B39B4614B11DFD  // typename NewCTFOStorage::UserNotificationPlayerID
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::UserNotificationPlayerID, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::UserNotificationPlayerID& from,
+                 typename INTO::UserNotificationPlayerID& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::UserNotificationPlayerID>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+      Evolve<NewCTFOStorage, decltype(from.player_id), EVOLVER>::template Go<INTO>(from.player_id, into.player_id);
+  }
+};
+#endif
+
+// Default evolution for struct `CardFlagAsInappropriate`.
+#ifndef DEFAULT_EVOLUTION_7485A3183F1152CDC8B3A05CD2875F7CE755EEBA219272828F718787492DF511  // typename NewCTFOStorage::CardFlagAsInappropriate
+#define DEFAULT_EVOLUTION_7485A3183F1152CDC8B3A05CD2875F7CE755EEBA219272828F718787492DF511  // typename NewCTFOStorage::CardFlagAsInappropriate
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::CardFlagAsInappropriate, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::CardFlagAsInappropriate& from,
+                 typename INTO::CardFlagAsInappropriate& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::CardFlagAsInappropriate>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_UserUpdated`.
+#ifndef DEFAULT_EVOLUTION_9E573849E2F130EE7D47CC1FF35B78BD3F16716427192F5175D778C0B3ABAE62  // typename NewCTFOStorage::Persisted_UserUpdated
+#define DEFAULT_EVOLUTION_9E573849E2F130EE7D47CC1FF35B78BD3F16716427192F5175D778C0B3ABAE62  // typename NewCTFOStorage::Persisted_UserUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_UserUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_UserUpdated& from,
+                 typename INTO::Persisted_UserUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_UserUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_NotificationDeleted`.
+#ifndef DEFAULT_EVOLUTION_2500E309C81A011B92B7FC1754FCEE9618DA6033B473E9C15B9A13D49E12FF8F  // typename NewCTFOStorage::Persisted_NotificationDeleted
+#define DEFAULT_EVOLUTION_2500E309C81A011B92B7FC1754FCEE9618DA6033B473E9C15B9A13D49E12FF8F  // typename NewCTFOStorage::Persisted_NotificationDeleted
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_NotificationDeleted, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_NotificationDeleted& from,
+                 typename INTO::Persisted_NotificationDeleted& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_NotificationDeleted>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.key), EVOLVER>::template Go<INTO>(from.key, into.key);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_PushNotificationsMarkerUpdated`.
+#ifndef DEFAULT_EVOLUTION_444ABB318A7C4DCC5D39CD7ED40644DA778C17A13E70A87838AEAF26F17F4E7C  // typename NewCTFOStorage::Persisted_PushNotificationsMarkerUpdated
+#define DEFAULT_EVOLUTION_444ABB318A7C4DCC5D39CD7ED40644DA778C17A13E70A87838AEAF26F17F4E7C  // typename NewCTFOStorage::Persisted_PushNotificationsMarkerUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_PushNotificationsMarkerUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_PushNotificationsMarkerUpdated& from,
+                 typename INTO::Persisted_PushNotificationsMarkerUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_PushNotificationsMarkerUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_CardUpdated`.
+#ifndef DEFAULT_EVOLUTION_A8822CCFA3D31FD5062640D22C7E697BBBE3CC11FD5FC5B2A12A6DF3A81EC994  // typename NewCTFOStorage::Persisted_CardUpdated
+#define DEFAULT_EVOLUTION_A8822CCFA3D31FD5062640D22C7E697BBBE3CC11FD5FC5B2A12A6DF3A81EC994  // typename NewCTFOStorage::Persisted_CardUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_CardUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_CardUpdated& from,
+                 typename INTO::Persisted_CardUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_CardUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `Persisted_UserBlockedUserUpdated`.
+#ifndef DEFAULT_EVOLUTION_52B6BBC0C09F87C0590441FEBF57C43D594916E2A410D53DD43E4B570F0A6DBF  // typename NewCTFOStorage::Persisted_UserBlockedUserUpdated
+#define DEFAULT_EVOLUTION_52B6BBC0C09F87C0590441FEBF57C43D594916E2A410D53DD43E4B570F0A6DBF  // typename NewCTFOStorage::Persisted_UserBlockedUserUpdated
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::Persisted_UserBlockedUserUpdated, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::Persisted_UserBlockedUserUpdated& from,
+                 typename INTO::Persisted_UserBlockedUserUpdated& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::Persisted_UserBlockedUserUpdated>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.us), EVOLVER>::template Go<INTO>(from.us, into.us);
+      Evolve<NewCTFOStorage, decltype(from.data), EVOLVER>::template Go<INTO>(from.data, into.data);
+  }
+};
+#endif
+
+// Default evolution for struct `CommentLike`.
+#ifndef DEFAULT_EVOLUTION_962715CCBC923442B7B26C959E28CF30F753224ED883783C1EB6654925F4703E  // typename NewCTFOStorage::CommentLike
+#define DEFAULT_EVOLUTION_962715CCBC923442B7B26C959E28CF30F753224ED883783C1EB6654925F4703E  // typename NewCTFOStorage::CommentLike
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::CommentLike, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::CommentLike& from,
+                 typename INTO::CommentLike& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::CommentLike>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.oid), EVOLVER>::template Go<INTO>(from.oid, into.oid);
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+  }
+};
+#endif
+
+// Default evolution for struct `CommentFlagAsInappropriate`.
+#ifndef DEFAULT_EVOLUTION_FDD82B771FBF687647530CB0A0FF62C7CE2A397006F3414AC4533E4B52526A22  // typename NewCTFOStorage::CommentFlagAsInappropriate
+#define DEFAULT_EVOLUTION_FDD82B771FBF687647530CB0A0FF62C7CE2A397006F3414AC4533E4B52526A22  // typename NewCTFOStorage::CommentFlagAsInappropriate
+template <typename EVOLVER>
+struct Evolve<NewCTFOStorage, typename NewCTFOStorage::CommentFlagAsInappropriate, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename NewCTFOStorage::CommentFlagAsInappropriate& from,
+                 typename INTO::CommentFlagAsInappropriate& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::CommentFlagAsInappropriate>::value == 2,
+                    "Custom evolver required.");
+      Evolve<NewCTFOStorage, decltype(from.oid), EVOLVER>::template Go<INTO>(from.oid, into.oid);
+      Evolve<NewCTFOStorage, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+  }
+};
+#endif
+
+// Default evolution for `Variant<Persisted_UserUpdated, Persisted_AuthKeyTokenPairUpdated, Persisted_UIDAuthKeyPairUpdated, Persisted_UserNotificationPlayerIDUpdated, Persisted_PushNotificationsMarkerUpdated, Persisted_CardUpdated, Persisted_AuthorCardUpdated, Persisted_AnswerUpdated, Persisted_FavoriteUpdated, Persisted_CommentUpdated, Persisted_CommentLikeUpdated, Persisted_CardFlagAsInappropriateUpdated, Persisted_CommentFlagAsInappropriateUpdated, Persisted_NotificationUpdated, Persisted_StarNotificationAlreadySentUpdated, Persisted_UserReportedUserUpdated, Persisted_UserBlockedUserUpdated, Persisted_BannedUserUpdated, Persisted_IOSAdWordsInstallTrackedUpdated, Persisted_UserDeleted, Persisted_AuthKeyTokenPairDeleted, Persisted_UIDAuthKeyPairDeleted, Persisted_UserNotificationPlayerIDDeleted, Persisted_PushNotificationsMarkerDeleted, Persisted_CardDeleted, Persisted_AuthorCardDeleted, Persisted_AnswerDeleted, Persisted_FavoriteDeleted, Persisted_CommentDeleted, Persisted_CommentLikeDeleted, Persisted_CardFlagAsInappropriateDeleted, Persisted_CommentFlagAsInappropriateDeleted, Persisted_NotificationDeleted, Persisted_StarNotificationAlreadySentDeleted, Persisted_UserReportedUserDeleted, Persisted_UserBlockedUserDeleted, Persisted_BannedUserDeleted, Persisted_IOSAdWordsInstallTrackedDeleted>`.
+#ifndef DEFAULT_EVOLUTION_7F9AE80A8C61E261E1602453B27B696F1B00A80A0CFF2E181B0452A6427AF8D1  // ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<NewCTFOStorage::Persisted_UserUpdated, NewCTFOStorage::Persisted_AuthKeyTokenPairUpdated, NewCTFOStorage::Persisted_UIDAuthKeyPairUpdated, NewCTFOStorage::Persisted_UserNotificationPlayerIDUpdated, NewCTFOStorage::Persisted_PushNotificationsMarkerUpdated, NewCTFOStorage::Persisted_CardUpdated, NewCTFOStorage::Persisted_AuthorCardUpdated, NewCTFOStorage::Persisted_AnswerUpdated, NewCTFOStorage::Persisted_FavoriteUpdated, NewCTFOStorage::Persisted_CommentUpdated, NewCTFOStorage::Persisted_CommentLikeUpdated, NewCTFOStorage::Persisted_CardFlagAsInappropriateUpdated, NewCTFOStorage::Persisted_CommentFlagAsInappropriateUpdated, NewCTFOStorage::Persisted_NotificationUpdated, NewCTFOStorage::Persisted_StarNotificationAlreadySentUpdated, NewCTFOStorage::Persisted_UserReportedUserUpdated, NewCTFOStorage::Persisted_UserBlockedUserUpdated, NewCTFOStorage::Persisted_BannedUserUpdated, NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedUpdated, NewCTFOStorage::Persisted_UserDeleted, NewCTFOStorage::Persisted_AuthKeyTokenPairDeleted, NewCTFOStorage::Persisted_UIDAuthKeyPairDeleted, NewCTFOStorage::Persisted_UserNotificationPlayerIDDeleted, NewCTFOStorage::Persisted_PushNotificationsMarkerDeleted, NewCTFOStorage::Persisted_CardDeleted, NewCTFOStorage::Persisted_AuthorCardDeleted, NewCTFOStorage::Persisted_AnswerDeleted, NewCTFOStorage::Persisted_FavoriteDeleted, NewCTFOStorage::Persisted_CommentDeleted, NewCTFOStorage::Persisted_CommentLikeDeleted, NewCTFOStorage::Persisted_CardFlagAsInappropriateDeleted, NewCTFOStorage::Persisted_CommentFlagAsInappropriateDeleted, NewCTFOStorage::Persisted_NotificationDeleted, NewCTFOStorage::Persisted_StarNotificationAlreadySentDeleted, NewCTFOStorage::Persisted_UserReportedUserDeleted, NewCTFOStorage::Persisted_UserBlockedUserDeleted, NewCTFOStorage::Persisted_BannedUserDeleted, NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedDeleted>>
+#define DEFAULT_EVOLUTION_7F9AE80A8C61E261E1602453B27B696F1B00A80A0CFF2E181B0452A6427AF8D1  // ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<NewCTFOStorage::Persisted_UserUpdated, NewCTFOStorage::Persisted_AuthKeyTokenPairUpdated, NewCTFOStorage::Persisted_UIDAuthKeyPairUpdated, NewCTFOStorage::Persisted_UserNotificationPlayerIDUpdated, NewCTFOStorage::Persisted_PushNotificationsMarkerUpdated, NewCTFOStorage::Persisted_CardUpdated, NewCTFOStorage::Persisted_AuthorCardUpdated, NewCTFOStorage::Persisted_AnswerUpdated, NewCTFOStorage::Persisted_FavoriteUpdated, NewCTFOStorage::Persisted_CommentUpdated, NewCTFOStorage::Persisted_CommentLikeUpdated, NewCTFOStorage::Persisted_CardFlagAsInappropriateUpdated, NewCTFOStorage::Persisted_CommentFlagAsInappropriateUpdated, NewCTFOStorage::Persisted_NotificationUpdated, NewCTFOStorage::Persisted_StarNotificationAlreadySentUpdated, NewCTFOStorage::Persisted_UserReportedUserUpdated, NewCTFOStorage::Persisted_UserBlockedUserUpdated, NewCTFOStorage::Persisted_BannedUserUpdated, NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedUpdated, NewCTFOStorage::Persisted_UserDeleted, NewCTFOStorage::Persisted_AuthKeyTokenPairDeleted, NewCTFOStorage::Persisted_UIDAuthKeyPairDeleted, NewCTFOStorage::Persisted_UserNotificationPlayerIDDeleted, NewCTFOStorage::Persisted_PushNotificationsMarkerDeleted, NewCTFOStorage::Persisted_CardDeleted, NewCTFOStorage::Persisted_AuthorCardDeleted, NewCTFOStorage::Persisted_AnswerDeleted, NewCTFOStorage::Persisted_FavoriteDeleted, NewCTFOStorage::Persisted_CommentDeleted, NewCTFOStorage::Persisted_CommentLikeDeleted, NewCTFOStorage::Persisted_CardFlagAsInappropriateDeleted, NewCTFOStorage::Persisted_CommentFlagAsInappropriateDeleted, NewCTFOStorage::Persisted_NotificationDeleted, NewCTFOStorage::Persisted_StarNotificationAlreadySentDeleted, NewCTFOStorage::Persisted_UserReportedUserDeleted, NewCTFOStorage::Persisted_UserBlockedUserDeleted, NewCTFOStorage::Persisted_BannedUserDeleted, NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedDeleted>>
+template <typename DST, typename FROM_NAMESPACE, typename INTO, typename EVOLVER>
+struct NewCTFOStorage_Variant_B_Persisted_UserUpdated_Persisted_AuthKeyTokenPairUpdated_Persisted_UIDAuthKeyPairUpdated_Persisted_UserNotificationPlayerIDUpdated_Persisted_PushNotificationsMarkerUpdated_Persisted_CardUpdated_Persisted_AuthorCardUpdated_Persisted_AnswerUpdated_Persisted_FavoriteUpdated_Persisted_CommentUpdated_Persisted_CommentLikeUpdated_Persisted_CardFlagAsInappropriateUpdated_Persisted_CommentFlagAsInappropriateUpdated_Persisted_NotificationUpdated_Persisted_StarNotificationAlreadySentUpdated_Persisted_UserReportedUserUpdated_Persisted_UserBlockedUserUpdated_Persisted_BannedUserUpdated_Persisted_IOSAdWordsInstallTrackedUpdated_Persisted_UserDeleted_Persisted_AuthKeyTokenPairDeleted_Persisted_UIDAuthKeyPairDeleted_Persisted_UserNotificationPlayerIDDeleted_Persisted_PushNotificationsMarkerDeleted_Persisted_CardDeleted_Persisted_AuthorCardDeleted_Persisted_AnswerDeleted_Persisted_FavoriteDeleted_Persisted_CommentDeleted_Persisted_CommentLikeDeleted_Persisted_CardFlagAsInappropriateDeleted_Persisted_CommentFlagAsInappropriateDeleted_Persisted_NotificationDeleted_Persisted_StarNotificationAlreadySentDeleted_Persisted_UserReportedUserDeleted_Persisted_UserBlockedUserDeleted_Persisted_BannedUserDeleted_Persisted_IOSAdWordsInstallTrackedDeleted_E_Cases {
+  DST& into;
+  explicit NewCTFOStorage_Variant_B_Persisted_UserUpdated_Persisted_AuthKeyTokenPairUpdated_Persisted_UIDAuthKeyPairUpdated_Persisted_UserNotificationPlayerIDUpdated_Persisted_PushNotificationsMarkerUpdated_Persisted_CardUpdated_Persisted_AuthorCardUpdated_Persisted_AnswerUpdated_Persisted_FavoriteUpdated_Persisted_CommentUpdated_Persisted_CommentLikeUpdated_Persisted_CardFlagAsInappropriateUpdated_Persisted_CommentFlagAsInappropriateUpdated_Persisted_NotificationUpdated_Persisted_StarNotificationAlreadySentUpdated_Persisted_UserReportedUserUpdated_Persisted_UserBlockedUserUpdated_Persisted_BannedUserUpdated_Persisted_IOSAdWordsInstallTrackedUpdated_Persisted_UserDeleted_Persisted_AuthKeyTokenPairDeleted_Persisted_UIDAuthKeyPairDeleted_Persisted_UserNotificationPlayerIDDeleted_Persisted_PushNotificationsMarkerDeleted_Persisted_CardDeleted_Persisted_AuthorCardDeleted_Persisted_AnswerDeleted_Persisted_FavoriteDeleted_Persisted_CommentDeleted_Persisted_CommentLikeDeleted_Persisted_CardFlagAsInappropriateDeleted_Persisted_CommentFlagAsInappropriateDeleted_Persisted_NotificationDeleted_Persisted_StarNotificationAlreadySentDeleted_Persisted_UserReportedUserDeleted_Persisted_UserBlockedUserDeleted_Persisted_BannedUserDeleted_Persisted_IOSAdWordsInstallTrackedDeleted_E_Cases(DST& into) : into(into) {}
+  void operator()(const typename FROM_NAMESPACE::Persisted_UserUpdated& value) const {
+    using into_t = typename INTO::Persisted_UserUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_UserUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_AuthKeyTokenPairUpdated& value) const {
+    using into_t = typename INTO::Persisted_AuthKeyTokenPairUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_AuthKeyTokenPairUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_UIDAuthKeyPairUpdated& value) const {
+    using into_t = typename INTO::Persisted_UIDAuthKeyPairUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_UIDAuthKeyPairUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_UserNotificationPlayerIDUpdated& value) const {
+    using into_t = typename INTO::Persisted_UserNotificationPlayerIDUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_UserNotificationPlayerIDUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_PushNotificationsMarkerUpdated& value) const {
+    using into_t = typename INTO::Persisted_PushNotificationsMarkerUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_PushNotificationsMarkerUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_CardUpdated& value) const {
+    using into_t = typename INTO::Persisted_CardUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_CardUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_AuthorCardUpdated& value) const {
+    using into_t = typename INTO::Persisted_AuthorCardUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_AuthorCardUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_AnswerUpdated& value) const {
+    using into_t = typename INTO::Persisted_AnswerUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_AnswerUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_FavoriteUpdated& value) const {
+    using into_t = typename INTO::Persisted_FavoriteUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_FavoriteUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_CommentUpdated& value) const {
+    using into_t = typename INTO::Persisted_CommentUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_CommentUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_CommentLikeUpdated& value) const {
+    using into_t = typename INTO::Persisted_CommentLikeUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_CommentLikeUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_CardFlagAsInappropriateUpdated& value) const {
+    using into_t = typename INTO::Persisted_CardFlagAsInappropriateUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_CardFlagAsInappropriateUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_CommentFlagAsInappropriateUpdated& value) const {
+    using into_t = typename INTO::Persisted_CommentFlagAsInappropriateUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_CommentFlagAsInappropriateUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_NotificationUpdated& value) const {
+    using into_t = typename INTO::Persisted_NotificationUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_NotificationUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_StarNotificationAlreadySentUpdated& value) const {
+    using into_t = typename INTO::Persisted_StarNotificationAlreadySentUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_StarNotificationAlreadySentUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_UserReportedUserUpdated& value) const {
+    using into_t = typename INTO::Persisted_UserReportedUserUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_UserReportedUserUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_UserBlockedUserUpdated& value) const {
+    using into_t = typename INTO::Persisted_UserBlockedUserUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_UserBlockedUserUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_BannedUserUpdated& value) const {
+    using into_t = typename INTO::Persisted_BannedUserUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_BannedUserUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_IOSAdWordsInstallTrackedUpdated& value) const {
+    using into_t = typename INTO::Persisted_IOSAdWordsInstallTrackedUpdated;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_IOSAdWordsInstallTrackedUpdated, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_UserDeleted& value) const {
+    using into_t = typename INTO::Persisted_UserDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_UserDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_AuthKeyTokenPairDeleted& value) const {
+    using into_t = typename INTO::Persisted_AuthKeyTokenPairDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_AuthKeyTokenPairDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_UIDAuthKeyPairDeleted& value) const {
+    using into_t = typename INTO::Persisted_UIDAuthKeyPairDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_UIDAuthKeyPairDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_UserNotificationPlayerIDDeleted& value) const {
+    using into_t = typename INTO::Persisted_UserNotificationPlayerIDDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_UserNotificationPlayerIDDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_PushNotificationsMarkerDeleted& value) const {
+    using into_t = typename INTO::Persisted_PushNotificationsMarkerDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_PushNotificationsMarkerDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_CardDeleted& value) const {
+    using into_t = typename INTO::Persisted_CardDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_CardDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_AuthorCardDeleted& value) const {
+    using into_t = typename INTO::Persisted_AuthorCardDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_AuthorCardDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_AnswerDeleted& value) const {
+    using into_t = typename INTO::Persisted_AnswerDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_AnswerDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_FavoriteDeleted& value) const {
+    using into_t = typename INTO::Persisted_FavoriteDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_FavoriteDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_CommentDeleted& value) const {
+    using into_t = typename INTO::Persisted_CommentDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_CommentDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_CommentLikeDeleted& value) const {
+    using into_t = typename INTO::Persisted_CommentLikeDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_CommentLikeDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_CardFlagAsInappropriateDeleted& value) const {
+    using into_t = typename INTO::Persisted_CardFlagAsInappropriateDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_CardFlagAsInappropriateDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_CommentFlagAsInappropriateDeleted& value) const {
+    using into_t = typename INTO::Persisted_CommentFlagAsInappropriateDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_CommentFlagAsInappropriateDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_NotificationDeleted& value) const {
+    using into_t = typename INTO::Persisted_NotificationDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_NotificationDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_StarNotificationAlreadySentDeleted& value) const {
+    using into_t = typename INTO::Persisted_StarNotificationAlreadySentDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_StarNotificationAlreadySentDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_UserReportedUserDeleted& value) const {
+    using into_t = typename INTO::Persisted_UserReportedUserDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_UserReportedUserDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_UserBlockedUserDeleted& value) const {
+    using into_t = typename INTO::Persisted_UserBlockedUserDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_UserBlockedUserDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_BannedUserDeleted& value) const {
+    using into_t = typename INTO::Persisted_BannedUserDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_BannedUserDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::Persisted_IOSAdWordsInstallTrackedDeleted& value) const {
+    using into_t = typename INTO::Persisted_IOSAdWordsInstallTrackedDeleted;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Persisted_IOSAdWordsInstallTrackedDeleted, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+};
+template <typename EVOLVER, typename VARIANT_NAME_HELPER>
+struct Evolve<NewCTFOStorage, ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<NewCTFOStorage::Persisted_UserUpdated, NewCTFOStorage::Persisted_AuthKeyTokenPairUpdated, NewCTFOStorage::Persisted_UIDAuthKeyPairUpdated, NewCTFOStorage::Persisted_UserNotificationPlayerIDUpdated, NewCTFOStorage::Persisted_PushNotificationsMarkerUpdated, NewCTFOStorage::Persisted_CardUpdated, NewCTFOStorage::Persisted_AuthorCardUpdated, NewCTFOStorage::Persisted_AnswerUpdated, NewCTFOStorage::Persisted_FavoriteUpdated, NewCTFOStorage::Persisted_CommentUpdated, NewCTFOStorage::Persisted_CommentLikeUpdated, NewCTFOStorage::Persisted_CardFlagAsInappropriateUpdated, NewCTFOStorage::Persisted_CommentFlagAsInappropriateUpdated, NewCTFOStorage::Persisted_NotificationUpdated, NewCTFOStorage::Persisted_StarNotificationAlreadySentUpdated, NewCTFOStorage::Persisted_UserReportedUserUpdated, NewCTFOStorage::Persisted_UserBlockedUserUpdated, NewCTFOStorage::Persisted_BannedUserUpdated, NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedUpdated, NewCTFOStorage::Persisted_UserDeleted, NewCTFOStorage::Persisted_AuthKeyTokenPairDeleted, NewCTFOStorage::Persisted_UIDAuthKeyPairDeleted, NewCTFOStorage::Persisted_UserNotificationPlayerIDDeleted, NewCTFOStorage::Persisted_PushNotificationsMarkerDeleted, NewCTFOStorage::Persisted_CardDeleted, NewCTFOStorage::Persisted_AuthorCardDeleted, NewCTFOStorage::Persisted_AnswerDeleted, NewCTFOStorage::Persisted_FavoriteDeleted, NewCTFOStorage::Persisted_CommentDeleted, NewCTFOStorage::Persisted_CommentLikeDeleted, NewCTFOStorage::Persisted_CardFlagAsInappropriateDeleted, NewCTFOStorage::Persisted_CommentFlagAsInappropriateDeleted, NewCTFOStorage::Persisted_NotificationDeleted, NewCTFOStorage::Persisted_StarNotificationAlreadySentDeleted, NewCTFOStorage::Persisted_UserReportedUserDeleted, NewCTFOStorage::Persisted_UserBlockedUserDeleted, NewCTFOStorage::Persisted_BannedUserDeleted, NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedDeleted>>, EVOLVER> {
+  template <typename INTO,
+            typename CUSTOM_INTO_VARIANT_TYPE>
+  static void Go(const ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<NewCTFOStorage::Persisted_UserUpdated, NewCTFOStorage::Persisted_AuthKeyTokenPairUpdated, NewCTFOStorage::Persisted_UIDAuthKeyPairUpdated, NewCTFOStorage::Persisted_UserNotificationPlayerIDUpdated, NewCTFOStorage::Persisted_PushNotificationsMarkerUpdated, NewCTFOStorage::Persisted_CardUpdated, NewCTFOStorage::Persisted_AuthorCardUpdated, NewCTFOStorage::Persisted_AnswerUpdated, NewCTFOStorage::Persisted_FavoriteUpdated, NewCTFOStorage::Persisted_CommentUpdated, NewCTFOStorage::Persisted_CommentLikeUpdated, NewCTFOStorage::Persisted_CardFlagAsInappropriateUpdated, NewCTFOStorage::Persisted_CommentFlagAsInappropriateUpdated, NewCTFOStorage::Persisted_NotificationUpdated, NewCTFOStorage::Persisted_StarNotificationAlreadySentUpdated, NewCTFOStorage::Persisted_UserReportedUserUpdated, NewCTFOStorage::Persisted_UserBlockedUserUpdated, NewCTFOStorage::Persisted_BannedUserUpdated, NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedUpdated, NewCTFOStorage::Persisted_UserDeleted, NewCTFOStorage::Persisted_AuthKeyTokenPairDeleted, NewCTFOStorage::Persisted_UIDAuthKeyPairDeleted, NewCTFOStorage::Persisted_UserNotificationPlayerIDDeleted, NewCTFOStorage::Persisted_PushNotificationsMarkerDeleted, NewCTFOStorage::Persisted_CardDeleted, NewCTFOStorage::Persisted_AuthorCardDeleted, NewCTFOStorage::Persisted_AnswerDeleted, NewCTFOStorage::Persisted_FavoriteDeleted, NewCTFOStorage::Persisted_CommentDeleted, NewCTFOStorage::Persisted_CommentLikeDeleted, NewCTFOStorage::Persisted_CardFlagAsInappropriateDeleted, NewCTFOStorage::Persisted_CommentFlagAsInappropriateDeleted, NewCTFOStorage::Persisted_NotificationDeleted, NewCTFOStorage::Persisted_StarNotificationAlreadySentDeleted, NewCTFOStorage::Persisted_UserReportedUserDeleted, NewCTFOStorage::Persisted_UserBlockedUserDeleted, NewCTFOStorage::Persisted_BannedUserDeleted, NewCTFOStorage::Persisted_IOSAdWordsInstallTrackedDeleted>>& from,
+                 CUSTOM_INTO_VARIANT_TYPE& into) {
+    from.Call(NewCTFOStorage_Variant_B_Persisted_UserUpdated_Persisted_AuthKeyTokenPairUpdated_Persisted_UIDAuthKeyPairUpdated_Persisted_UserNotificationPlayerIDUpdated_Persisted_PushNotificationsMarkerUpdated_Persisted_CardUpdated_Persisted_AuthorCardUpdated_Persisted_AnswerUpdated_Persisted_FavoriteUpdated_Persisted_CommentUpdated_Persisted_CommentLikeUpdated_Persisted_CardFlagAsInappropriateUpdated_Persisted_CommentFlagAsInappropriateUpdated_Persisted_NotificationUpdated_Persisted_StarNotificationAlreadySentUpdated_Persisted_UserReportedUserUpdated_Persisted_UserBlockedUserUpdated_Persisted_BannedUserUpdated_Persisted_IOSAdWordsInstallTrackedUpdated_Persisted_UserDeleted_Persisted_AuthKeyTokenPairDeleted_Persisted_UIDAuthKeyPairDeleted_Persisted_UserNotificationPlayerIDDeleted_Persisted_PushNotificationsMarkerDeleted_Persisted_CardDeleted_Persisted_AuthorCardDeleted_Persisted_AnswerDeleted_Persisted_FavoriteDeleted_Persisted_CommentDeleted_Persisted_CommentLikeDeleted_Persisted_CardFlagAsInappropriateDeleted_Persisted_CommentFlagAsInappropriateDeleted_Persisted_NotificationDeleted_Persisted_StarNotificationAlreadySentDeleted_Persisted_UserReportedUserDeleted_Persisted_UserBlockedUserDeleted_Persisted_BannedUserDeleted_Persisted_IOSAdWordsInstallTrackedDeleted_E_Cases<decltype(into), NewCTFOStorage, INTO, EVOLVER>(into));
+  }
+};
+#endif
+
+// Default evolution for `Variant<NotificationMyCardNewComment, NotificationNewReplyToMyComment, NotificationMyCommentLiked, NotificationNewCommentOnCardIStarred, NotificationMyCardStarred, NotificationNewVotesOnMyCard>`.
+#ifndef DEFAULT_EVOLUTION_98692785F792629DC24D930F0B23386E18FC8BCA3D3688E3A86D94FF6277BD0C  // ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<NewCTFOStorage::NotificationMyCardNewComment, NewCTFOStorage::NotificationNewReplyToMyComment, NewCTFOStorage::NotificationMyCommentLiked, NewCTFOStorage::NotificationNewCommentOnCardIStarred, NewCTFOStorage::NotificationMyCardStarred, NewCTFOStorage::NotificationNewVotesOnMyCard>>
+#define DEFAULT_EVOLUTION_98692785F792629DC24D930F0B23386E18FC8BCA3D3688E3A86D94FF6277BD0C  // ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<NewCTFOStorage::NotificationMyCardNewComment, NewCTFOStorage::NotificationNewReplyToMyComment, NewCTFOStorage::NotificationMyCommentLiked, NewCTFOStorage::NotificationNewCommentOnCardIStarred, NewCTFOStorage::NotificationMyCardStarred, NewCTFOStorage::NotificationNewVotesOnMyCard>>
+template <typename DST, typename FROM_NAMESPACE, typename INTO, typename EVOLVER>
+struct NewCTFOStorage_Variant_B_NotificationMyCardNewComment_NotificationNewReplyToMyComment_NotificationMyCommentLiked_NotificationNewCommentOnCardIStarred_NotificationMyCardStarred_NotificationNewVotesOnMyCard_E_Cases {
+  DST& into;
+  explicit NewCTFOStorage_Variant_B_NotificationMyCardNewComment_NotificationNewReplyToMyComment_NotificationMyCommentLiked_NotificationNewCommentOnCardIStarred_NotificationMyCardStarred_NotificationNewVotesOnMyCard_E_Cases(DST& into) : into(into) {}
+  void operator()(const typename FROM_NAMESPACE::NotificationMyCardNewComment& value) const {
+    using into_t = typename INTO::NotificationMyCardNewComment;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::NotificationMyCardNewComment, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::NotificationNewReplyToMyComment& value) const {
+    using into_t = typename INTO::NotificationNewReplyToMyComment;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::NotificationNewReplyToMyComment, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::NotificationMyCommentLiked& value) const {
+    using into_t = typename INTO::NotificationMyCommentLiked;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::NotificationMyCommentLiked, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::NotificationNewCommentOnCardIStarred& value) const {
+    using into_t = typename INTO::NotificationNewCommentOnCardIStarred;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::NotificationNewCommentOnCardIStarred, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::NotificationMyCardStarred& value) const {
+    using into_t = typename INTO::NotificationMyCardStarred;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::NotificationMyCardStarred, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::NotificationNewVotesOnMyCard& value) const {
+    using into_t = typename INTO::NotificationNewVotesOnMyCard;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::NotificationNewVotesOnMyCard, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+};
+template <typename EVOLVER, typename VARIANT_NAME_HELPER>
+struct Evolve<NewCTFOStorage, ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<NewCTFOStorage::NotificationMyCardNewComment, NewCTFOStorage::NotificationNewReplyToMyComment, NewCTFOStorage::NotificationMyCommentLiked, NewCTFOStorage::NotificationNewCommentOnCardIStarred, NewCTFOStorage::NotificationMyCardStarred, NewCTFOStorage::NotificationNewVotesOnMyCard>>, EVOLVER> {
+  template <typename INTO,
+            typename CUSTOM_INTO_VARIANT_TYPE>
+  static void Go(const ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<NewCTFOStorage::NotificationMyCardNewComment, NewCTFOStorage::NotificationNewReplyToMyComment, NewCTFOStorage::NotificationMyCommentLiked, NewCTFOStorage::NotificationNewCommentOnCardIStarred, NewCTFOStorage::NotificationMyCardStarred, NewCTFOStorage::NotificationNewVotesOnMyCard>>& from,
+                 CUSTOM_INTO_VARIANT_TYPE& into) {
+    from.Call(NewCTFOStorage_Variant_B_NotificationMyCardNewComment_NotificationNewReplyToMyComment_NotificationMyCommentLiked_NotificationNewCommentOnCardIStarred_NotificationMyCardStarred_NotificationNewVotesOnMyCard_E_Cases<decltype(into), NewCTFOStorage, INTO, EVOLVER>(into));
+  }
+};
+#endif
+
+}  // namespace current::type_evolution
+}  // namespace current
+
+#if 0  // Boilerplate evolvers.
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, StarNotificationAlreadySent, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_BannedUserDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_UserDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_UserNotificationPlayerIDDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, BannedUser, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.banned_uid, into.banned_uid);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_UserReportedUserUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, AuthorCard, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.cid, into.cid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_CardDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Favorite, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.cid, into.cid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.favorited, into.favorited);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_StarNotificationAlreadySentUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_PushNotificationsMarkerDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_IOSAdWordsInstallTrackedDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Notification, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.timestamp, into.timestamp);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.notification, into.notification);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, UIDAuthKeyPair, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.auth_key, into.auth_key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_UIDAuthKeyPairUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_AuthKeyTokenPairDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_BannedUserUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_NotificationUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_IOSAdWordsInstallTrackedUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_CommentDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, User, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.level, into.level);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.score, into.score);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_AnswerUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_FavoriteUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, PushNotificationsMarker, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.dummy_key, into.dummy_key);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.last_pushed_notification_timestamp, into.last_pushed_notification_timestamp);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.notification_push_frozen_until_timestamp, into.notification_push_frozen_until_timestamp);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_FavoriteDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_StarNotificationAlreadySentDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_AuthorCardDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_AnswerDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_UIDAuthKeyPairDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Card, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.cid, into.cid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.text, into.text);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.color, into.color);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.ctfo_count, into.ctfo_count);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.tfu_count, into.tfu_count);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.skip_count, into.skip_count);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.startup_index, into.startup_index);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Comment, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.cid, into.cid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.oid, into.oid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.parent_oid, into.parent_oid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.author_uid, into.author_uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.text, into.text);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, AuthKeyTokenPair, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.auth_key, into.auth_key);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.token, into.token);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.valid, into.valid);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, IOSAdWordsInstallTracked, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.ios_advertising_id, into.ios_advertising_id);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.tracked, into.tracked);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_CommentFlagAsInappropriateDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_CommentLikeDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, UserReportedUser, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.who, into.who);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.whom, into.whom);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, UserBlockedUser, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.who, into.who);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.whom, into.whom);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Color, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.red, into.red);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.green, into.green);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.blue, into.blue);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_UserNotificationPlayerIDUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, NotificationNewReplyToMyComment, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.cid, into.cid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.oid, into.oid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.text, into.text);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, NotificationMyCommentLiked, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.cid, into.cid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.oid, into.oid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.text, into.text);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, NotificationNewCommentOnCardIStarred, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.cid, into.cid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.oid, into.oid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.text, into.text);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, NotificationMyCardNewComment, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.cid, into.cid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.oid, into.oid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.text, into.text);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Transaction_T9224851607491269616, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.meta, into.meta);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.mutations, into.mutations);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_CommentUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_UserBlockedUserDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_UserReportedUserDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, NotificationMyCardStarred, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.cid, into.cid);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, NotificationNewVotesOnMyCard, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.cid, into.cid);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_AuthKeyTokenPairUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Answer, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.cid, into.cid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.answer, into.answer);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_AuthorCardUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_CardFlagAsInappropriateUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, TransactionMeta, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.begin_us, into.begin_us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.end_us, into.end_us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.fields, into.fields);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, AuthKey, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.type, into.type);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_CommentLikeUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_CommentFlagAsInappropriateUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_CardFlagAsInappropriateDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, UserNotificationPlayerID, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.player_id, into.player_id);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, CardFlagAsInappropriate, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.cid, into.cid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_UserUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_NotificationDeleted, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.key, into.key);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_PushNotificationsMarkerUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_CardUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, Persisted_UserBlockedUserUpdated, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.us, into.us);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.data, into.data);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, CommentLike, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.oid, into.oid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, NewCTFOStorage, CommentFlagAsInappropriate, {
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.oid, into.oid);
+  CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from.uid, into.uid);
+});
+
+CURRENT_TYPE_EVOLVER_VARIANT(CustomEvolver, NewCTFOStorage, t9224851607491269616::Variant_B_Persisted_UserUpdated_Persisted_AuthKeyTokenPairUpdated_Persisted_UIDAuthKeyPairUpdated_Persisted_UserNotificationPlayerIDUpdated_Persisted_PushNotificationsMarkerUpdated_Persisted_CardUpdated_Persisted_AuthorCardUpdated_Persisted_AnswerUpdated_Persisted_FavoriteUpdated_Persisted_CommentUpdated_Persisted_CommentLikeUpdated_Persisted_CardFlagAsInappropriateUpdated_Persisted_CommentFlagAsInappropriateUpdated_Persisted_NotificationUpdated_Persisted_StarNotificationAlreadySentUpdated_Persisted_UserReportedUserUpdated_Persisted_UserBlockedUserUpdated_Persisted_BannedUserUpdated_Persisted_IOSAdWordsInstallTrackedUpdated_Persisted_UserDeleted_Persisted_AuthKeyTokenPairDeleted_Persisted_UIDAuthKeyPairDeleted_Persisted_UserNotificationPlayerIDDeleted_Persisted_PushNotificationsMarkerDeleted_Persisted_CardDeleted_Persisted_AuthorCardDeleted_Persisted_AnswerDeleted_Persisted_FavoriteDeleted_Persisted_CommentDeleted_Persisted_CommentLikeDeleted_Persisted_CardFlagAsInappropriateDeleted_Persisted_CommentFlagAsInappropriateDeleted_Persisted_NotificationDeleted_Persisted_StarNotificationAlreadySentDeleted_Persisted_UserReportedUserDeleted_Persisted_UserBlockedUserDeleted_Persisted_BannedUserDeleted_Persisted_IOSAdWordsInstallTrackedDeleted_E, CustomDestinationNamespace) {
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9208126756460151169::Persisted_UserUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9206424609723014602::Persisted_AuthKeyTokenPairUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9201404791496349854::Persisted_UIDAuthKeyPairUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9204377525154536962::Persisted_UserNotificationPlayerIDUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9209126580169162192::Persisted_PushNotificationsMarkerUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9209203382401796593::Persisted_CardUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9206788028424307888::Persisted_AuthorCardUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9202869881718653279::Persisted_AnswerUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9203152417234971506::Persisted_FavoriteUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9205726664918690175::Persisted_CommentUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9207245805676534356::Persisted_CommentLikeUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9206820196250065258::Persisted_CardFlagAsInappropriateUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9207308163082688082::Persisted_CommentFlagAsInappropriateUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9202282189215953871::Persisted_NotificationUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9200732099755365792::Persisted_StarNotificationAlreadySentUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9200370528760460699::Persisted_UserReportedUserUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9209578065760681677::Persisted_UserBlockedUserUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9201957969463616179::Persisted_BannedUserUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9202593411485357007::Persisted_IOSAdWordsInstallTrackedUpdated, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9200244113881109438::Persisted_UserDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9201639387125546521::Persisted_AuthKeyTokenPairDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9203348299841190094::Persisted_UIDAuthKeyPairDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9200244115692391934::Persisted_UserNotificationPlayerIDDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9200749444858374255::Persisted_PushNotificationsMarkerDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9200491824645954551::Persisted_CardDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9203264334819812593::Persisted_AuthorCardDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9203264334960943284::Persisted_AnswerDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9203264333455182644::Persisted_FavoriteDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9202616594103322979::Persisted_CommentDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9203831637526002670::Persisted_CommentLikeDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9207338306079275190::Persisted_CardFlagAsInappropriateDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9203831635148683240::Persisted_CommentFlagAsInappropriateDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9208789096931447804::Persisted_NotificationDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9203264333977679343::Persisted_StarNotificationAlreadySentDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9205788704562369935::Persisted_UserReportedUserDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9205788702451752665::Persisted_UserBlockedUserDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9200244113131106536::Persisted_BannedUserDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9200749445102405243::Persisted_IOSAdWordsInstallTrackedDeleted, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+};
+
+CURRENT_TYPE_EVOLVER_VARIANT(CustomEvolver, NewCTFOStorage, t9226204898011996251::Variant_B_NotificationMyCardNewComment_NotificationNewReplyToMyComment_NotificationMyCommentLiked_NotificationNewCommentOnCardIStarred_NotificationMyCardStarred_NotificationNewVotesOnMyCard_E, CustomDestinationNamespace) {
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9205139962535721888::NotificationMyCardNewComment, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9205139961216784732::NotificationNewReplyToMyComment, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9205139961216938388::NotificationMyCommentLiked, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9205139961498515997::NotificationNewCommentOnCardIStarred, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9206133354855243134::NotificationMyCardStarred, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9206133355116522510::NotificationNewVotesOnMyCard, CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CustomDestinationNamespace, from, into));
+};
+
+#endif  // Boilerplate evolvers.
+
+// clang-format on
