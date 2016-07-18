@@ -73,8 +73,8 @@ struct CTFOHypermedia
 #endif
 
   template <class HTTP_VERB, typename PARTICULAR_FIELD, typename ENTRY, typename KEY>
-  struct RESTful : super_t::RESTful<HTTP_VERB, PARTICULAR_FIELD, ENTRY, KEY> {
-    using restful_super_t = super_t::RESTful<HTTP_VERB, PARTICULAR_FIELD, ENTRY, KEY>;
+  struct RESTfulDataHandlerGenerator : super_t::RESTfulDataHandlerGenerator<HTTP_VERB, PARTICULAR_FIELD, ENTRY, KEY> {
+    using restful_super_t = super_t::RESTfulDataHandlerGenerator<HTTP_VERB, PARTICULAR_FIELD, ENTRY, KEY>;
     using headers_list_t = std::vector<current::net::http::Header>;
     headers_list_t headers;
 
