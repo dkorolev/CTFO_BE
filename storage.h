@@ -58,6 +58,9 @@ CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary,
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, CTFO::UserReportedUser, Persisted_UserReportedUser);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, CTFO::UserBlockedUser, Persisted_UserBlockedUser);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, CTFO::BannedUser, Persisted_BannedUser);
+CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary,
+                            CTFO::IOSAdWordsInstallTracked, 
+                            Persisted_IOSAdWordsInstallTracked);
 
 CURRENT_STORAGE(CTFOStorage) {
   CURRENT_STORAGE_FIELD(user, Persisted_User);
@@ -79,6 +82,7 @@ CURRENT_STORAGE(CTFOStorage) {
   CURRENT_STORAGE_FIELD(user_reported_user, Persisted_UserReportedUser);
   CURRENT_STORAGE_FIELD(user_blocked_user, Persisted_UserBlockedUser);
   CURRENT_STORAGE_FIELD(banned_user, Persisted_BannedUser);
+  CURRENT_STORAGE_FIELD(ios_adwords_install_tracked, Persisted_IOSAdWordsInstallTracked);
 };
 
 #endif  // STORAGE_H

@@ -296,6 +296,31 @@ class CTFOServer final {
 
   void operator()(const current::midichlorians::ios::iOSGenericEvent& event) { UpdateStateOnEvent(event); }
 
+  void operator()(const current::midichlorians::ios::iOSDeviceInfo& event) {
+    if (!event.device_id.empty()) {
+      const auto& info = event.info;
+      const auto cit = event.info.find("advertisingIdentifier");
+      if (cit != info.end() && !cit->second.empty()) {
+        const std::string& rdid = cit->second;
+        DebugPrint("iOSDeviceInfo for device ID " + event.device_id + ": AdId == " + rdid);
+        storage_.ReadWriteTransaction([this, rdid](MutableFields<Storage> data) {
+          const auto value = data.ios_adwords_install_tracked[rdid];
+          if (!Exists(value) || !Exists(Value(value).tracked)) {
+            DebugPrint("SendConversionEvent(" + rdid + ")");
+            if (adwords_tracker_.SendConversionEvent(rdid)) {
+              data.ios_adwords_install_tracked.Add(IOSAdWordsInstallTracked(rdid, current::time::Now()));
+              DebugPrint("SendConversionEvent(" + rdid + "): OK");
+            } else {
+              DebugPrint("SendConversionEvent(" + rdid + "): Fail");
+            }
+          }
+        }).Wait();
+      } else {
+        DebugPrint("iOSDeviceInfo for device ID " + event.device_id + ": AdId not found.");
+      }
+    }
+  }   
+
  private:
   typedef void (CTFOServer::*CTFOServerMemberFunctionServingRequest)(Request);
 

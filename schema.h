@@ -394,6 +394,20 @@ CURRENT_STRUCT(BannedUser) {
   void InitializeOwnKey() {}
 };
 
+// To enable app installs tracking for AdWords.
+CURRENT_STRUCT(IOSAdWordsInstallTracked) {
+  CURRENT_FIELD(ios_advertising_id, std::string, "");
+  CURRENT_USE_FIELD_AS_KEY(ios_advertising_id);
+
+  CURRENT_FIELD(tracked, Optional<std::chrono::microseconds>);
+
+  CURRENT_DEFAULT_CONSTRUCTOR(IOSAdWordsInstallTracked) {}
+  CURRENT_CONSTRUCTOR(IOSAdWordsInstallTracked)(const std::string& rdid, std::chrono::microseconds us)
+      : ios_advertising_id(rdid), tracked(us) {}
+
+  void InitializeOwnKey() {}
+};
+
 // Notifications.
 CURRENT_STRUCT(NotificationMyCardNewComment) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that comment.
