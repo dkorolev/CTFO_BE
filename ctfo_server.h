@@ -43,9 +43,9 @@ SOFTWARE.
 
 #include "../Current/Storage/api.h"
 #ifdef USE_BASIC_HYPERMEDIA
-#include "../Current/Storage/rest/hypermedia.h"
+#include "../Current/Storage/rest/plain.h"
 #else
-#include "../Current/Storage/rest/advanced_hypermedia.h"
+#include "../Current/Storage/rest/hypermedia.h"
 #endif
 
 #include "storage.h"
@@ -68,16 +68,16 @@ namespace CTFO {
 
 struct CTFOHypermedia
 #ifdef USE_BASIC_HYPERMEDIA
+    : current::storage::rest::Simple {
+  using super_t = current::storage::rest::Simple;
+#else
     : current::storage::rest::Hypermedia {
   using super_t = current::storage::rest::Hypermedia;
-#else
-    : current::storage::rest::AdvancedHypermedia {
-  using super_t = current::storage::rest::AdvancedHypermedia;
 #endif
 
-  template <class HTTP_VERB, typename PARTICULAR_FIELD, typename ENTRY, typename KEY>
-  struct RESTfulDataHandlerGenerator : super_t::RESTfulDataHandlerGenerator<HTTP_VERB, PARTICULAR_FIELD, ENTRY, KEY> {
-    using restful_super_t = super_t::RESTfulDataHandlerGenerator<HTTP_VERB, PARTICULAR_FIELD, ENTRY, KEY>;
+  template <class HTTP_VERB, typename OPERATION, typename PARTICULAR_FIELD, typename ENTRY, typename KEY>
+  struct RESTfulDataHandlerGenerator : super_t::RESTfulDataHandlerGenerator<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY> {
+    using restful_super_t = super_t::RESTfulDataHandlerGenerator<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY>;
     using headers_list_t = std::vector<current::net::http::Header>;
     headers_list_t headers;
 
@@ -218,7 +218,7 @@ class CTFOServer final {
                               config_.Config().tick_interval_ms,
                               config_.Config().midichlorians_url_path,
                               "OK\n"),
-        storage_(current::sherlock::SherlockNamespaceName("NewCTFOStorage"), config_.Config().storage_file),
+        storage_(current::sherlock::SherlockNamespaceName("NewCTFOStorage", "TopLevelTransaction"), config_.Config().storage_file),
         rest_(storage_,
               config_.Config().rest_port,
               config_.Config().rest_url_path,
