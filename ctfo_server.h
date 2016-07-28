@@ -76,8 +76,10 @@ struct CTFOHypermedia
 #endif
 
   template <class HTTP_VERB, typename OPERATION, typename PARTICULAR_FIELD, typename ENTRY, typename KEY>
-  struct RESTfulDataHandlerGenerator : super_t::RESTfulDataHandlerGenerator<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY> {
-    using restful_super_t = super_t::RESTfulDataHandlerGenerator<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY>;
+  struct RESTfulDataHandlerGenerator
+      : super_t::RESTfulDataHandlerGenerator<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY> {
+    using restful_super_t =
+        super_t::RESTfulDataHandlerGenerator<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY>;
     using headers_list_t = std::vector<current::net::http::Header>;
     headers_list_t headers;
 
@@ -143,8 +145,8 @@ CURRENT_STRUCT(CTFOServerParams) {
   CURRENT_FIELD_DESCRIPTION(onesignal_app_port, "The local port routed via nginx to connect to OneSignal API.");
 
   CURRENT_FIELD(adwords_app_port,
-               uint16_t,
-               current::integrations::adwords::conversion_tracking::kDefaultAdWordsIntegrationPort);
+                uint16_t,
+                current::integrations::adwords::conversion_tracking::kDefaultAdWordsIntegrationPort);
   CURRENT_FIELD_DESCRIPTION(adwords_app_port, "The local port routed via nginx to connect to AdWords API.");
 
   CURRENT_FIELD(adwords_config,
@@ -218,7 +220,8 @@ class CTFOServer final {
                               config_.Config().tick_interval_ms,
                               config_.Config().midichlorians_url_path,
                               "OK\n"),
-        storage_(current::sherlock::SherlockNamespaceName("NewCTFOStorage", "TopLevelTransaction"), config_.Config().storage_file),
+        storage_(current::sherlock::SherlockNamespaceName("NewCTFOStorage", "TopLevelTransaction"),
+                 config_.Config().storage_file),
         rest_(storage_,
               config_.Config().rest_port,
               config_.Config().rest_url_path,
@@ -319,7 +322,7 @@ class CTFOServer final {
         DebugPrint("iOSDeviceInfo for device ID " + event.device_id + ": AdId not found.");
       }
     }
-  }   
+  }
 
  private:
   typedef void (CTFOServer::*CTFOServerMemberFunctionServingRequest)(Request);
