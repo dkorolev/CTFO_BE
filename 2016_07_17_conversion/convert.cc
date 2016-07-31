@@ -32,24 +32,33 @@ DEFINE_string(new_db, "new_db.json", "");
 
 static int64_t pseudo_now = 0ull;
 
-CURRENT_TYPE_EVOLVER(CustomEvolver, OldCTFOStorage, TopLevelTransaction, {
-  pseudo_now = std::max(pseudo_now, from.meta.timestamp.count());
-  into.meta.begin_us = std::chrono::microseconds(pseudo_now);
-  CURRENT_NATURAL_EVOLVE(OldCTFOStorage, NewCTFOStorage, from.meta.fields, into.meta.fields);
-  CURRENT_NATURAL_EVOLVE(OldCTFOStorage, NewCTFOStorage, from.mutations, into.mutations);
-  into.meta.end_us = std::chrono::microseconds(++pseudo_now);
-});
+CURRENT_TYPE_EVOLVER(CustomEvolver,
+                     OldCTFOStorage,
+                     TopLevelTransaction,
+                     {
+                       pseudo_now = std::max(pseudo_now, from.meta.timestamp.count());
+                       into.meta.begin_us = std::chrono::microseconds(pseudo_now);
+                       CURRENT_NATURAL_EVOLVE(
+                           OldCTFOStorage, NewCTFOStorage, from.meta.fields, into.meta.fields);
+                       CURRENT_NATURAL_EVOLVE(OldCTFOStorage, NewCTFOStorage, from.mutations, into.mutations);
+                       into.meta.end_us = std::chrono::microseconds(++pseudo_now);
+                     });
 
-
-#define EXISTING_TABLE(X) \
-CURRENT_TYPE_EVOLVER(CustomEvolver, OldCTFOStorage, Persisted_##X##Updated, { \
-  into.us = std::chrono::microseconds(++pseudo_now); \
-  CURRENT_NATURAL_EVOLVE(OldCTFOStorage, NewCTFOStorage, from.data, into.data); \
-}); \
-CURRENT_TYPE_EVOLVER(CustomEvolver, OldCTFOStorage, Persisted_##X##Deleted, { \
-  into.us = std::chrono::microseconds(++pseudo_now); \
-  CURRENT_NATURAL_EVOLVE(OldCTFOStorage, NewCTFOStorage, from.key, into.key); \
-})
+#define EXISTING_TABLE(X)                                                         \
+  CURRENT_TYPE_EVOLVER(CustomEvolver,                                             \
+                       OldCTFOStorage,                                            \
+                       Persisted_##X##Updated,                                    \
+                       {                                                          \
+    into.us = std::chrono::microseconds(++pseudo_now);                            \
+    CURRENT_NATURAL_EVOLVE(OldCTFOStorage, NewCTFOStorage, from.data, into.data); \
+                       });                                                        \
+  CURRENT_TYPE_EVOLVER(CustomEvolver,                                             \
+                       OldCTFOStorage,                                            \
+                       Persisted_##X##Deleted,                                    \
+                       {                                                          \
+    into.us = std::chrono::microseconds(++pseudo_now);                            \
+    CURRENT_NATURAL_EVOLVE(OldCTFOStorage, NewCTFOStorage, from.key, into.key);   \
+                       })
 
 EXISTING_TABLE(User);
 EXISTING_TABLE(AuthKeyTokenPair);
@@ -76,8 +85,8 @@ int main(int argc, char** argv) {
 
   std::vector<std::string> output;
 
-  for (const std::string& line :
-       current::strings::Split<current::strings::ByLines>(current::FileSystem::ReadFileAsString(FLAGS_old_db))) {
+  for (const std::string& line : current::strings::Split<current::strings::ByLines>(
+           current::FileSystem::ReadFileAsString(FLAGS_old_db))) {
     std::vector<std::string> parts = current::strings::Split(line, '\t');
     assert(parts.size() == 2u);
 
@@ -87,8 +96,8 @@ int main(int argc, char** argv) {
     ParseJSON(parts[1], from);
     current::type_evolution::Evolve<OldCTFOStorage,
                                     typename OldCTFOStorage::TopLevelTransaction,
-                                    current::type_evolution::CustomEvolver>
-        ::template Go<NewCTFOStorage>(from, into);
+                                    current::type_evolution::CustomEvolver>::template Go<NewCTFOStorage>(from,
+                                                                                                         into);
 
     output.push_back(parts[0] + '\t' + JSON(into));
   }

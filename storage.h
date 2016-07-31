@@ -59,7 +59,7 @@ CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, CTFO::UserReportedUser
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedManyToUnorderedMany, CTFO::UserBlockedUser, Persisted_UserBlockedUser);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary, CTFO::BannedUser, Persisted_BannedUser);
 CURRENT_STORAGE_FIELD_ENTRY(UnorderedDictionary,
-                            CTFO::IOSAdWordsInstallTracked, 
+                            CTFO::IOSAdWordsInstallTracked,
                             Persisted_IOSAdWordsInstallTracked);
 
 CURRENT_STORAGE(CTFOStorage) {

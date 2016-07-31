@@ -28,9 +28,40 @@ SOFTWARE.
 
 #include <functional>
 
+#include "../Current/Sherlock/sherlock.h"
+
 #include "../Current/Bricks/util/comparators.h"  // For `CurrentHashFunction`.
 #include "../Current/TypeSystem/struct.h"
 #include "../Current/TypeSystem/enum.h"
+
+// This ugliness is to be removed, right on the next round of type evolution. -- D.K.
+namespace current {
+namespace strings {
+
+template <typename FST, typename SND>
+struct ToStringImpl<std::pair<FST, SND>, false, false> {
+  static std::string DoIt(const std::pair<FST, SND>& pair) {
+    return ToString(pair.first) + '-' + ToString(pair.second);
+  }
+};
+
+template <typename INPUT, typename OUTPUT_FST, typename OUTPUT_SND>
+struct FromStringImpl<INPUT, std::pair<OUTPUT_FST, OUTPUT_SND>, false, false> {
+  static const std::pair<OUTPUT_FST, OUTPUT_SND>& Go(const std::string& input,
+                                                     std::pair<OUTPUT_FST, OUTPUT_SND>& output) {
+    const size_t dash = input.find('-');
+    FromString(input.substr(0, dash), output.first);
+    if (dash != std::string::npos) {
+      FromString(input.substr(dash + 1), output.second);
+    } else {
+      output.second = OUTPUT_SND();
+    }
+    return output;
+  }
+};
+
+}  // namespace current::strings
+}  // namespace current
 
 namespace CTFO {
 
@@ -81,6 +112,10 @@ CURRENT_STRUCT(Color) {
   CURRENT_DEFAULT_CONSTRUCTOR(Color) : red(0u), green(0u), blue(0u) {}
   CURRENT_CONSTRUCTOR(Color)(uint8_t red, uint8_t green, uint8_t blue) : red(red), green(green), blue(blue) {}
 };
+
+static current::sherlock::SherlockNamespaceName SchemaKey() {
+  return current::sherlock::SherlockNamespaceName("NewCTFOStorage", "TopLevelTransaction");
+}
 
 }  // namespace CTFO
 
