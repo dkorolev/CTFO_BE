@@ -28,6 +28,8 @@ SOFTWARE.
 
 #include <functional>
 
+#include "../Current/Sherlock/sherlock.h"
+
 #include "../Current/Bricks/util/comparators.h"  // For `CurrentHashFunction`.
 #include "../Current/TypeSystem/struct.h"
 #include "../Current/TypeSystem/enum.h"
@@ -110,6 +112,10 @@ CURRENT_STRUCT(Color) {
   CURRENT_DEFAULT_CONSTRUCTOR(Color) : red(0u), green(0u), blue(0u) {}
   CURRENT_CONSTRUCTOR(Color)(uint8_t red, uint8_t green, uint8_t blue) : red(red), green(green), blue(blue) {}
 };
+
+static current::sherlock::SherlockNamespaceName SchemaKey() {
+  return current::sherlock::SherlockNamespaceName("NewCTFOStorage", "TopLevelTransaction");
+}
 
 }  // namespace CTFO
 

@@ -76,10 +76,10 @@ struct CTFOHypermedia
 #endif
 
   template <class HTTP_VERB, typename OPERATION, typename PARTICULAR_FIELD, typename ENTRY, typename KEY>
-  struct RESTfulDataHandlerGenerator
-      : super_t::RESTfulDataHandlerGenerator<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY> {
+  struct RESTfulDataHandler
+      : super_t::RESTfulDataHandler<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY> {
     using restful_super_t =
-        super_t::RESTfulDataHandlerGenerator<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY>;
+        super_t::RESTfulDataHandler<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY>;
     using headers_list_t = std::vector<current::net::http::Header>;
     headers_list_t headers;
 
@@ -220,8 +220,7 @@ class CTFOServer final {
                               config_.Config().tick_interval_ms,
                               config_.Config().midichlorians_url_path,
                               "OK\n"),
-        storage_(current::sherlock::SherlockNamespaceName("NewCTFOStorage", "TopLevelTransaction"),
-                 config_.Config().storage_file),
+        storage_(CTFO::SchemaKey(), config_.Config().storage_file),
         rest_(storage_,
               config_.Config().rest_port,
               config_.Config().rest_url_path,
