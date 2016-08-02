@@ -76,10 +76,8 @@ struct CTFOHypermedia
 #endif
 
   template <class HTTP_VERB, typename OPERATION, typename PARTICULAR_FIELD, typename ENTRY, typename KEY>
-  struct RESTfulDataHandler
-      : super_t::RESTfulDataHandler<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY> {
-    using restful_super_t =
-        super_t::RESTfulDataHandler<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY>;
+  struct RESTfulDataHandler : super_t::RESTfulDataHandler<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY> {
+    using restful_super_t = super_t::RESTfulDataHandler<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY>;
     using headers_list_t = std::vector<current::net::http::Header>;
     headers_list_t headers;
 
@@ -208,10 +206,10 @@ CURRENT_STRUCT(CTFOServerParams) {
 
 class CTFOServer final {
  public:
-  using Storage = CTFOStorage<SherlockStreamPersister>;
-  using MidichloriansServer = current::midichlorians::server::MidichloriansHTTPServer<CTFOServer>;
-  using RESTStorage = RESTfulStorage<Storage, CTFOHypermedia>;
-  using Config = current::SelfModifyingConfig<CTFOServerParams>;
+  using storage_t = CTFOStorage<SherlockStreamPersister>;
+  using midichlorians_server_t = current::midichlorians::server::MidichloriansHTTPServer<CTFOServer>;
+  using rest_t = RESTfulStorage<storage_t, CTFOHypermedia>;
+  using config_t = current::SelfModifyingConfig<CTFOServerParams>;
 
   explicit CTFOServer(const std::string& config_path)
       : config_(config_path),
@@ -228,7 +226,7 @@ class CTFOServer final {
         pusher_(storage_,
                 [this]() {
                   return Value(storage_.ReadOnlyTransaction(
-                                            [](ImmutableFields<Storage> fields) -> std::chrono::microseconds {
+                                            [](ImmutableFields<storage_t> fields) -> std::chrono::microseconds {
                                               const auto placeholder = fields.push_notifications_marker[""];
                                               if (Exists(placeholder)) {
                                                 return Value(placeholder).last_pushed_notification_timestamp;
@@ -246,7 +244,7 @@ class CTFOServer final {
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
     std::ifstream cf(config_.Config().cards_file);
     assert(cf.good());
-    storage_.ReadWriteTransaction([&cf](MutableFields<Storage> data) {
+    storage_.ReadWriteTransaction([&cf](MutableFields<storage_t> data) {
       User admin_user;
       admin_user.uid = admin_uid;
       admin_user.level = 80;         // Superuser 80lvl.
@@ -305,7 +303,7 @@ class CTFOServer final {
       if (cit != info.end() && !cit->second.empty()) {
         const std::string& rdid = cit->second;
         DebugPrint("iOSDeviceInfo for device ID " + event.device_id + ": AdId == " + rdid);
-        storage_.ReadWriteTransaction([this, rdid](MutableFields<Storage> data) {
+        storage_.ReadWriteTransaction([this, rdid](MutableFields<storage_t> data) {
           const auto value = data.ios_adwords_install_tracked[rdid];
           if (!Exists(value) || !Exists(Value(value).tracked)) {
             DebugPrint("SendConversionEvent(" + rdid + ")");
@@ -363,7 +361,7 @@ class CTFOServer final {
         const size_t feed_count = current::FromString<size_t>(r.url.query.get("feed_count", "20"));
         // Searching for users with the corresponding authentication key.
         storage_.ReadWriteTransaction(  // clang-format off
-            [this, device_id, app_key, feed_count, notification_since_ms](MutableFields<Storage> data) {
+            [this, device_id, app_key, feed_count, notification_since_ms](MutableFields<storage_t> data) {
               AuthKey auth_key("iOS::" + device_id + "::" + app_key, AUTH_TYPE::IOS);
               UID uid = UID::INVALID_USER;
               User user;
@@ -439,7 +437,7 @@ class CTFOServer final {
         const size_t feed_count = current::FromString<size_t>(r.url.query.get("feed_count", "20"));
         const std::string requested_url = r.url.ComposeURL();
         storage_.ReadOnlyTransaction(  // clang-format off
-            [this, uid, token, requested_url, feed_count, notification_since_ms](ImmutableFields<Storage> data) {
+            [this, uid, token, requested_url, feed_count, notification_since_ms](ImmutableFields<storage_t> data) {
               bool token_is_valid = false;
               const auto& auth_token_accessor = data.auth_token;
               if (auth_token_accessor.Cols().Has(token)) {
@@ -467,7 +465,7 @@ class CTFOServer final {
     }
   }
   void RouteInitialCards(Request r) {
-    storage_.ReadOnlyTransaction([this](ImmutableFields<Storage> data) {
+    storage_.ReadOnlyTransaction([this](ImmutableFields<storage_t> data) {
       return MakeResponse(
           GenerateResponseFeed(data, ResponseUserEntry(), 10000u, static_cast<uint64_t>(-1), 10000u, true));
     }, std::move(r)).Go();
@@ -486,7 +484,7 @@ class CTFOServer final {
         DebugPrint(Printf("[/ctfo/favs] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
       } else {
-        storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<Storage> data) {
+        storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<storage_t> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
           if (auth_token_accessor.Cols().Has(token)) {
@@ -601,7 +599,7 @@ class CTFOServer final {
         DebugPrint(Printf("[/ctfo/my_cards] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
       } else {
-        storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<Storage> data) {
+        storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<storage_t> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
           if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -713,7 +711,7 @@ class CTFOServer final {
             Printf("[/ctfo/card] Non-empty yet invalid UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED EMPTY OR VALID UID\n", HTTPResponseCode.BadRequest);
       } else {
-        storage_.ReadOnlyTransaction([this, cid, uid](ImmutableFields<Storage> data) {
+        storage_.ReadOnlyTransaction([this, cid, uid](ImmutableFields<storage_t> data) {
           const auto card_wrapper = data.card[cid];
           if (!Exists(card_wrapper)) {
             return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
@@ -786,7 +784,7 @@ class CTFOServer final {
             request.color = CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()];
           }
           storage_.ReadWriteTransaction(  // clang-format off
-              [this, cid, uid, token, request, requested_url](MutableFields<Storage> data) {
+              [this, cid, uid, token, request, requested_url](MutableFields<storage_t> data) {
                 bool token_is_valid = false;
                 const auto& auth_token_accessor = data.auth_token;
                 if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -842,7 +840,7 @@ class CTFOServer final {
         r("NEED VALID CID\n", HTTPResponseCode.BadRequest);
       } else {
         const std::string requested_url = r.url.ComposeURL();
-        storage_.ReadWriteTransaction([this, requested_url, uid, cid, token](MutableFields<Storage> data) {
+        storage_.ReadWriteTransaction([this, requested_url, uid, cid, token](MutableFields<storage_t> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
           if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -909,7 +907,7 @@ class CTFOServer final {
     } else {
       if (r.method == "GET") {
         const std::string requested_url = r.url.ComposeURL();
-        storage_.ReadOnlyTransaction([this, uid, cid, token, requested_url](ImmutableFields<Storage> data) {
+        storage_.ReadOnlyTransaction([this, uid, cid, token, requested_url](ImmutableFields<storage_t> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
           if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -1032,7 +1030,7 @@ class CTFOServer final {
             request.text = short_request.text;
           }
           storage_.ReadWriteTransaction(  // clang-format off
-              [this, cid, uid, oid, token, request, requested_url](MutableFields<Storage> data) {
+              [this, cid, uid, oid, token, request, requested_url](MutableFields<storage_t> data) {
                 bool token_is_valid = false;
                 const auto& auth_token_accessor = data.auth_token;
                 if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -1133,7 +1131,7 @@ class CTFOServer final {
         } else {
           const std::string requested_url = r.url.ComposeURL();
           storage_.ReadWriteTransaction(  // clang-format off
-              [this, requested_url, uid, cid, token, oid](MutableFields<Storage> data) {
+              [this, requested_url, uid, cid, token, oid](MutableFields<storage_t> data) {
                 bool token_is_valid = false;
                 const auto& auth_token_accessor = data.auth_token;
                 if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -1182,13 +1180,13 @@ class CTFOServer final {
 
  private:
   struct PushNotificationsSender {
-    Storage& storage;
+    storage_t& storage;
     const std::chrono::microseconds starting_from;
     current::integrations::onesignal::IOSPushNotificationsSender transport;
 
-    using transaction_t = typename Storage::transaction_t;
+    using transaction_t = typename storage_t::transaction_t;
 
-    PushNotificationsSender(Storage& storage,
+    PushNotificationsSender(storage_t& storage,
                             std::chrono::microseconds last_pushed_notification_timestamp,
                             const std::string& onesignal_app_id,
                             uint16_t onesignal_local_port)
@@ -1204,7 +1202,7 @@ class CTFOServer final {
           if (Exists<Persisted_NotificationUpdated>(mutation)) {
             const UID uid = Value<Persisted_NotificationUpdated>(mutation).data.uid;
             const std::string player_id =
-                Value(storage.ReadOnlyTransaction([uid](ImmutableFields<Storage> fields) -> std::string {
+                Value(storage.ReadOnlyTransaction([uid](ImmutableFields<storage_t> fields) -> std::string {
                   const auto rhs = fields.uid_player_id[uid];
                   if (Exists(rhs)) {
                     return Value(rhs).player_id;
@@ -1217,7 +1215,7 @@ class CTFOServer final {
               if (transport.Push(player_id, 1)) {
                 const std::chrono::microseconds last_pushed_notification_timestamp = current.us;
                 storage.ReadWriteTransaction(
-                            [last_pushed_notification_timestamp](MutableFields<Storage> fields) {
+                            [last_pushed_notification_timestamp](MutableFields<storage_t> fields) {
                               PushNotificationsMarker marker;
                               marker.last_pushed_notification_timestamp = last_pushed_notification_timestamp;
                               fields.push_notifications_marker.Add(marker);
@@ -1238,13 +1236,14 @@ class CTFOServer final {
   };
 
  private:
-  Config config_;
+  config_t config_;
   std::ofstream midichlorians_stream_;
-  MidichloriansServer midichlorians_server_;
+  midichlorians_server_t midichlorians_server_;
 
-  Storage storage_;
-  RESTStorage rest_;
-  current::ss::StreamSubscriber<PushNotificationsSender, typename Storage::transaction_t> pusher_;
+  storage_t storage_;
+  rest_t rest_;
+
+  current::ss::StreamSubscriber<PushNotificationsSender, typename storage_t::transaction_t> pusher_;
   const current::sherlock::SubscriberScope push_notifications_sender_subcriber_scope_;
   const current::integrations::adwords::conversion_tracking::AdWordsMobileConversionEventsSender
       adwords_tracker_;
@@ -1284,7 +1283,7 @@ class CTFOServer final {
     entry.banned = banned;
   }
 
-  ResponseFeed GenerateResponseFeed(ImmutableFields<Storage> data,
+  ResponseFeed GenerateResponseFeed(ImmutableFields<storage_t> data,
                                     ResponseUserEntry user_entry,
                                     size_t feed_size,
                                     uint64_t notifications_since_ms,
@@ -1511,7 +1510,7 @@ class CTFOServer final {
       if (uid != UID::INVALID_USER) {  // clang-format off
         storage_.ReadWriteTransaction(
             [this, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, user_id_str, response](
-                MutableFields<Storage> data) {
+                MutableFields<storage_t> data) {
               const auto& auth_token_accessor = data.auth_token;
               bool token_is_valid = false;
               if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -1778,7 +1777,7 @@ class CTFOServer final {
     }
   }
 
-  void BanUser(MutableFields<Storage> data, const UID uid) {
+  void BanUser(MutableFields<storage_t> data, const UID uid) {
     if (!Exists(data.banned_user[uid])) {
       data.banned_user.Add(BannedUser(uid));
     }
