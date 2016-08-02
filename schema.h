@@ -31,6 +31,8 @@ SOFTWARE.
 #include "schema_public.h"
 #include "util.h"
 
+#include "../Current/Midichlorians/MidichloriansDataDictionary.h"
+
 namespace CTFO {
 
 // Constants.
@@ -406,6 +408,17 @@ CURRENT_STRUCT(IOSAdWordsInstallTracked) {
       : ios_advertising_id(rdid), tracked(us) {}
 
   void InitializeOwnKey() {}
+};
+
+// To enable REST-browsing device info by its device ID, and to map devices into their advertiser IDs.
+CURRENT_STRUCT(Device) {
+  CURRENT_FIELD(did, std::string);    // Midichlorians-internal device ID.
+  CURRENT_FIELD(ad_id, std::string);  // Generally, `advertisingIdentifier` from iOS, but keep the type generic.
+
+  CURRENT_FIELD(info, current::midichlorians::ios::iOSDeviceInfo);
+
+  CURRENT_USE_FIELD_AS_ROW(did);
+  CURRENT_USE_FIELD_AS_COL(ad_id);
 };
 
 // Notifications.

@@ -114,7 +114,7 @@ CURRENT_STRUCT(Color) {
 };
 
 static current::sherlock::SherlockNamespaceName SchemaKey() {
-  return current::sherlock::SherlockNamespaceName("NewCTFOStorage", "TopLevelTransaction");
+  return current::sherlock::SherlockNamespaceName("CTFO_2016_08_01", "CTFOEvent");
 }
 
 }  // namespace CTFO
