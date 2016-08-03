@@ -76,19 +76,19 @@ struct CTFOEventToStreamImporter {
 #error "Please stop doing this."
 #endif
 
-#define IMPORT_EVENT(EVENT_TYPE_NAME)                                                                \
-  void operator()(const midichlorians_events_to_import::EVENT_TYPE_NAME& input_event) {              \
-    typename CTFO_2016_08_01::CTFOLogEntry ctfo_event;                                               \
-    ctfo_event = typename CTFO_2016_08_01::EventLogEntry();                                          \
-    auto& output_top_level_event = Value<typename CTFO_2016_08_01::EventLogEntry>(ctfo_event).event; \
-    output_top_level_event = typename CTFO_2016_08_01::EVENT_TYPE_NAME();                            \
-    current::type_evolution::Evolve<CTFO_2016_08_01,                                                 \
-                                    typename CTFO_2016_08_01::EVENT_TYPE_NAME,                       \
-                                    current::type_evolution::Evolver_2016_08_01>::                   \
-        template Go<CTFO_2016_08_01>(                                                                \
-            reinterpret_cast<const typename CTFO_2016_08_01::EVENT_TYPE_NAME&>(input_event),         \
-            Value<typename CTFO_2016_08_01::EVENT_TYPE_NAME>(output_top_level_event));               \
-    output.emplace_back(us, JSON(ctfo_event));                                                       \
+#define IMPORT_EVENT(EVENT_TYPE_NAME)                                                                          \
+  void operator()(const midichlorians_events_to_import::EVENT_TYPE_NAME& input_event) {                        \
+    typename CTFO_2016_08_01::CTFOLogEntry ctfo_event_log_entry;                                               \
+    ctfo_event_log_entry = typename CTFO_2016_08_01::EventLogEntry();                                          \
+    auto& output_top_level_event = Value<typename CTFO_2016_08_01::EventLogEntry>(ctfo_event_log_entry).event; \
+    output_top_level_event = typename CTFO_2016_08_01::EVENT_TYPE_NAME();                                      \
+    current::type_evolution::Evolve<CTFO_2016_08_01,                                                           \
+                                    typename CTFO_2016_08_01::EVENT_TYPE_NAME,                                 \
+                                    current::type_evolution::Evolver_2016_08_01>::                             \
+        template Go<CTFO_2016_08_01>(                                                                          \
+            reinterpret_cast<const typename CTFO_2016_08_01::EVENT_TYPE_NAME&>(input_event),                   \
+            Value<typename CTFO_2016_08_01::EVENT_TYPE_NAME>(output_top_level_event));                         \
+    output.emplace_back(us, JSON(ctfo_event_log_entry));                                                       \
   }
 
   IMPORT_EVENT(iOSFirstLaunchEvent);
