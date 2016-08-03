@@ -94,7 +94,6 @@ struct CTFOEventsParser {
   // Ignore all events except `current::midichlorians::ios::iOSDeviceInfo` for now.
   template <typename T>
   void operator()(const T&) {}
-
 };
 
 int main(int argc, char** argv) {
