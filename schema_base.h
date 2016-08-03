@@ -88,11 +88,8 @@ CURRENT_ENUM(NID, uint64_t){INVALID_NOTIFICATION = 0u};
 CURRENT_ENUM(ANSWER, int8_t){UNSEEN = 0, CTFO = 1, TFU = 2, SKIP = -1};
 CURRENT_ENUM(AUTH_TYPE, uint8_t){UNDEFINED = 0u, IOS = 1u};
 CURRENT_ENUM(SHARE_DESTINATION, uint8_t){UNDEFINED = 0u, FACEBOOK = 101};
-CURRENT_ENUM(SHARE_STATUS, uint8_t){UNDEFINED = 0u,
-                                    COMPLETE_SHARE_TO_FACEBOOK = 1u,
-                                    START_SHARE_TO_FACEBOOK = 101u,
-                                    CANCEL_SHARE_TO_FACEBOOK = 111u,
-                                    FAIL_SHARE_TO_FACEBOOK = 112u};
+CURRENT_ENUM(SHARE_STATUS, uint8_t){
+    UNDEFINED = 0u, COMPLETED = 1u, INITIATED = 101u, CANCELED = 111u, FAILED = 112u};
 
 // To parse incoming Midichlorians logs.
 enum class LOG_EVENT : int {

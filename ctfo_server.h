@@ -1286,10 +1286,10 @@ class CTFOServer final {
       {"FAIL_SHARE_TO_FACEBOOK", LOG_EVENT::FAIL_SHARE_TO_FACEBOOK}};
 
   const std::map<LOG_EVENT, SHARE_STATUS> valid_share_statuses_ = {
-      {LOG_EVENT::COMPLETE_SHARE_TO_FACEBOOK, SHARE_STATUS::COMPLETE_SHARE_TO_FACEBOOK},
-      {LOG_EVENT::START_SHARE_TO_FACEBOOK, SHARE_STATUS::START_SHARE_TO_FACEBOOK},
-      {LOG_EVENT::CANCEL_SHARE_TO_FACEBOOK, SHARE_STATUS::CANCEL_SHARE_TO_FACEBOOK},
-      {LOG_EVENT::FAIL_SHARE_TO_FACEBOOK, SHARE_STATUS::FAIL_SHARE_TO_FACEBOOK}};
+      {LOG_EVENT::COMPLETE_SHARE_TO_FACEBOOK, SHARE_STATUS::COMPLETED},
+      {LOG_EVENT::START_SHARE_TO_FACEBOOK, SHARE_STATUS::INITIATED},
+      {LOG_EVENT::CANCEL_SHARE_TO_FACEBOOK, SHARE_STATUS::CANCELED},
+      {LOG_EVENT::FAIL_SHARE_TO_FACEBOOK, SHARE_STATUS::FAILED}};
 
   void DebugPrint(const std::string& message) {
     if (config_.Config().debug_print_to_stderr) {
@@ -1792,7 +1792,7 @@ class CTFOServer final {
                       cid_str.c_str(),
                       token.c_str()));
 
-                  if (share_status == SHARE_STATUS::COMPLETE_SHARE_TO_FACEBOOK) {
+                  if (share_status == SHARE_STATUS::COMPLETED) {
                     Share share;
                     share.uid = uid;
                     share.cid = cid;
