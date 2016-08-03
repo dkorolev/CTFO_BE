@@ -199,14 +199,14 @@ CURRENT_STRUCT(CTFOServerParams) {
 };
 
 using CTFOStorageTransaction = typename current::storage::transaction_t<CTFOStorage>;
-using CTFOEvent = Variant<CTFOStorageTransaction, current::midichlorians::server::EventLogEntry>;
+using CTFOLogEntry = Variant<CTFOStorageTransaction, current::midichlorians::server::EventLogEntry>;
 
 class CTFOServer final {
  public:
   using storage_t =
-      CTFOStorage<SherlockStreamPersister, current::storage::transaction_policy::Synchronous, CTFOEvent>;
+      CTFOStorage<SherlockStreamPersister, current::storage::transaction_policy::Synchronous, CTFOLogEntry>;
   using transaction_t = CTFOStorageTransaction;
-  using stream_t = current::sherlock::Stream<CTFOEvent, current::persistence::File>;
+  using stream_t = current::sherlock::Stream<CTFOLogEntry, current::persistence::File>;
   using midichlorians_server_t = current::midichlorians::server::MidichloriansHTTPServer<CTFOServer>;
   using rest_t = RESTfulStorage<storage_t, CTFOHypermedia>;
   using config_t = current::SelfModifyingConfig<CTFOServerParams>;

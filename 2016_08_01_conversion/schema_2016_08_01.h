@@ -1138,7 +1138,7 @@ CURRENT_NAMESPACE(CTFO_2016_08_01) {
   CURRENT_NAMESPACE_TYPE(Variant_B_NotificationMyCardNewComment_NotificationNewReplyToMyComment_NotificationMyCommentLiked_NotificationNewCommentOnCardIStarred_NotificationMyCardStarred_NotificationNewVotesOnMyCard_E, current_userspace::t9226204898011996251::Variant_B_NotificationMyCardNewComment_NotificationNewReplyToMyComment_NotificationMyCommentLiked_NotificationNewCommentOnCardIStarred_NotificationMyCardStarred_NotificationNewVotesOnMyCard_E);
 
   // Privileged types.
-  CURRENT_NAMESPACE_TYPE(CTFOEvent, current_userspace::t9220976968237854469::Variant_B_Transaction_Z_EventLogEntry_E);
+  CURRENT_NAMESPACE_TYPE(CTFOLogEntry, current_userspace::t9220976968237854469::Variant_B_Transaction_Z_EventLogEntry_E);
   // <MANUAL_LINE>
   CURRENT_NAMESPACE_TYPE(TopLevelTransaction, Transaction_T9220981828355492272);
   // </MANUAL_LINE>

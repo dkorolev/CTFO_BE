@@ -78,7 +78,7 @@ struct CTFOEventToStreamImporter {
 
 #define IMPORT_EVENT(EVENT_TYPE_NAME)                                                                \
   void operator()(const midichlorians_events_to_import::EVENT_TYPE_NAME& input_event) {              \
-    typename CTFO_2016_08_01::CTFOEvent ctfo_event;                                                  \
+    typename CTFO_2016_08_01::CTFOLogEntry ctfo_event;                                               \
     ctfo_event = typename CTFO_2016_08_01::EventLogEntry();                                          \
     auto& output_top_level_event = Value<typename CTFO_2016_08_01::EventLogEntry>(ctfo_event).event; \
     output_top_level_event = typename CTFO_2016_08_01::EVENT_TYPE_NAME();                            \
@@ -114,7 +114,7 @@ struct CTFODeviceIDPopulator {
       : output(output) {}
 
   void operator()(const current::midichlorians::ios::iOSDeviceInfo& input_device_info) {
-    typename CTFO_2016_08_01::CTFOEvent ctfo_event;
+    typename CTFO_2016_08_01::CTFOLogEntry ctfo_event;
     ctfo_event = typename CTFO_2016_08_01::TopLevelTransaction();
     auto& output_event = Value<typename CTFO_2016_08_01::TopLevelTransaction>(ctfo_event);
 
@@ -168,7 +168,7 @@ int main(int argc, char** argv) {
     assert(parts.size() == 2u);
 
     typename NewCTFOStorage::TopLevelTransaction from;
-    typename CTFO_2016_08_01::CTFOEvent into;
+    typename CTFO_2016_08_01::CTFOLogEntry into;
 
     const auto idx_ts = ParseJSON<idxts_t>(parts[0]);
     ParseJSON(parts[1], from);
