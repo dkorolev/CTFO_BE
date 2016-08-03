@@ -204,9 +204,18 @@ CURRENT_STRUCT(CTFOServerParams) {
   }
 };
 
+CURRENT_STRUCT(CTFOMidichloriansEvent) {
+  CURRENT_FIELD(event, Variant<current::midichlorians::ios::ios_events_t>);
+};
+
+using CTFOStorageTransaction = typename current::storage::transaction_t<CTFOStorage>;
+using CTFOEvent = Variant<CTFOStorageTransaction, CTFOMidichloriansEvent>;
+
 class CTFOServer final {
  public:
-  using storage_t = CTFOStorage<SherlockStreamPersister>;
+  using storage_t = CTFOStorage<SherlockStreamPersister, current::storage::transaction_policy::Synchronous, CTFOEvent>;
+  using transaction_t = CTFOStorageTransaction;
+  using stream_t = current::sherlock::Stream<CTFOEvent, current::persistence::File>;
   using midichlorians_server_t = current::midichlorians::server::MidichloriansHTTPServer<CTFOServer>;
   using rest_t = RESTfulStorage<storage_t, CTFOHypermedia>;
   using config_t = current::SelfModifyingConfig<CTFOServerParams>;
@@ -218,7 +227,8 @@ class CTFOServer final {
                               config_.Config().tick_interval_ms,
                               config_.Config().midichlorians_url_path,
                               "OK\n"),
-        storage_(CTFO::SchemaKey(), config_.Config().storage_file),
+        stream_(CTFO::SchemaKey(), config_.Config().storage_file),
+        storage_(stream_),
         rest_(storage_,
               config_.Config().rest_port,
               config_.Config().rest_url_path,
@@ -237,7 +247,7 @@ class CTFOServer final {
                 }(),
                 config_.Config().onesignal_app_id,
                 config_.Config().onesignal_app_port),
-        push_notifications_sender_subcriber_scope_(storage_.InternalExposeStream().Subscribe(pusher_)),
+        push_notifications_sender_subcriber_scope_(storage_.InternalExposeStream().Subscribe<transaction_t>(pusher_)),
         adwords_tracker_(config_.Config().adwords_config, config_.Config().adwords_app_port) {
     midichlorians_stream_.open(config_.Config().midichlorians_file, std::ofstream::out | std::ofstream::app);
 
@@ -1240,6 +1250,7 @@ class CTFOServer final {
   std::ofstream midichlorians_stream_;
   midichlorians_server_t midichlorians_server_;
 
+  stream_t stream_;
   storage_t storage_;
   rest_t rest_;
 

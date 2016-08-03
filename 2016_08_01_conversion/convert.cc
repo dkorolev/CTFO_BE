@@ -24,12 +24,15 @@ SOFTWARE.
 
 #include "schema_2016_07_17.h"
 
-// Note: The following lines have been added into `schema_2016_08_01.h` manually:
+// Note 1: The following lines have been added into `schema_2016_08_01.h` manually:
 /*
   // <MANUAL_LINE>
   CURRENT_NAMESPACE_TYPE(CTFOEvent, current_userspace::t9204521049515947345::Transaction_T9225800578910870409);
   // </MANUAL_LINE>
 */
+
+// Note 2: Need to run the following command as well:
+// $ sed -i 's/Transaction_T9225800578910870409/Transaction_Z/g' db.json
 
 #include "schema_2016_08_01.h"
 
@@ -59,7 +62,10 @@ struct CTFOEventsParser {
   CTFOEventsParser(std::vector<std::pair<std::chrono::microseconds, std::string>>& output) : output(output) {}
 
   void operator()(const current::midichlorians::ios::iOSDeviceInfo& input_device_info) {
-    typename CTFO_2016_08_01::CTFOEvent output_event;
+    typename CTFO_2016_08_01::CTFOEvent ctfo_event;
+    ctfo_event = typename CTFO_2016_08_01::TopLevelTransaction();
+    auto& output_event = Value<typename CTFO_2016_08_01::TopLevelTransaction>(ctfo_event);
+
     output_event.meta.begin_us = us + std::chrono::microseconds(1);
     output_event.meta.end_us = us + std::chrono::microseconds(3);
 
@@ -82,7 +88,7 @@ struct CTFOEventsParser {
     output_device_info_mutation_event.data = output_device;
     output_event.mutations.push_back(output_device_info_mutation_event);
 
-    output.emplace_back(us, JSON(output_event));
+    output.emplace_back(us, JSON(ctfo_event));
   }
 
   // Ignore all events except `current::midichlorians::ios::iOSDeviceInfo` for now.
@@ -115,10 +121,13 @@ int main(int argc, char** argv) {
     const auto idx_ts = ParseJSON<idxts_t>(parts[0]);
     ParseJSON(parts[1], from);
 
+    into = typename CTFO_2016_08_01::TopLevelTransaction();
+    auto& transaction = Value<typename CTFO_2016_08_01::TopLevelTransaction>(into);
+
     current::type_evolution::Evolve<
         NewCTFOStorage,
         typename NewCTFOStorage::TopLevelTransaction,
-        current::type_evolution::Evolver_2016_08_01>::template Go<CTFO_2016_08_01>(from, into);
+        current::type_evolution::Evolver_2016_08_01>::template Go<CTFO_2016_08_01>(from, transaction);
 
     output.emplace_back(idx_ts.us, JSON(into));
   }
