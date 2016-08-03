@@ -143,7 +143,7 @@ struct CTFODeviceIDPopulator {
     output.emplace_back(us, JSON(ctfo_event));
   }
 
-  // Ignore all events except `current::midichlorians::ios::iOSDeviceInfo` for now.
+  // Only process device ID events.
   template <typename T>
   void operator()(const T&) {}
 };
