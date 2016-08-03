@@ -1265,7 +1265,7 @@ class CTFOServer final {
       adwords_tracker_;
   HTTPRoutesScope scoped_http_routes_;
 
-  const std::map<std::string, LOG_EVENT> valid_responses_ = {
+  const std::map<std::string, LOG_EVENT> supported_events_ = {
       {"CTFO", LOG_EVENT::CTFO},
       {"TFU", LOG_EVENT::TFU},
       {"SKIP", LOG_EVENT::SKIP},
@@ -1511,11 +1511,11 @@ class CTFOServer final {
   void UpdateStateOnEvent(const current::midichlorians::ios::iOSGenericEvent& ge) {
     const auto now = current::time::Now();
     try {
-      if (!valid_responses_.count(ge.event)) {
+      if (!supported_events_.count(ge.event)) {
         DebugPrint(Printf("[UpdateStateOnEvent] Unhandled event: '%s'", ge.event.c_str()));
         return;
       }
-      const LOG_EVENT response = valid_responses_.at(ge.event);
+      const LOG_EVENT response = supported_events_.at(ge.event);
       const std::string uid_str = ge.fields.at("uid");
       const std::string token = ge.fields.at("token");
       const std::string whom_str = ge.fields.count("whom") ? ge.fields.at("whom") : "";
