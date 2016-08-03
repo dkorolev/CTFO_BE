@@ -813,6 +813,79 @@ CURRENT_STRUCT(Transaction_T9225800578910870409) {
 }  // namespace t9204521049515947345
 #endif  // CURRENT_SCHEMA_FOR_T_9204521049515947345
 
+#ifndef CURRENT_SCHEMA_FOR_T9204032455253812491
+#define CURRENT_SCHEMA_FOR_T9204032455253812491
+namespace t9204032455253812491 {
+CURRENT_STRUCT(iOSFirstLaunchEvent, t9201007102355628834::iOSBaseEvent) {
+};
+}  // namespace t9204032455253812491
+#endif  // CURRENT_SCHEMA_FOR_T_9204032455253812491
+
+#ifndef CURRENT_SCHEMA_FOR_T9205653292032376105
+#define CURRENT_SCHEMA_FOR_T9205653292032376105
+namespace t9205653292032376105 {
+CURRENT_STRUCT(iOSAppLaunchEvent, t9201007102355628834::iOSBaseEvent) {
+  CURRENT_FIELD(binary_version, std::string);
+  CURRENT_FIELD(cf_version, std::string);
+  CURRENT_FIELD(app_install_time, uint64_t);
+  CURRENT_FIELD(app_update_time, uint64_t);
+};
+}  // namespace t9205653292032376105
+#endif  // CURRENT_SCHEMA_FOR_T_9205653292032376105
+
+#ifndef CURRENT_SCHEMA_FOR_T9204032455276172217
+#define CURRENT_SCHEMA_FOR_T9204032455276172217
+namespace t9204032455276172217 {
+CURRENT_STRUCT(iOSIdentifyEvent, t9201007102355628834::iOSBaseEvent) {
+};
+}  // namespace t9204032455276172217
+#endif  // CURRENT_SCHEMA_FOR_T_9204032455276172217
+
+#ifndef CURRENT_SCHEMA_FOR_T9207776099720188653
+#define CURRENT_SCHEMA_FOR_T9207776099720188653
+namespace t9207776099720188653 {
+CURRENT_STRUCT(iOSFocusEvent, t9201007102355628834::iOSBaseEvent) {
+  CURRENT_FIELD(gained_focus, bool);
+  CURRENT_FIELD(source, std::string);
+};
+}  // namespace t9207776099720188653
+#endif  // CURRENT_SCHEMA_FOR_T_9207776099720188653
+
+#ifndef CURRENT_SCHEMA_FOR_T9201174724793298462
+#define CURRENT_SCHEMA_FOR_T9201174724793298462
+namespace t9201174724793298462 {
+CURRENT_STRUCT(iOSGenericEvent, t9201007102355628834::iOSBaseEvent) {
+  CURRENT_FIELD(event, std::string);
+  CURRENT_FIELD(source, std::string);
+  CURRENT_FIELD(fields, (std::map<std::string, std::string>));
+  CURRENT_FIELD(unparsable_fields, std::vector<std::string>);
+};
+}  // namespace t9201174724793298462
+#endif  // CURRENT_SCHEMA_FOR_T_9201174724793298462
+
+#ifndef CURRENT_SCHEMA_FOR_T9221024183018054946
+#define CURRENT_SCHEMA_FOR_T9221024183018054946
+namespace t9221024183018054946 {
+CURRENT_VARIANT(Variant_B_iOSFirstLaunchEvent_iOSAppLaunchEvent_iOSDeviceInfo_iOSIdentifyEvent_iOSFocusEvent_iOSGenericEvent_E, t9204032455253812491::iOSFirstLaunchEvent, t9205653292032376105::iOSAppLaunchEvent, t9201594862172611068::iOSDeviceInfo, t9204032455276172217::iOSIdentifyEvent, t9207776099720188653::iOSFocusEvent, t9201174724793298462::iOSGenericEvent);
+}  // namespace t9221024183018054946
+#endif  // CURRENT_SCHEMA_FOR_T_9221024183018054946
+
+#ifndef CURRENT_SCHEMA_FOR_T9201199957099453311
+#define CURRENT_SCHEMA_FOR_T9201199957099453311
+namespace t9201199957099453311 {
+CURRENT_STRUCT(CTFOMidichloriansEvent) {
+  CURRENT_FIELD(event, t9221024183018054946::Variant_B_iOSFirstLaunchEvent_iOSAppLaunchEvent_iOSDeviceInfo_iOSIdentifyEvent_iOSFocusEvent_iOSGenericEvent_E);
+};
+}  // namespace t9201199957099453311
+#endif  // CURRENT_SCHEMA_FOR_T_9201199957099453311
+
+#ifndef CURRENT_SCHEMA_FOR_T9221507412431469778
+#define CURRENT_SCHEMA_FOR_T9221507412431469778
+namespace t9221507412431469778 {
+CURRENT_VARIANT(Variant_B_Transaction_Z_CTFOMidichloriansEvent_E, t9204521049515947345::Transaction_T9225800578910870409, t9201199957099453311::CTFOMidichloriansEvent);
+}  // namespace t9221507412431469778
+#endif  // CURRENT_SCHEMA_FOR_T_9221507412431469778
+
 }  // namespace current_userspace
 
 #ifndef CURRENT_NAMESPACE_CTFO_2016_08_01_DEFINED
@@ -838,6 +911,8 @@ CURRENT_NAMESPACE(CTFO_2016_08_01) {
   CURRENT_NAMESPACE_TYPE(Notification, current_userspace::t9200800801070359784::Notification);
   CURRENT_NAMESPACE_TYPE(UIDAuthKeyPair, current_userspace::t9201002821766233156::UIDAuthKeyPair);
   CURRENT_NAMESPACE_TYPE(iOSBaseEvent, current_userspace::t9201007102355628834::iOSBaseEvent);
+  CURRENT_NAMESPACE_TYPE(iOSGenericEvent, current_userspace::t9201174724793298462::iOSGenericEvent);
+  CURRENT_NAMESPACE_TYPE(CTFOMidichloriansEvent, current_userspace::t9201199957099453311::CTFOMidichloriansEvent);
   CURRENT_NAMESPACE_TYPE(Persisted_UIDAuthKeyPairUpdated, current_userspace::t9201404791496349854::Persisted_UIDAuthKeyPairUpdated);
   CURRENT_NAMESPACE_TYPE(iOSDeviceInfo, current_userspace::t9201594862172611068::iOSDeviceInfo);
   CURRENT_NAMESPACE_TYPE(Persisted_AuthKeyTokenPairDeleted, current_userspace::t9201639387125546521::Persisted_AuthKeyTokenPairDeleted);
@@ -860,6 +935,8 @@ CURRENT_NAMESPACE(CTFO_2016_08_01) {
   CURRENT_NAMESPACE_TYPE(IOSAdWordsInstallTracked, current_userspace::t9203799426742738470::IOSAdWordsInstallTracked);
   CURRENT_NAMESPACE_TYPE(Persisted_CommentFlagAsInappropriateDeleted, current_userspace::t9203831635148683240::Persisted_CommentFlagAsInappropriateDeleted);
   CURRENT_NAMESPACE_TYPE(Persisted_CommentLikeDeleted, current_userspace::t9203831637526002670::Persisted_CommentLikeDeleted);
+  CURRENT_NAMESPACE_TYPE(iOSFirstLaunchEvent, current_userspace::t9204032455253812491::iOSFirstLaunchEvent);
+  CURRENT_NAMESPACE_TYPE(iOSIdentifyEvent, current_userspace::t9204032455276172217::iOSIdentifyEvent);
   CURRENT_NAMESPACE_TYPE(UserReportedUser, current_userspace::t9204169224127870611::UserReportedUser);
   CURRENT_NAMESPACE_TYPE(UserBlockedUser, current_userspace::t9204169225399823167::UserBlockedUser);
   CURRENT_NAMESPACE_TYPE(Color, current_userspace::t9204213868853430923::Color);
@@ -869,6 +946,7 @@ CURRENT_NAMESPACE(CTFO_2016_08_01) {
   CURRENT_NAMESPACE_TYPE(NotificationMyCommentLiked, current_userspace::t9205139961216938388::NotificationMyCommentLiked);
   CURRENT_NAMESPACE_TYPE(NotificationNewCommentOnCardIStarred, current_userspace::t9205139961498515997::NotificationNewCommentOnCardIStarred);
   CURRENT_NAMESPACE_TYPE(NotificationMyCardNewComment, current_userspace::t9205139962535721888::NotificationMyCardNewComment);
+  CURRENT_NAMESPACE_TYPE(iOSAppLaunchEvent, current_userspace::t9205653292032376105::iOSAppLaunchEvent);
   CURRENT_NAMESPACE_TYPE(Persisted_CommentUpdated, current_userspace::t9205726664918690175::Persisted_CommentUpdated);
   CURRENT_NAMESPACE_TYPE(Persisted_UserBlockedUserDeleted, current_userspace::t9205788702451752665::Persisted_UserBlockedUserDeleted);
   CURRENT_NAMESPACE_TYPE(Persisted_UserReportedUserDeleted, current_userspace::t9205788704562369935::Persisted_UserReportedUserDeleted);
@@ -886,6 +964,7 @@ CURRENT_NAMESPACE(CTFO_2016_08_01) {
   CURRENT_NAMESPACE_TYPE(Persisted_CommentFlagAsInappropriateUpdated, current_userspace::t9207308163082688082::Persisted_CommentFlagAsInappropriateUpdated);
   CURRENT_NAMESPACE_TYPE(Persisted_CardFlagAsInappropriateDeleted, current_userspace::t9207338306079275190::Persisted_CardFlagAsInappropriateDeleted);
   CURRENT_NAMESPACE_TYPE(UserNotificationPlayerID, current_userspace::t9207541387680683014::UserNotificationPlayerID);
+  CURRENT_NAMESPACE_TYPE(iOSFocusEvent, current_userspace::t9207776099720188653::iOSFocusEvent);
   CURRENT_NAMESPACE_TYPE(CardFlagAsInappropriate, current_userspace::t9208106292780677444::CardFlagAsInappropriate);
   CURRENT_NAMESPACE_TYPE(Persisted_UserUpdated, current_userspace::t9208126756460151169::Persisted_UserUpdated);
   CURRENT_NAMESPACE_TYPE(Persisted_NotificationDeleted, current_userspace::t9208789096931447804::Persisted_NotificationDeleted);
@@ -895,15 +974,15 @@ CURRENT_NAMESPACE(CTFO_2016_08_01) {
   CURRENT_NAMESPACE_TYPE(Persisted_UserBlockedUserUpdated, current_userspace::t9209578065760681677::Persisted_UserBlockedUserUpdated);
   CURRENT_NAMESPACE_TYPE(CommentLike, current_userspace::t9209939847913682852::CommentLike);
   CURRENT_NAMESPACE_TYPE(CommentFlagAsInappropriate, current_userspace::t9209939848218954266::CommentFlagAsInappropriate);
+  CURRENT_NAMESPACE_TYPE(Variant_B_iOSFirstLaunchEvent_iOSAppLaunchEvent_iOSDeviceInfo_iOSIdentifyEvent_iOSFocusEvent_iOSGenericEvent_E, current_userspace::t9221024183018054946::Variant_B_iOSFirstLaunchEvent_iOSAppLaunchEvent_iOSDeviceInfo_iOSIdentifyEvent_iOSFocusEvent_iOSGenericEvent_E);
+  CURRENT_NAMESPACE_TYPE(Variant_B_Transaction_Z_CTFOMidichloriansEvent_E, current_userspace::t9221507412431469778::Variant_B_Transaction_Z_CTFOMidichloriansEvent_E);
   CURRENT_NAMESPACE_TYPE(Variant_B_Persisted_UserUpdated_Persisted_AuthKeyTokenPairUpdated_Persisted_UIDAuthKeyPairUpdated_Persisted_UserNotificationPlayerIDUpdated_Persisted_PushNotificationsMarkerUpdated_Persisted_CardUpdated_Persisted_AuthorCardUpdated_Persisted_AnswerUpdated_Persisted_FavoriteUpdated_Persisted_CommentUpdated_Persisted_CommentLikeUpdated_Persisted_CardFlagAsInappropriateUpdated_Persisted_CommentFlagAsInappropriateUpdated_Persisted_NotificationUpdated_Persisted_StarNotificationAlreadySentUpdated_Persisted_UserReportedUserUpdated_Persisted_UserBlockedUserUpdated_Persisted_BannedUserUpdated_Persisted_IOSAdWordsInstallTrackedUpdated_Persisted_DeviceUpdated_Persisted_UserDeleted_Persisted_AuthKeyTokenPairDeleted_Persisted_UIDAuthKeyPairDeleted_Persisted_UserNotificationPlayerIDDeleted_Persisted_PushNotificationsMarkerDeleted_Persisted_CardDeleted_Persisted_AuthorCardDeleted_Persisted_AnswerDeleted_Persisted_FavoriteDeleted_Persisted_CommentDeleted_Persisted_CommentLikeDeleted_Persisted_CardFlagAsInappropriateDeleted_Persisted_CommentFlagAsInappropriateDeleted_Persisted_NotificationDeleted_Persisted_StarNotificationAlreadySentDeleted_Persisted_UserReportedUserDeleted_Persisted_UserBlockedUserDeleted_Persisted_BannedUserDeleted_Persisted_IOSAdWordsInstallTrackedDeleted_Persisted_DeviceDeleted_E, current_userspace::t9225800578910870409::Variant_B_Persisted_UserUpdated_Persisted_AuthKeyTokenPairUpdated_Persisted_UIDAuthKeyPairUpdated_Persisted_UserNotificationPlayerIDUpdated_Persisted_PushNotificationsMarkerUpdated_Persisted_CardUpdated_Persisted_AuthorCardUpdated_Persisted_AnswerUpdated_Persisted_FavoriteUpdated_Persisted_CommentUpdated_Persisted_CommentLikeUpdated_Persisted_CardFlagAsInappropriateUpdated_Persisted_CommentFlagAsInappropriateUpdated_Persisted_NotificationUpdated_Persisted_StarNotificationAlreadySentUpdated_Persisted_UserReportedUserUpdated_Persisted_UserBlockedUserUpdated_Persisted_BannedUserUpdated_Persisted_IOSAdWordsInstallTrackedUpdated_Persisted_DeviceUpdated_Persisted_UserDeleted_Persisted_AuthKeyTokenPairDeleted_Persisted_UIDAuthKeyPairDeleted_Persisted_UserNotificationPlayerIDDeleted_Persisted_PushNotificationsMarkerDeleted_Persisted_CardDeleted_Persisted_AuthorCardDeleted_Persisted_AnswerDeleted_Persisted_FavoriteDeleted_Persisted_CommentDeleted_Persisted_CommentLikeDeleted_Persisted_CardFlagAsInappropriateDeleted_Persisted_CommentFlagAsInappropriateDeleted_Persisted_NotificationDeleted_Persisted_StarNotificationAlreadySentDeleted_Persisted_UserReportedUserDeleted_Persisted_UserBlockedUserDeleted_Persisted_BannedUserDeleted_Persisted_IOSAdWordsInstallTrackedDeleted_Persisted_DeviceDeleted_E);
   CURRENT_NAMESPACE_TYPE(Variant_B_NotificationMyCardNewComment_NotificationNewReplyToMyComment_NotificationMyCommentLiked_NotificationNewCommentOnCardIStarred_NotificationMyCardStarred_NotificationNewVotesOnMyCard_E, current_userspace::t9226204898011996251::Variant_B_NotificationMyCardNewComment_NotificationNewReplyToMyComment_NotificationMyCommentLiked_NotificationNewCommentOnCardIStarred_NotificationMyCardStarred_NotificationNewVotesOnMyCard_E);
 
   // Privileged types.
-  CURRENT_NAMESPACE_TYPE(TopLevelTransaction, current_userspace::t9204521049515947345::Transaction_T9225800578910870409);
-
-  // NOTE(dkorolev): The next line added manually, as part of storage + stream migration.
+  CURRENT_NAMESPACE_TYPE(CTFOEvent, current_userspace::t9221507412431469778::Variant_B_Transaction_Z_CTFOMidichloriansEvent_E);
   // <MANUAL_LINE>
-  CURRENT_NAMESPACE_TYPE(CTFOEvent, current_userspace::t9204521049515947345::Transaction_T9225800578910870409);
+  CURRENT_NAMESPACE_TYPE(TopLevelTransaction, current_userspace::t9204521049515947345::Transaction_T9225800578910870409);
   // </MANUAL_LINE>
 };  // CURRENT_NAMESPACE(CTFO_2016_08_01)
 #endif  // CURRENT_NAMESPACE_CTFO_2016_08_01_DEFINED
@@ -1231,6 +1310,40 @@ struct Evolve<CTFO_2016_08_01, typename CTFO_2016_08_01::iOSBaseEvent, EVOLVER> 
                     "Custom evolver required.");
       Evolve<CTFO_2016_08_01, CTFO_2016_08_01::MidichloriansBaseEvent, EVOLVER>::template Go<INTO>(static_cast<const typename CTFO_2016_08_01::MidichloriansBaseEvent&>(from), static_cast<typename INTO::MidichloriansBaseEvent&>(into));
       Evolve<CTFO_2016_08_01, decltype(from.device_id), EVOLVER>::template Go<INTO>(from.device_id, into.device_id);
+  }
+};
+#endif
+
+// Default evolution for struct `iOSGenericEvent`.
+#ifndef DEFAULT_EVOLUTION_CB90BDF094853BE22642716BE529B33A4273592B69F05E1890665D67BF9983BB  // typename CTFO_2016_08_01::iOSGenericEvent
+#define DEFAULT_EVOLUTION_CB90BDF094853BE22642716BE529B33A4273592B69F05E1890665D67BF9983BB  // typename CTFO_2016_08_01::iOSGenericEvent
+template <typename EVOLVER>
+struct Evolve<CTFO_2016_08_01, typename CTFO_2016_08_01::iOSGenericEvent, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename CTFO_2016_08_01::iOSGenericEvent& from,
+                 typename INTO::iOSGenericEvent& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::iOSGenericEvent>::value == 4,
+                    "Custom evolver required.");
+      Evolve<CTFO_2016_08_01, CTFO_2016_08_01::iOSBaseEvent, EVOLVER>::template Go<INTO>(static_cast<const typename CTFO_2016_08_01::iOSBaseEvent&>(from), static_cast<typename INTO::iOSBaseEvent&>(into));
+      Evolve<CTFO_2016_08_01, decltype(from.event), EVOLVER>::template Go<INTO>(from.event, into.event);
+      Evolve<CTFO_2016_08_01, decltype(from.source), EVOLVER>::template Go<INTO>(from.source, into.source);
+      Evolve<CTFO_2016_08_01, decltype(from.fields), EVOLVER>::template Go<INTO>(from.fields, into.fields);
+      Evolve<CTFO_2016_08_01, decltype(from.unparsable_fields), EVOLVER>::template Go<INTO>(from.unparsable_fields, into.unparsable_fields);
+  }
+};
+#endif
+
+// Default evolution for struct `CTFOMidichloriansEvent`.
+#ifndef DEFAULT_EVOLUTION_B7A7366BD1C279BA2C875060F15B9E3147749C6035B42ABD859F22A5359D7060  // typename CTFO_2016_08_01::CTFOMidichloriansEvent
+#define DEFAULT_EVOLUTION_B7A7366BD1C279BA2C875060F15B9E3147749C6035B42ABD859F22A5359D7060  // typename CTFO_2016_08_01::CTFOMidichloriansEvent
+template <typename EVOLVER>
+struct Evolve<CTFO_2016_08_01, typename CTFO_2016_08_01::CTFOMidichloriansEvent, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename CTFO_2016_08_01::CTFOMidichloriansEvent& from,
+                 typename INTO::CTFOMidichloriansEvent& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::CTFOMidichloriansEvent>::value == 1,
+                    "Custom evolver required.");
+      Evolve<CTFO_2016_08_01, decltype(from.event), EVOLVER>::template Go<INTO>(from.event, into.event);
   }
 };
 #endif
@@ -1601,6 +1714,40 @@ struct Evolve<CTFO_2016_08_01, typename CTFO_2016_08_01::Persisted_CommentLikeDe
 };
 #endif
 
+// Default evolution for struct `iOSFirstLaunchEvent`.
+#ifndef DEFAULT_EVOLUTION_EDD972930E5DCBAC017A9FAC1CA95E4701C537FAD6F305F71EDB0C862F37D016  // typename CTFO_2016_08_01::iOSFirstLaunchEvent
+#define DEFAULT_EVOLUTION_EDD972930E5DCBAC017A9FAC1CA95E4701C537FAD6F305F71EDB0C862F37D016  // typename CTFO_2016_08_01::iOSFirstLaunchEvent
+template <typename EVOLVER>
+struct Evolve<CTFO_2016_08_01, typename CTFO_2016_08_01::iOSFirstLaunchEvent, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename CTFO_2016_08_01::iOSFirstLaunchEvent& from,
+                 typename INTO::iOSFirstLaunchEvent& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::iOSFirstLaunchEvent>::value == 0,
+                    "Custom evolver required.");
+      Evolve<CTFO_2016_08_01, CTFO_2016_08_01::iOSBaseEvent, EVOLVER>::template Go<INTO>(static_cast<const typename CTFO_2016_08_01::iOSBaseEvent&>(from), static_cast<typename INTO::iOSBaseEvent&>(into));
+      static_cast<void>(from);
+      static_cast<void>(into);
+  }
+};
+#endif
+
+// Default evolution for struct `iOSIdentifyEvent`.
+#ifndef DEFAULT_EVOLUTION_E345BE5C7AF121ACA1B8F90CECA52E74EC5BF43F52F3DDE56153621CE438D6EB  // typename CTFO_2016_08_01::iOSIdentifyEvent
+#define DEFAULT_EVOLUTION_E345BE5C7AF121ACA1B8F90CECA52E74EC5BF43F52F3DDE56153621CE438D6EB  // typename CTFO_2016_08_01::iOSIdentifyEvent
+template <typename EVOLVER>
+struct Evolve<CTFO_2016_08_01, typename CTFO_2016_08_01::iOSIdentifyEvent, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename CTFO_2016_08_01::iOSIdentifyEvent& from,
+                 typename INTO::iOSIdentifyEvent& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::iOSIdentifyEvent>::value == 0,
+                    "Custom evolver required.");
+      Evolve<CTFO_2016_08_01, CTFO_2016_08_01::iOSBaseEvent, EVOLVER>::template Go<INTO>(static_cast<const typename CTFO_2016_08_01::iOSBaseEvent&>(from), static_cast<typename INTO::iOSBaseEvent&>(into));
+      static_cast<void>(from);
+      static_cast<void>(into);
+  }
+};
+#endif
+
 // Default evolution for struct `UserReportedUser`.
 #ifndef DEFAULT_EVOLUTION_C1F4EBD4CA4C723CE52B21BB686A6A58DDFC0C0FA7421B6E0F6E0ED40BF44A04  // typename CTFO_2016_08_01::UserReportedUser
 #define DEFAULT_EVOLUTION_C1F4EBD4CA4C723CE52B21BB686A6A58DDFC0C0FA7421B6E0F6E0ED40BF44A04  // typename CTFO_2016_08_01::UserReportedUser
@@ -1750,6 +1897,25 @@ struct Evolve<CTFO_2016_08_01, typename CTFO_2016_08_01::NotificationMyCardNewCo
       Evolve<CTFO_2016_08_01, decltype(from.cid), EVOLVER>::template Go<INTO>(from.cid, into.cid);
       Evolve<CTFO_2016_08_01, decltype(from.oid), EVOLVER>::template Go<INTO>(from.oid, into.oid);
       Evolve<CTFO_2016_08_01, decltype(from.text), EVOLVER>::template Go<INTO>(from.text, into.text);
+  }
+};
+#endif
+
+// Default evolution for struct `iOSAppLaunchEvent`.
+#ifndef DEFAULT_EVOLUTION_780BB96AA7AE16B166A44AFD3BFF49C5E22D155546259E212A8B362DC1E01377  // typename CTFO_2016_08_01::iOSAppLaunchEvent
+#define DEFAULT_EVOLUTION_780BB96AA7AE16B166A44AFD3BFF49C5E22D155546259E212A8B362DC1E01377  // typename CTFO_2016_08_01::iOSAppLaunchEvent
+template <typename EVOLVER>
+struct Evolve<CTFO_2016_08_01, typename CTFO_2016_08_01::iOSAppLaunchEvent, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename CTFO_2016_08_01::iOSAppLaunchEvent& from,
+                 typename INTO::iOSAppLaunchEvent& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::iOSAppLaunchEvent>::value == 4,
+                    "Custom evolver required.");
+      Evolve<CTFO_2016_08_01, CTFO_2016_08_01::iOSBaseEvent, EVOLVER>::template Go<INTO>(static_cast<const typename CTFO_2016_08_01::iOSBaseEvent&>(from), static_cast<typename INTO::iOSBaseEvent&>(into));
+      Evolve<CTFO_2016_08_01, decltype(from.binary_version), EVOLVER>::template Go<INTO>(from.binary_version, into.binary_version);
+      Evolve<CTFO_2016_08_01, decltype(from.cf_version), EVOLVER>::template Go<INTO>(from.cf_version, into.cf_version);
+      Evolve<CTFO_2016_08_01, decltype(from.app_install_time), EVOLVER>::template Go<INTO>(from.app_install_time, into.app_install_time);
+      Evolve<CTFO_2016_08_01, decltype(from.app_update_time), EVOLVER>::template Go<INTO>(from.app_update_time, into.app_update_time);
   }
 };
 #endif
@@ -2029,6 +2195,23 @@ struct Evolve<CTFO_2016_08_01, typename CTFO_2016_08_01::UserNotificationPlayerI
 };
 #endif
 
+// Default evolution for struct `iOSFocusEvent`.
+#ifndef DEFAULT_EVOLUTION_E918521741303F0098DB53778EB979B2E5BF772E9ECD9F9AB064452573CADFFE  // typename CTFO_2016_08_01::iOSFocusEvent
+#define DEFAULT_EVOLUTION_E918521741303F0098DB53778EB979B2E5BF772E9ECD9F9AB064452573CADFFE  // typename CTFO_2016_08_01::iOSFocusEvent
+template <typename EVOLVER>
+struct Evolve<CTFO_2016_08_01, typename CTFO_2016_08_01::iOSFocusEvent, EVOLVER> {
+  template <typename INTO>
+  static void Go(const typename CTFO_2016_08_01::iOSFocusEvent& from,
+                 typename INTO::iOSFocusEvent& into) {
+      static_assert(::current::reflection::FieldCounter<typename INTO::iOSFocusEvent>::value == 2,
+                    "Custom evolver required.");
+      Evolve<CTFO_2016_08_01, CTFO_2016_08_01::iOSBaseEvent, EVOLVER>::template Go<INTO>(static_cast<const typename CTFO_2016_08_01::iOSBaseEvent&>(from), static_cast<typename INTO::iOSBaseEvent&>(into));
+      Evolve<CTFO_2016_08_01, decltype(from.gained_focus), EVOLVER>::template Go<INTO>(from.gained_focus, into.gained_focus);
+      Evolve<CTFO_2016_08_01, decltype(from.source), EVOLVER>::template Go<INTO>(from.source, into.source);
+  }
+};
+#endif
+
 // Default evolution for struct `CardFlagAsInappropriate`.
 #ifndef DEFAULT_EVOLUTION_1F30F1FBE92A27EC0CC149FCD2EB95FEE3B409216C89CEE3A428D7B8B6825F6A  // typename CTFO_2016_08_01::CardFlagAsInappropriate
 #define DEFAULT_EVOLUTION_1F30F1FBE92A27EC0CC149FCD2EB95FEE3B409216C89CEE3A428D7B8B6825F6A  // typename CTFO_2016_08_01::CardFlagAsInappropriate
@@ -2169,6 +2352,84 @@ struct Evolve<CTFO_2016_08_01, typename CTFO_2016_08_01::CommentFlagAsInappropri
                     "Custom evolver required.");
       Evolve<CTFO_2016_08_01, decltype(from.oid), EVOLVER>::template Go<INTO>(from.oid, into.oid);
       Evolve<CTFO_2016_08_01, decltype(from.uid), EVOLVER>::template Go<INTO>(from.uid, into.uid);
+  }
+};
+#endif
+
+// Default evolution for `Variant<iOSFirstLaunchEvent, iOSAppLaunchEvent, iOSDeviceInfo, iOSIdentifyEvent, iOSFocusEvent, iOSGenericEvent>`.
+#ifndef DEFAULT_EVOLUTION_9D2A0ACE55C26CA1CA94B2CC8D0F13663F002B2E95C0071080CB4B4B19CE299F  // ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<CTFO_2016_08_01::iOSFirstLaunchEvent, CTFO_2016_08_01::iOSAppLaunchEvent, CTFO_2016_08_01::iOSDeviceInfo, CTFO_2016_08_01::iOSIdentifyEvent, CTFO_2016_08_01::iOSFocusEvent, CTFO_2016_08_01::iOSGenericEvent>>
+#define DEFAULT_EVOLUTION_9D2A0ACE55C26CA1CA94B2CC8D0F13663F002B2E95C0071080CB4B4B19CE299F  // ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<CTFO_2016_08_01::iOSFirstLaunchEvent, CTFO_2016_08_01::iOSAppLaunchEvent, CTFO_2016_08_01::iOSDeviceInfo, CTFO_2016_08_01::iOSIdentifyEvent, CTFO_2016_08_01::iOSFocusEvent, CTFO_2016_08_01::iOSGenericEvent>>
+template <typename DST, typename FROM_NAMESPACE, typename INTO, typename EVOLVER>
+struct CTFO_2016_08_01_Variant_B_iOSFirstLaunchEvent_iOSAppLaunchEvent_iOSDeviceInfo_iOSIdentifyEvent_iOSFocusEvent_iOSGenericEvent_E_Cases {
+  DST& into;
+  explicit CTFO_2016_08_01_Variant_B_iOSFirstLaunchEvent_iOSAppLaunchEvent_iOSDeviceInfo_iOSIdentifyEvent_iOSFocusEvent_iOSGenericEvent_E_Cases(DST& into) : into(into) {}
+  void operator()(const typename FROM_NAMESPACE::iOSFirstLaunchEvent& value) const {
+    using into_t = typename INTO::iOSFirstLaunchEvent;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::iOSFirstLaunchEvent, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::iOSAppLaunchEvent& value) const {
+    using into_t = typename INTO::iOSAppLaunchEvent;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::iOSAppLaunchEvent, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::iOSDeviceInfo& value) const {
+    using into_t = typename INTO::iOSDeviceInfo;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::iOSDeviceInfo, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::iOSIdentifyEvent& value) const {
+    using into_t = typename INTO::iOSIdentifyEvent;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::iOSIdentifyEvent, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::iOSFocusEvent& value) const {
+    using into_t = typename INTO::iOSFocusEvent;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::iOSFocusEvent, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::iOSGenericEvent& value) const {
+    using into_t = typename INTO::iOSGenericEvent;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::iOSGenericEvent, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+};
+template <typename EVOLVER, typename VARIANT_NAME_HELPER>
+struct Evolve<CTFO_2016_08_01, ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<CTFO_2016_08_01::iOSFirstLaunchEvent, CTFO_2016_08_01::iOSAppLaunchEvent, CTFO_2016_08_01::iOSDeviceInfo, CTFO_2016_08_01::iOSIdentifyEvent, CTFO_2016_08_01::iOSFocusEvent, CTFO_2016_08_01::iOSGenericEvent>>, EVOLVER> {
+  template <typename INTO,
+            typename CUSTOM_INTO_VARIANT_TYPE>
+  static void Go(const ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<CTFO_2016_08_01::iOSFirstLaunchEvent, CTFO_2016_08_01::iOSAppLaunchEvent, CTFO_2016_08_01::iOSDeviceInfo, CTFO_2016_08_01::iOSIdentifyEvent, CTFO_2016_08_01::iOSFocusEvent, CTFO_2016_08_01::iOSGenericEvent>>& from,
+                 CUSTOM_INTO_VARIANT_TYPE& into) {
+    from.Call(CTFO_2016_08_01_Variant_B_iOSFirstLaunchEvent_iOSAppLaunchEvent_iOSDeviceInfo_iOSIdentifyEvent_iOSFocusEvent_iOSGenericEvent_E_Cases<decltype(into), CTFO_2016_08_01, INTO, EVOLVER>(into));
+  }
+};
+#endif
+
+// Default evolution for `Variant<Transaction_T9225800578910870409, CTFOMidichloriansEvent>`.
+#ifndef DEFAULT_EVOLUTION_34BC6E932B0A531EA0373BCF64AB3B09F00A1A49808339D5A6657EB7563E3648  // ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<CTFO_2016_08_01::Transaction_T9225800578910870409, CTFO_2016_08_01::CTFOMidichloriansEvent>>
+#define DEFAULT_EVOLUTION_34BC6E932B0A531EA0373BCF64AB3B09F00A1A49808339D5A6657EB7563E3648  // ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<CTFO_2016_08_01::Transaction_T9225800578910870409, CTFO_2016_08_01::CTFOMidichloriansEvent>>
+template <typename DST, typename FROM_NAMESPACE, typename INTO, typename EVOLVER>
+struct CTFO_2016_08_01_Variant_B_Transaction_Z_CTFOMidichloriansEvent_E_Cases {
+  DST& into;
+  explicit CTFO_2016_08_01_Variant_B_Transaction_Z_CTFOMidichloriansEvent_E_Cases(DST& into) : into(into) {}
+  void operator()(const typename FROM_NAMESPACE::Transaction_T9225800578910870409& value) const {
+    using into_t = typename INTO::Transaction_T9225800578910870409;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::Transaction_T9225800578910870409, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+  void operator()(const typename FROM_NAMESPACE::CTFOMidichloriansEvent& value) const {
+    using into_t = typename INTO::CTFOMidichloriansEvent;
+    into = into_t();
+    Evolve<FROM_NAMESPACE, typename FROM_NAMESPACE::CTFOMidichloriansEvent, EVOLVER>::template Go<INTO>(value, Value<into_t>(into));
+  }
+};
+template <typename EVOLVER, typename VARIANT_NAME_HELPER>
+struct Evolve<CTFO_2016_08_01, ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<CTFO_2016_08_01::Transaction_T9225800578910870409, CTFO_2016_08_01::CTFOMidichloriansEvent>>, EVOLVER> {
+  template <typename INTO,
+            typename CUSTOM_INTO_VARIANT_TYPE>
+  static void Go(const ::current::VariantImpl<VARIANT_NAME_HELPER, TypeListImpl<CTFO_2016_08_01::Transaction_T9225800578910870409, CTFO_2016_08_01::CTFOMidichloriansEvent>>& from,
+                 CUSTOM_INTO_VARIANT_TYPE& into) {
+    from.Call(CTFO_2016_08_01_Variant_B_Transaction_Z_CTFOMidichloriansEvent_E_Cases<decltype(into), CTFO_2016_08_01, INTO, EVOLVER>(into));
   }
 };
 #endif
@@ -2528,6 +2789,17 @@ CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, iOSBaseEvent, {
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.device_id, into.device_id);
 });
 
+CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, iOSGenericEvent, {
+  CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.event, into.event);
+  CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.source, into.source);
+  CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.fields, into.fields);
+  CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.unparsable_fields, into.unparsable_fields);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, CTFOMidichloriansEvent, {
+  CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.event, into.event);
+});
+
 CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, Persisted_UIDAuthKeyPairUpdated, {
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.us, into.us);
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.data, into.data);
@@ -2651,6 +2923,12 @@ CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, Persisted_CommentLikeDelete
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.key, into.key);
 });
 
+CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, iOSFirstLaunchEvent, {
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, iOSIdentifyEvent, {
+});
+
 CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, UserReportedUser, {
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.who, into.who);
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.whom, into.whom);
@@ -2703,6 +2981,13 @@ CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, NotificationMyCardNewCommen
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.cid, into.cid);
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.oid, into.oid);
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.text, into.text);
+});
+
+CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, iOSAppLaunchEvent, {
+  CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.binary_version, into.binary_version);
+  CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.cf_version, into.cf_version);
+  CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.app_install_time, into.app_install_time);
+  CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.app_update_time, into.app_update_time);
 });
 
 CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, Persisted_CommentUpdated, {
@@ -2793,6 +3078,11 @@ CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, UserNotificationPlayerID, {
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.player_id, into.player_id);
 });
 
+CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, iOSFocusEvent, {
+  CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.gained_focus, into.gained_focus);
+  CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.source, into.source);
+});
+
 CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, CardFlagAsInappropriate, {
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.cid, into.cid);
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.uid, into.uid);
@@ -2837,6 +3127,20 @@ CURRENT_TYPE_EVOLVER(CustomEvolver, CTFO_2016_08_01, CommentFlagAsInappropriate,
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.oid, into.oid);
   CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from.uid, into.uid);
 });
+
+CURRENT_TYPE_EVOLVER_VARIANT(CustomEvolver, CTFO_2016_08_01, t9221024183018054946::Variant_B_iOSFirstLaunchEvent_iOSAppLaunchEvent_iOSDeviceInfo_iOSIdentifyEvent_iOSFocusEvent_iOSGenericEvent_E, CustomDestinationNamespace) {
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9204032455253812491::iOSFirstLaunchEvent, CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9205653292032376105::iOSAppLaunchEvent, CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9201594862172611068::iOSDeviceInfo, CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9204032455276172217::iOSIdentifyEvent, CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9207776099720188653::iOSFocusEvent, CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9201174724793298462::iOSGenericEvent, CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from, into));
+};
+
+CURRENT_TYPE_EVOLVER_VARIANT(CustomEvolver, CTFO_2016_08_01, t9221507412431469778::Variant_B_Transaction_Z_CTFOMidichloriansEvent_E, CustomDestinationNamespace) {
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9204521049515947345::Transaction_T9225800578910870409, CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from, into));
+  CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9201199957099453311::CTFOMidichloriansEvent, CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from, into));
+};
 
 CURRENT_TYPE_EVOLVER_VARIANT(CustomEvolver, CTFO_2016_08_01, t9225800578910870409::Variant_B_Persisted_UserUpdated_Persisted_AuthKeyTokenPairUpdated_Persisted_UIDAuthKeyPairUpdated_Persisted_UserNotificationPlayerIDUpdated_Persisted_PushNotificationsMarkerUpdated_Persisted_CardUpdated_Persisted_AuthorCardUpdated_Persisted_AnswerUpdated_Persisted_FavoriteUpdated_Persisted_CommentUpdated_Persisted_CommentLikeUpdated_Persisted_CardFlagAsInappropriateUpdated_Persisted_CommentFlagAsInappropriateUpdated_Persisted_NotificationUpdated_Persisted_StarNotificationAlreadySentUpdated_Persisted_UserReportedUserUpdated_Persisted_UserBlockedUserUpdated_Persisted_BannedUserUpdated_Persisted_IOSAdWordsInstallTrackedUpdated_Persisted_DeviceUpdated_Persisted_UserDeleted_Persisted_AuthKeyTokenPairDeleted_Persisted_UIDAuthKeyPairDeleted_Persisted_UserNotificationPlayerIDDeleted_Persisted_PushNotificationsMarkerDeleted_Persisted_CardDeleted_Persisted_AuthorCardDeleted_Persisted_AnswerDeleted_Persisted_FavoriteDeleted_Persisted_CommentDeleted_Persisted_CommentLikeDeleted_Persisted_CardFlagAsInappropriateDeleted_Persisted_CommentFlagAsInappropriateDeleted_Persisted_NotificationDeleted_Persisted_StarNotificationAlreadySentDeleted_Persisted_UserReportedUserDeleted_Persisted_UserBlockedUserDeleted_Persisted_BannedUserDeleted_Persisted_IOSAdWordsInstallTrackedDeleted_Persisted_DeviceDeleted_E, CustomDestinationNamespace) {
   CURRENT_TYPE_EVOLVER_NATURAL_VARIANT_CASE(t9208126756460151169::Persisted_UserUpdated, CURRENT_NATURAL_EVOLVE(CTFO_2016_08_01, CustomDestinationNamespace, from, into));
