@@ -121,8 +121,6 @@ struct CTFODeviceIDPopulator {
     output_event.meta.begin_us = us + std::chrono::microseconds(1);
     output_event.meta.end_us = us + std::chrono::microseconds(3);
 
-    typename CTFO_2016_08_01::iOSDeviceInfo output_device_info;
-
     typename CTFO_2016_08_01::Device output_device;
     output_device.did = input_device_info.device_id;
     static const std::string field_name = "advertisingIdentifier";
