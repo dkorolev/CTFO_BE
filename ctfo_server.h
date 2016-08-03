@@ -119,8 +119,6 @@ CURRENT_STRUCT(CTFOServerParams) {
   CURRENT_FIELD_DESCRIPTION(storage_file, "The file to store the snapshot of the database in.");
   CURRENT_FIELD(cards_file, std::string);
   CURRENT_FIELD_DESCRIPTION(cards_file, "Cards data file in JSON format.");
-  CURRENT_FIELD(midichlorians_file, std::string);
-  CURRENT_FIELD_DESCRIPTION(midichlorians_file, "Log file to store events received by midichlorians server.");
   CURRENT_FIELD(rest_url_prefix, std::string);
   CURRENT_FIELD_DESCRIPTION(rest_url_prefix, "Hypermedia route prefix to spawn RESTful server on.");
   CURRENT_FIELD(rest_url_path, std::string, "/ctfo/rest");
@@ -174,10 +172,6 @@ CURRENT_STRUCT(CTFOServerParams) {
     cards_file = file;
     return *this;
   }
-  CTFOServerParams& SetMidichloriansFile(const std::string& file) {
-    midichlorians_file = file;
-    return *this;
-  }
   CTFOServerParams& SetRESTURLPrefix(const std::string& prefix) {
     rest_url_prefix = prefix;
     return *this;
@@ -204,16 +198,13 @@ CURRENT_STRUCT(CTFOServerParams) {
   }
 };
 
-CURRENT_STRUCT(CTFOMidichloriansEvent) {
-  CURRENT_FIELD(event, Variant<current::midichlorians::ios::ios_events_t>);
-};
-
 using CTFOStorageTransaction = typename current::storage::transaction_t<CTFOStorage>;
-using CTFOEvent = Variant<CTFOStorageTransaction, CTFOMidichloriansEvent>;
+using CTFOEvent = Variant<CTFOStorageTransaction, current::midichlorians::server::EventLogEntry>;
 
 class CTFOServer final {
  public:
-  using storage_t = CTFOStorage<SherlockStreamPersister, current::storage::transaction_policy::Synchronous, CTFOEvent>;
+  using storage_t =
+      CTFOStorage<SherlockStreamPersister, current::storage::transaction_policy::Synchronous, CTFOEvent>;
   using transaction_t = CTFOStorageTransaction;
   using stream_t = current::sherlock::Stream<CTFOEvent, current::persistence::File>;
   using midichlorians_server_t = current::midichlorians::server::MidichloriansHTTPServer<CTFOServer>;
@@ -247,10 +238,9 @@ class CTFOServer final {
                 }(),
                 config_.Config().onesignal_app_id,
                 config_.Config().onesignal_app_port),
-        push_notifications_sender_subcriber_scope_(storage_.InternalExposeStream().Subscribe<transaction_t>(pusher_)),
+        push_notifications_sender_subcriber_scope_(
+            storage_.InternalExposeStream().Subscribe<transaction_t>(pusher_)),
         adwords_tracker_(config_.Config().adwords_config, config_.Config().adwords_app_port) {
-    midichlorians_stream_.open(config_.Config().midichlorians_file, std::ofstream::out | std::ofstream::app);
-
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
     std::ifstream cf(config_.Config().cards_file);
     assert(cf.good());
@@ -300,7 +290,7 @@ class CTFOServer final {
   void operator()(const current::midichlorians::server::TickLogEntry&) {}
 
   void operator()(const current::midichlorians::server::EventLogEntry& e) {
-    midichlorians_stream_ << JSON(e) << std::endl;
+    stream_.Publish(e);
     e.event.Call(*this);
   }
 
@@ -310,23 +300,39 @@ class CTFOServer final {
     if (!event.device_id.empty()) {
       const auto& info = event.info;
       const auto cit = event.info.find("advertisingIdentifier");
-      if (cit != info.end() && !cit->second.empty()) {
-        const std::string& rdid = cit->second;
-        DebugPrint("iOSDeviceInfo for device ID " + event.device_id + ": AdId == " + rdid);
-        storage_.ReadWriteTransaction([this, rdid](MutableFields<storage_t> data) {
-          const auto value = data.ios_adwords_install_tracked[rdid];
-          if (!Exists(value) || !Exists(Value(value).tracked)) {
-            DebugPrint("SendConversionEvent(" + rdid + ")");
-            if (adwords_tracker_.SendConversionEvent(rdid)) {
-              data.ios_adwords_install_tracked.Add(IOSAdWordsInstallTracked(rdid, current::time::Now()));
-              DebugPrint("SendConversionEvent(" + rdid + "): OK");
-            } else {
-              DebugPrint("SendConversionEvent(" + rdid + "): Fail");
-            }
-          }
-        }).Wait();
+      const std::string ad_id = (cit != info.end() ? cit->second : "");
+
+      if (!ad_id.empty()) {
+        DebugPrint("iOSDeviceInfo for device ID " + event.device_id + ": AdId == " + ad_id);
       } else {
         DebugPrint("iOSDeviceInfo for device ID " + event.device_id + ": AdId not found.");
+      }
+
+      const bool should_track =
+          Value(storage_.ReadWriteTransaction([this, &event, &ad_id](MutableFields<storage_t> data) {
+            Device saved_device;
+            saved_device.did = event.device_id;
+            saved_device.ad_id = ad_id;
+            saved_device.info = event;
+            data.device.Add(saved_device);
+
+            const auto value = data.ios_adwords_install_tracked[ad_id];
+            if (!Exists(value) || !Exists(Value(value).tracked)) {
+              DebugPrint("SendConversionEvent(" + ad_id + ")");
+              return true;
+            } else {
+              return false;
+            }
+          }).Go());
+      if (should_track) {
+        if (adwords_tracker_.SendConversionEvent(ad_id)) {
+          DebugPrint("SendConversionEvent(" + ad_id + "): OK");
+          storage_.ReadWriteTransaction([this, &ad_id](MutableFields<storage_t> data) {
+            data.ios_adwords_install_tracked.Add(IOSAdWordsInstallTracked(ad_id, current::time::Now()));
+          }).Wait();
+        } else {
+          DebugPrint("SendConversionEvent(" + ad_id + "): Fail");
+        }
       }
     }
   }
@@ -1247,7 +1253,6 @@ class CTFOServer final {
 
  private:
   config_t config_;
-  std::ofstream midichlorians_stream_;
   midichlorians_server_t midichlorians_server_;
 
   stream_t stream_;
@@ -1274,7 +1279,17 @@ class CTFOServer final {
       {"FLAG_CARD", LOG_EVENT::FLAG_CARD},
       {"REPORT_USER", LOG_EVENT::REPORT_USER},
       {"BLOCK_USER", LOG_EVENT::BLOCK_USER},
-      {"ONE_SIGNAL_USER_ID", LOG_EVENT::ONE_SIGNAL_USER_ID}};
+      {"ONE_SIGNAL_USER_ID", LOG_EVENT::ONE_SIGNAL_USER_ID},
+      {"COMPLETE_SHARE_TO_FACEBOOK", LOG_EVENT::COMPLETE_SHARE_TO_FACEBOOK},
+      {"START_SHARE_TO_FACEBOOK", LOG_EVENT::START_SHARE_TO_FACEBOOK},
+      {"CANCEL_SHARE_TO_FACEBOOK", LOG_EVENT::CANCEL_SHARE_TO_FACEBOOK},
+      {"FAIL_SHARE_TO_FACEBOOK", LOG_EVENT::FAIL_SHARE_TO_FACEBOOK}};
+
+  const std::map<LOG_EVENT, SHARE_STATUS> valid_share_statuses_ = {
+      {LOG_EVENT::COMPLETE_SHARE_TO_FACEBOOK, SHARE_STATUS::COMPLETE_SHARE_TO_FACEBOOK},
+      {LOG_EVENT::START_SHARE_TO_FACEBOOK, SHARE_STATUS::START_SHARE_TO_FACEBOOK},
+      {LOG_EVENT::CANCEL_SHARE_TO_FACEBOOK, SHARE_STATUS::CANCEL_SHARE_TO_FACEBOOK},
+      {LOG_EVENT::FAIL_SHARE_TO_FACEBOOK, SHARE_STATUS::FAIL_SHARE_TO_FACEBOOK}};
 
   void DebugPrint(const std::string& message) {
     if (config_.Config().debug_print_to_stderr) {
@@ -1494,6 +1509,7 @@ class CTFOServer final {
   }
 
   void UpdateStateOnEvent(const current::midichlorians::ios::iOSGenericEvent& ge) {
+    const auto now = current::time::Now();
     try {
       if (!valid_responses_.count(ge.event)) {
         DebugPrint(Printf("[UpdateStateOnEvent] Unhandled event: '%s'", ge.event.c_str()));
@@ -1520,7 +1536,7 @@ class CTFOServer final {
                  user_id_str.c_str()));
       if (uid != UID::INVALID_USER) {  // clang-format off
         storage_.ReadWriteTransaction(
-            [this, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, user_id_str, response](
+            [this, now, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, user_id_str, response](
                 MutableFields<storage_t> data) {
               const auto& auth_token_accessor = data.auth_token;
               bool token_is_valid = false;
@@ -1766,6 +1782,32 @@ class CTFOServer final {
                     data.uid_player_id.Add(player_id_record);
                   } else {
                     DebugPrint("[UpdateStateOnEvent] Ignoring `ONE_SIGNAL_USER_ID`, no `used_id` provided.\n");
+                  }
+                } else if (valid_share_statuses_.count(response)) {
+                  const SHARE_STATUS share_status = valid_share_statuses_.at(response);
+                  DebugPrint(Printf(
+                      "[UpdateStateOnEvent] Share status `%s` for uid='%s', cid='%s',token='%s'",
+                      static_cast<int>(share_status),
+                      uid_str.c_str(),
+                      cid_str.c_str(),
+                      token.c_str()));
+
+                  if (share_status == SHARE_STATUS::COMPLETE_SHARE_TO_FACEBOOK) {
+                    Share share;
+                    share.uid = uid;
+                    share.cid = cid;
+                    share.destination = SHARE_DESTINATION::FACEBOOK;
+                    share.timestamp = now;
+                    data.share.Add(share);
+                    data.incomplete_share.Erase(uid, cid);
+                  } else {
+                    IncompleteShare incomplete;
+                    incomplete.uid = uid;
+                    incomplete.cid = cid;
+                    incomplete.destination = SHARE_DESTINATION::FACEBOOK;
+                    incomplete.status = share_status;
+                    incomplete.timestamp = now;
+                    data.incomplete_share.Add(incomplete);
                   }
                 } else {
                   DebugPrint(Printf(

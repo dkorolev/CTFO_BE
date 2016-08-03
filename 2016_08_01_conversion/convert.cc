@@ -24,15 +24,11 @@ SOFTWARE.
 
 #include "schema_2016_07_17.h"
 
-// Note 1: The following lines have been added into `schema_2016_08_01.h` manually:
-/*
-  // <MANUAL_LINE>
-  CURRENT_NAMESPACE_TYPE(CTFOEvent, current_userspace::t9204521049515947345::Transaction_T9225800578910870409);
-  // </MANUAL_LINE>
-*/
+// Note 1: The following line has to be been added into `schema_2016_08_01.h`, under "Privileged types".
+// CURRENT_NAMESPACE_TYPE(TopLevelTransaction, Transaction_T9220981828355492272);
 
 // Note 2: Need to run the following command as well:
-// $ sed -i 's/Transaction_T9225800578910870409/Transaction_Z/g' db.json
+// $ sed -i 's/Transaction_T9220981828355492272/Transaction_Z/g' db.json
 
 #include "schema_2016_08_01.h"
 

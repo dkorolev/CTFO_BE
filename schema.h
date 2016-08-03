@@ -421,6 +421,28 @@ CURRENT_STRUCT(Device) {
   CURRENT_USE_FIELD_AS_COL(ad_id);
 };
 
+// To keep track of shares. `Share`: Successful shares, `IncompleteShare`: failed and/or abandoned shares.
+CURRENT_STRUCT(Share) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
+  CURRENT_FIELD(destination, SHARE_DESTINATION, SHARE_DESTINATION::UNDEFINED);
+  CURRENT_FIELD(timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
+
+  CURRENT_USE_FIELD_AS_ROW(uid);
+  CURRENT_USE_FIELD_AS_COL(cid);
+};
+
+CURRENT_STRUCT(IncompleteShare) {
+  CURRENT_FIELD(uid, UID, UID::INVALID_USER);
+  CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
+  CURRENT_FIELD(destination, SHARE_DESTINATION, SHARE_DESTINATION::UNDEFINED);
+  CURRENT_FIELD(status, SHARE_STATUS, SHARE_STATUS::UNDEFINED);
+  CURRENT_FIELD(timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
+
+  CURRENT_USE_FIELD_AS_ROW(uid);
+  CURRENT_USE_FIELD_AS_COL(cid);
+};
+
 // Notifications.
 CURRENT_STRUCT(NotificationMyCardNewComment) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);     // Who left that comment.
