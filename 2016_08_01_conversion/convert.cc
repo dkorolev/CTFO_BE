@@ -51,11 +51,67 @@ CURRENT_TYPE_EVOLVER(Evolver_2016_08_01,
                        CURRENT_NATURAL_EVOLVE(NewCTFOStorage, CTFO_2016_08_01, from.mutations, into.mutations);
                      });
 
-struct CTFOEventsParser {
+namespace midichlorians_events_to_import {
+using current::midichlorians::ios::iOSFirstLaunchEvent;
+using current::midichlorians::ios::iOSAppLaunchEvent;
+using current::midichlorians::ios::iOSDeviceInfo;
+using current::midichlorians::ios::iOSIdentifyEvent;
+using current::midichlorians::ios::iOSFocusEvent;
+using current::midichlorians::ios::iOSGenericEvent;
+using current::midichlorians::web::WebEnterEvent;
+using current::midichlorians::web::WebExitEvent;
+using current::midichlorians::web::WebForegroundEvent;
+using current::midichlorians::web::WebBackgroundEvent;
+using current::midichlorians::web::WebGenericEvent;
+}  // namespace midichlorians_events_to_import
+
+struct CTFOEventToStreamImporter {
   std::chrono::microseconds us;
   std::vector<std::pair<std::chrono::microseconds, std::string>>& output;
 
-  CTFOEventsParser(std::vector<std::pair<std::chrono::microseconds, std::string>>& output) : output(output) {}
+  CTFOEventToStreamImporter(std::vector<std::pair<std::chrono::microseconds, std::string>>& output)
+      : output(output) {}
+
+#ifdef IMPORT_EVENT
+#error "Please stop doing this."
+#endif
+
+#define IMPORT_EVENT(EVENT_TYPE_NAME)                                                                \
+  void operator()(const midichlorians_events_to_import::EVENT_TYPE_NAME& input_event) {              \
+    typename CTFO_2016_08_01::CTFOEvent ctfo_event;                                                  \
+    ctfo_event = typename CTFO_2016_08_01::EventLogEntry();                                          \
+    auto& output_top_level_event = Value<typename CTFO_2016_08_01::EventLogEntry>(ctfo_event).event; \
+    output_top_level_event = typename CTFO_2016_08_01::EVENT_TYPE_NAME();                            \
+    current::type_evolution::Evolve<CTFO_2016_08_01,                                                 \
+                                    typename CTFO_2016_08_01::EVENT_TYPE_NAME,                       \
+                                    current::type_evolution::Evolver_2016_08_01>::                   \
+        template Go<CTFO_2016_08_01>(                                                                \
+            reinterpret_cast<const typename CTFO_2016_08_01::EVENT_TYPE_NAME&>(input_event),         \
+            Value<typename CTFO_2016_08_01::EVENT_TYPE_NAME>(output_top_level_event));               \
+    output.emplace_back(us, JSON(ctfo_event));                                                       \
+  }
+
+  IMPORT_EVENT(iOSFirstLaunchEvent);
+  IMPORT_EVENT(iOSAppLaunchEvent);
+  IMPORT_EVENT(iOSDeviceInfo);
+  IMPORT_EVENT(iOSIdentifyEvent);
+  IMPORT_EVENT(iOSFocusEvent);
+  IMPORT_EVENT(iOSGenericEvent);
+  IMPORT_EVENT(WebEnterEvent);
+  IMPORT_EVENT(WebExitEvent);
+  IMPORT_EVENT(WebForegroundEvent);
+  IMPORT_EVENT(WebBackgroundEvent);
+  IMPORT_EVENT(WebGenericEvent);
+
+#undef IMPORT_EVENT
+};
+
+struct CTFODeviceIDPopulator {
+  std::chrono::microseconds us;
+  std::vector<std::pair<std::chrono::microseconds, std::string>>& output;
+
+  CTFODeviceIDPopulator(std::vector<std::pair<std::chrono::microseconds, std::string>>& output)
+      : output(output) {}
 
   void operator()(const current::midichlorians::ios::iOSDeviceInfo& input_device_info) {
     typename CTFO_2016_08_01::CTFOEvent ctfo_event;
@@ -97,12 +153,15 @@ int main(int argc, char** argv) {
 
   std::vector<std::pair<std::chrono::microseconds, std::string>> output;
 
-  CTFOEventsParser parser(output);
+  CTFOEventToStreamImporter event_importer(output);
+  CTFODeviceIDPopulator device_id_populator(output);
   for (const std::string& line : current::strings::Split<current::strings::ByLines>(
            current::FileSystem::ReadFileAsString(FLAGS_old_ctfo_events))) {
     const auto e = ParseJSON<current::midichlorians::server::EventLogEntry, JSONFormat::Minimalistic>(line);
-    parser.us = e.server_us;
-    e.event.Call(parser);
+    event_importer.us = e.server_us;
+    e.event.Call(event_importer);
+    device_id_populator.us = e.server_us + std::chrono::microseconds(4);
+    e.event.Call(device_id_populator);
   }
 
   for (const std::string& line : current::strings::Split<current::strings::ByLines>(
