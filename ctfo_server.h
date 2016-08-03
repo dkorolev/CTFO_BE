@@ -1785,7 +1785,7 @@ class CTFOServer final {
                 } else if (valid_share_statuses_.count(event)) {
                   const SHARE_STATUS share_status = valid_share_statuses_.at(event);
                   DebugPrint(Printf(
-                      "[UpdateStateOnEvent] Share status `%s` for uid='%s', cid='%s',token='%s'",
+                      "[UpdateStateOnEvent] Share status `%d` for uid='%s', cid='%s',token='%s'",
                       static_cast<int>(share_status),
                       uid_str.c_str(),
                       cid_str.c_str(),
