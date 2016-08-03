@@ -123,8 +123,8 @@ CURRENT_STRUCT(Color) {
   CURRENT_CONSTRUCTOR(Color)(uint8_t red, uint8_t green, uint8_t blue) : red(red), green(green), blue(blue) {}
 };
 
-static current::sherlock::SherlockNamespaceName SchemaKey() {
-  return current::sherlock::SherlockNamespaceName("CTFO_2016_08_01", "CTFOEvent");
+inline current::sherlock::SherlockNamespaceName SchemaKey() {
+  return current::sherlock::SherlockNamespaceName("CTFO_2016_08_01", "CTFOLogEntry");
 }
 
 }  // namespace CTFO
