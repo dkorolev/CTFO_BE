@@ -1265,31 +1265,31 @@ class CTFOServer final {
       adwords_tracker_;
   HTTPRoutesScope scoped_http_routes_;
 
-  const std::map<std::string, LOG_EVENT> supported_events_ = {
-      {"CTFO", LOG_EVENT::CTFO},
-      {"TFU", LOG_EVENT::TFU},
-      {"SKIP", LOG_EVENT::SKIP},
-      {"FAV", LOG_EVENT::FAV_CARD},
-      {"FAV_CARD", LOG_EVENT::FAV_CARD},
-      {"UNFAV", LOG_EVENT::UNFAV_CARD},
-      {"UNFAV_CARD", LOG_EVENT::UNFAV_CARD},
-      {"LIKE_COMMENT", LOG_EVENT::LIKE_COMMENT},
-      {"UNLIKE_COMMENT", LOG_EVENT::UNLIKE_COMMENT},
-      {"FLAG_COMMENT", LOG_EVENT::FLAG_COMMENT},
-      {"FLAG_CARD", LOG_EVENT::FLAG_CARD},
-      {"REPORT_USER", LOG_EVENT::REPORT_USER},
-      {"BLOCK_USER", LOG_EVENT::BLOCK_USER},
-      {"ONE_SIGNAL_USER_ID", LOG_EVENT::ONE_SIGNAL_USER_ID},
-      {"COMPLETE_SHARE_TO_FACEBOOK", LOG_EVENT::COMPLETE_SHARE_TO_FACEBOOK},
-      {"START_SHARE_TO_FACEBOOK", LOG_EVENT::START_SHARE_TO_FACEBOOK},
-      {"CANCEL_SHARE_TO_FACEBOOK", LOG_EVENT::CANCEL_SHARE_TO_FACEBOOK},
-      {"FAIL_SHARE_TO_FACEBOOK", LOG_EVENT::FAIL_SHARE_TO_FACEBOOK}};
+  const std::map<std::string, CTFO_EVENT> supported_events_ = {
+      {"CTFO", CTFO_EVENT::CTFO},
+      {"TFU", CTFO_EVENT::TFU},
+      {"SKIP", CTFO_EVENT::SKIP},
+      {"FAV", CTFO_EVENT::FAV_CARD},
+      {"FAV_CARD", CTFO_EVENT::FAV_CARD},
+      {"UNFAV", CTFO_EVENT::UNFAV_CARD},
+      {"UNFAV_CARD", CTFO_EVENT::UNFAV_CARD},
+      {"LIKE_COMMENT", CTFO_EVENT::LIKE_COMMENT},
+      {"UNLIKE_COMMENT", CTFO_EVENT::UNLIKE_COMMENT},
+      {"FLAG_COMMENT", CTFO_EVENT::FLAG_COMMENT},
+      {"FLAG_CARD", CTFO_EVENT::FLAG_CARD},
+      {"REPORT_USER", CTFO_EVENT::REPORT_USER},
+      {"BLOCK_USER", CTFO_EVENT::BLOCK_USER},
+      {"ONE_SIGNAL_USER_ID", CTFO_EVENT::ONE_SIGNAL_USER_ID},
+      {"COMPLETE_SHARE_TO_FACEBOOK", CTFO_EVENT::COMPLETE_SHARE_TO_FACEBOOK},
+      {"START_SHARE_TO_FACEBOOK", CTFO_EVENT::START_SHARE_TO_FACEBOOK},
+      {"CANCEL_SHARE_TO_FACEBOOK", CTFO_EVENT::CANCEL_SHARE_TO_FACEBOOK},
+      {"FAIL_SHARE_TO_FACEBOOK", CTFO_EVENT::FAIL_SHARE_TO_FACEBOOK}};
 
-  const std::map<LOG_EVENT, SHARE_STATUS> valid_share_statuses_ = {
-      {LOG_EVENT::COMPLETE_SHARE_TO_FACEBOOK, SHARE_STATUS::COMPLETED},
-      {LOG_EVENT::START_SHARE_TO_FACEBOOK, SHARE_STATUS::INITIATED},
-      {LOG_EVENT::CANCEL_SHARE_TO_FACEBOOK, SHARE_STATUS::CANCELED},
-      {LOG_EVENT::FAIL_SHARE_TO_FACEBOOK, SHARE_STATUS::FAILED}};
+  const std::map<CTFO_EVENT, SHARE_STATUS> valid_share_statuses_ = {
+      {CTFO_EVENT::COMPLETE_SHARE_TO_FACEBOOK, SHARE_STATUS::COMPLETED},
+      {CTFO_EVENT::START_SHARE_TO_FACEBOOK, SHARE_STATUS::INITIATED},
+      {CTFO_EVENT::CANCEL_SHARE_TO_FACEBOOK, SHARE_STATUS::CANCELED},
+      {CTFO_EVENT::FAIL_SHARE_TO_FACEBOOK, SHARE_STATUS::FAILED}};
 
   void DebugPrint(const std::string& message) {
     if (config_.Config().debug_print_to_stderr) {
@@ -1515,7 +1515,7 @@ class CTFOServer final {
         DebugPrint(Printf("[UpdateStateOnEvent] Unhandled event: '%s'", ge.event.c_str()));
         return;
       }
-      const LOG_EVENT event = supported_events_.at(ge.event);
+      const CTFO_EVENT event = supported_events_.at(ge.event);
       const std::string uid_str = ge.fields.at("uid");
       const std::string token = ge.fields.at("token");
       const std::string whom_str = ge.fields.count("whom") ? ge.fields.at("whom") : "";
@@ -1550,7 +1550,7 @@ class CTFOServer final {
                   DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s'.", uid_str.c_str()));
                   return;
                 }
-                if (event == LOG_EVENT::SKIP || event == LOG_EVENT::CTFO || event == LOG_EVENT::TFU) {
+                if (event == CTFO_EVENT::SKIP || event == CTFO_EVENT::CTFO || event == CTFO_EVENT::TFU) {
                   if (cid == CID::INVALID_CARD) {
                     DebugPrint("[UpdateStateOnEvent] No CID.");
                     return;
@@ -1562,7 +1562,7 @@ class CTFOServer final {
                   }
                   // Do not overwrite existing answers, except CTFO/TFU can and should overwrite SKIP.
                   const bool has_answer = Exists(data.answer.Get(uid, cid));
-                  const bool skip_to_overwrite = event != LOG_EVENT::SKIP && has_answer &&
+                  const bool skip_to_overwrite = event != CTFO_EVENT::SKIP && has_answer &&
                                                   Value(data.answer.Get(uid, cid)).answer == ANSWER::SKIP;
                   if (!has_answer || skip_to_overwrite) {
                     data.answer.Add(Answer(uid, cid, static_cast<ANSWER>(event)));
@@ -1575,7 +1575,7 @@ class CTFOServer final {
                     if (Exists(optional_card) && Exists(optional_user)) {
                       Card card = Value(optional_card);
                       User user = Value(optional_user);
-                      if (event == LOG_EVENT::SKIP) {
+                      if (event == CTFO_EVENT::SKIP) {
                         ++card.skip_count;
                       } else {
                         if (skip_to_overwrite) {
@@ -1584,7 +1584,7 @@ class CTFOServer final {
                             --card.skip_count;
                           }
                         }
-                        if (event == LOG_EVENT::CTFO) {
+                        if (event == CTFO_EVENT::CTFO) {
                           ++card.ctfo_count;
                           DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
                                             CIDToString(cid).c_str(),
@@ -1594,7 +1594,7 @@ class CTFOServer final {
                               Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
                                      UIDToString(uid).c_str(),
                                      50u));
-                        } else if (event == LOG_EVENT::TFU) {
+                        } else if (event == CTFO_EVENT::TFU) {
                           ++card.tfu_count;
                           DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
                                             CIDToString(cid).c_str(),
@@ -1607,7 +1607,7 @@ class CTFOServer final {
                         }
                       }
 
-                      if (event != LOG_EVENT::SKIP && user.level < LEVEL_SCORES.size() - 1 &&
+                      if (event != CTFO_EVENT::SKIP && user.level < LEVEL_SCORES.size() - 1 &&
                           user.score > LEVEL_SCORES[user.level + 1]) {
                         user.score -= LEVEL_SCORES[user.level + 1];
                         ++user.level;
@@ -1619,7 +1619,7 @@ class CTFOServer final {
                       data.card.Add(card);
                       data.user.Add(user);
 
-                      if (event != LOG_EVENT::SKIP) {
+                      if (event != CTFO_EVENT::SKIP) {
                         // Emit the "new votes on my card" notification.
                         const auto author = data.author_card.GetEntryFromCol(cid);
                         if (Exists(author)) {
@@ -1638,7 +1638,7 @@ class CTFOServer final {
                                       CIDToString(cid).c_str(),
                                       static_cast<int>(Value(data.answer.Get(uid, cid)).answer)));
                   }
-                } else if (event == LOG_EVENT::FAV_CARD || event == LOG_EVENT::UNFAV_CARD) {
+                } else if (event == CTFO_EVENT::FAV_CARD || event == CTFO_EVENT::UNFAV_CARD) {
                   if (cid == CID::INVALID_CARD) {
                     DebugPrint("[UpdateStateOnEvent] No CID.");
                     return;
@@ -1649,13 +1649,13 @@ class CTFOServer final {
                     return;
                   }
                   auto& favorites_mutator = data.favorite;
-                  favorites_mutator.Add(Favorite(uid, cid, (event == LOG_EVENT::FAV_CARD)));
+                  favorites_mutator.Add(Favorite(uid, cid, (event == CTFO_EVENT::FAV_CARD)));
                   DebugPrint(Printf("[UpdateStateOnEvent] Added favorite: [%s, %s, %s]",
                                     UIDToString(uid).c_str(),
                                     CIDToString(cid).c_str(),
-                                    (event == LOG_EVENT::FAV_CARD) ? "Favorite" : "Unfavorite"));
+                                    (event == CTFO_EVENT::FAV_CARD) ? "Favorite" : "Unfavorite"));
 
-                  if (event == LOG_EVENT::FAV_CARD) {
+                  if (event == CTFO_EVENT::FAV_CARD) {
                     // Emit the "my card starred" notification.
                     const auto star_notification_key = UIDAndCID(uid, cid);
                     if (!Exists(data.starred_notification_already_sent[star_notification_key])) {
@@ -1672,9 +1672,9 @@ class CTFOServer final {
                       }
                     }
                   }
-                } else if (event == LOG_EVENT::LIKE_COMMENT ||
-                           event == LOG_EVENT::UNLIKE_COMMENT ||
-                           event == LOG_EVENT::FLAG_COMMENT) {
+                } else if (event == CTFO_EVENT::LIKE_COMMENT ||
+                           event == CTFO_EVENT::UNLIKE_COMMENT ||
+                           event == CTFO_EVENT::FLAG_COMMENT) {
                   if (oid == OID::INVALID_COMMENT) {
                     DebugPrint("[UpdateStateOnEvent] No OID.");
                     return;
@@ -1684,7 +1684,7 @@ class CTFOServer final {
                                       oid_str.c_str()));
                     return;
                   }
-                  if (event == LOG_EVENT::LIKE_COMMENT) {
+                  if (event == CTFO_EVENT::LIKE_COMMENT) {
                     DebugPrint(Printf("[UpdateStateOnEvent] Like comment '%s' '%s'.",
                                       uid_str.c_str(),
                                       oid_str.c_str()));
@@ -1706,12 +1706,12 @@ class CTFOServer final {
                       }
                     }
 
-                  } else if (event == LOG_EVENT::UNLIKE_COMMENT) {
+                  } else if (event == CTFO_EVENT::UNLIKE_COMMENT) {
                     DebugPrint(Printf("[UpdateStateOnEvent] Unlike comment '%s' '%s'.",
                                       uid_str.c_str(),
                                       oid_str.c_str()));
                     data.comment_like.Erase(oid, uid);
-                  } else if (event == LOG_EVENT::FLAG_COMMENT) {
+                  } else if (event == CTFO_EVENT::FLAG_COMMENT) {
                     DebugPrint(Printf("[UpdateStateOnEvent] Flag comment '%s' '%s'.",
                                       uid_str.c_str(),
                                       oid_str.c_str()));
@@ -1727,7 +1727,7 @@ class CTFOServer final {
                         cid_str.c_str(),
                         token.c_str()));
                   }
-                } else if (event == LOG_EVENT::FLAG_CARD) {
+                } else if (event == CTFO_EVENT::FLAG_CARD) {
                   if (cid == CID::INVALID_CARD) {
                     DebugPrint("[UpdateStateOnEvent] No CID.");
                     return;
@@ -1743,7 +1743,7 @@ class CTFOServer final {
                   flag.cid = cid;
                   flag.uid = uid;
                   data.flagged_card.Add(flag);
-                } else if (event == LOG_EVENT::REPORT_USER || event == LOG_EVENT::BLOCK_USER) {
+                } else if (event == CTFO_EVENT::REPORT_USER || event == CTFO_EVENT::BLOCK_USER) {
                   if (whom == UID::INVALID_USER) {
                     DebugPrint("[UpdateStateOnEvent] No WHOM.");
                     return;
@@ -1758,9 +1758,9 @@ class CTFOServer final {
                   }
                   DebugPrint(Printf("[UpdateStateOnEvent] '%s' %s '%s'.",
                                     uid_str.c_str(),
-                                    (event == LOG_EVENT::REPORT_USER) ? "reported" : "blocked",
+                                    (event == CTFO_EVENT::REPORT_USER) ? "reported" : "blocked",
                                     whom_str.c_str()));
-                  if (event == LOG_EVENT::REPORT_USER) {
+                  if (event == CTFO_EVENT::REPORT_USER) {
                     data.user_reported_user.Add(UserReportedUser(uid, whom));
                   } else {
                     data.user_blocked_user.Add(UserBlockedUser(uid, whom));
@@ -1773,7 +1773,7 @@ class CTFOServer final {
                       BanUser(data, whom);
                     }
                   }
-                } else if (event == LOG_EVENT::ONE_SIGNAL_USER_ID) {
+                } else if (event == CTFO_EVENT::ONE_SIGNAL_USER_ID) {
                   if (!user_id_str.empty()) {
                     UserNotificationPlayerID player_id_record;
                     player_id_record.uid = uid;

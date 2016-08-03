@@ -92,7 +92,7 @@ CURRENT_ENUM(SHARE_STATUS, uint8_t){
     UNDEFINED = 0u, COMPLETED = 1u, INITIATED = 101u, CANCELED = 111u, FAILED = 112u};
 
 // To parse incoming Midichlorians logs.
-enum class LOG_EVENT : int {
+enum class CTFO_EVENT : int {
   SKIP = static_cast<int>(ANSWER::SKIP),
   CTFO = static_cast<int>(ANSWER::CTFO),
   TFU = static_cast<int>(ANSWER::TFU),
