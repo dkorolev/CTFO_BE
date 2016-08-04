@@ -4,7 +4,7 @@ matrix:
       env:
       - NDEBUG=0
       - CPLUSPLUS=g++-5
-      compiler: "g++-5, Job: make individual_tests"
+      compiler: "g++-5, Job: ./ci.sh"
       os: linux
       addons:
         apt:
@@ -17,7 +17,7 @@ matrix:
       env:
       - NDEBUG=0
       - CPLUSPLUS=clang++-3.6
-      compiler: "clang++-3.6, Job: make individual_tests"
+      compiler: "clang++-3.6, Job: ./ci.sh"
       os: linux
       addons:
         apt:
@@ -31,7 +31,7 @@ matrix:
       env:
       - NDEBUG=1
       - CPLUSPLUS=g++-5
-      compiler: "g++-5, Job: make individual_tests"
+      compiler: "g++-5, Job: ./ci.sh"
       os: linux
       addons:
         apt:
@@ -44,7 +44,7 @@ matrix:
       env:
       - NDEBUG=1
       - CPLUSPLUS=clang++-3.6
-      compiler: "clang++-3.6, Job: make individual_tests"
+      compiler: "clang++-3.6, Job: ./ci.sh"
       os: linux
       addons:
         apt:
@@ -57,13 +57,13 @@ matrix:
     - script: ./ci.sh
       env:
       - NDEBUG=0
-      compiler: "native clang++, Job: make individual_tests"
+      compiler: "native clang++, Job: ./ci.sh"
       os: osx
 
     - script: ./ci.sh
       env:
       - NDEBUG=1
-      compiler: "native clang++, Job: make individual_tests"
+      compiler: "native clang++, Job: ./ci.sh"
       os: osx
 
 notifications:
