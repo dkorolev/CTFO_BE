@@ -238,8 +238,7 @@ class CTFOServer final {
                 }(),
                 config_.Config().onesignal_app_id,
                 config_.Config().onesignal_app_port),
-        push_notifications_sender_subcriber_scope_(
-            storage_.InternalExposeStream().Subscribe<transaction_t>(pusher_)),
+        push_notifications_sender_subcriber_scope_(stream_.Subscribe<transaction_t>(pusher_)),
         adwords_tracker_(config_.Config().adwords_config, config_.Config().adwords_app_port) {
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
     std::ifstream cf(config_.Config().cards_file);
@@ -275,8 +274,8 @@ class CTFOServer final {
     if (Exists(config_.Config().raw_log_url_path)) {
       const auto route = Value(config_.Config().raw_log_url_path);
       DebugPrint("Registering raw log on: `" + route + "`.");
-      scoped_http_routes_ += HTTP(port).Register(
-          route, URLPathArgs::CountMask::None | URLPathArgs::CountMask::One, storage_.InternalExposeStream());
+      scoped_http_routes_ +=
+          HTTP(port).Register(route, URLPathArgs::CountMask::None | URLPathArgs::CountMask::One, stream_);
     }
   }
 
