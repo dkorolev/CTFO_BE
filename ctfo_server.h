@@ -128,7 +128,7 @@ CURRENT_STRUCT(CTFOServerParams) {
                             "The HTTP url path to expose the storage underlying stream raw log in.");
   CURRENT_FIELD(midichlorians_url_path, std::string, "/ctfo/log");
   CURRENT_FIELD_DESCRIPTION(midichlorians_url_path, "The HTTP url path for the midichlorians server.");
-  CURRENT_FIELD(tick_interval_ms, std::chrono::milliseconds, std::chrono::microseconds(0));
+  CURRENT_FIELD(tick_interval_ms, std::chrono::milliseconds, std::chrono::milliseconds(0));
   CURRENT_FIELD_DESCRIPTION(tick_interval_ms, "Maximum interval between event entries.");
   CURRENT_FIELD(debug_print_to_stderr, bool, false);
   CURRENT_FIELD_DESCRIPTION(debug_print_to_stderr, "Print debug info to stderr.");
