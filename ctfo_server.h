@@ -254,7 +254,7 @@ class CTFOServer final {
         const Card card = ParseJSON<Card>(line);
         if (!Exists(data.card[card.cid])) {
           data.card.Add(card);
-          data.author_card.Add(AuthorCard{admin_uid, card.cid});
+          data.author_card.Add(AuthorCard(admin_uid, card.cid));
         }
       }
     }).Go();
@@ -380,6 +380,7 @@ class CTFOServer final {
               AuthKey auth_key("iOS::" + device_id + "::" + app_key, AUTH_TYPE::IOS);
               UID uid = UID::INVALID_USER;
               User user;
+
               ResponseUserEntry user_entry;
               std::string token;
 
@@ -388,11 +389,10 @@ class CTFOServer final {
                 uid = Value(uid_auth_accessor.GetEntryFromCol(auth_key)).uid;
               }
 
-              auto& auth_token_mutator = data.auth_token;
               if (uid != UID::INVALID_USER) {
                 // User exists => invalidate all tokens.
-                for (const auto& auth_token : auth_token_mutator.Row(auth_key)) {
-                  auth_token_mutator.Add(AuthKeyTokenPair(auth_key, auth_token.token, false));
+                for (const auto& auth_token : data.auth_token.Row(auth_key)) {
+                  data.auth_token.Add(AuthKeyTokenPair(auth_key, auth_token.token, false));
                 }
                 user = Value(data.user[uid]);
               }
@@ -400,10 +400,11 @@ class CTFOServer final {
               // Generate a new token.
               do {
                 token = RandomToken();
-              } while (auth_token_mutator.Cols().Has(token));
-              auth_token_mutator.Add(AuthKeyTokenPair(auth_key, token, true));
+              } while (data.auth_token.Cols().Has(token));
+              data.auth_token.Add(AuthKeyTokenPair(auth_key, token, true));
 
-              if (uid != UID::INVALID_USER) {  // Existing user.
+              if (uid != UID::INVALID_USER) {
+                // Existing user.
                 user_entry.score = user.score;
                 DebugPrint(
                   Printf("[/ctfo/auth/ios] Existing user: UID='%s', DeviceID='%s', AppKey='%s', Token='%s'",
@@ -411,9 +412,11 @@ class CTFOServer final {
                          device_id.c_str(),
                          app_key.c_str(),
                          token.c_str()));
-              } else {  // New user.
+              } else {
+                // New user.
                 uid = RandomUID();
                 user.uid = uid;
+                user.us = current::time::Now();
                 data.user.Add(user);
                 data.uid_auth.Add(UIDAuthKeyPair(user.uid, auth_key));
               }
@@ -819,19 +822,8 @@ class CTFOServer final {
                                     requested_url.c_str()));
                   const auto now = current::time::Now();
 
-                  auto& cards_mutator = data.card;
-                  auto& authors_mutator = data.author_card;
-
-                  Card card;
-                  card.cid = cid;
-                  card.text = request.text;
-                  card.color = request.color;
-                  cards_mutator.Add(card);
-
-                  AuthorCard author;
-                  author.uid = uid;
-                  author.cid = cid;
-                  authors_mutator.Add(author);
+                  data.card.Add(Card(cid, request.text, request.color));
+                  data.author_card.Add(AuthorCard(uid, cid));
 
                   ResponseAddCard response;
                   response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(now);
@@ -871,24 +863,21 @@ class CTFOServer final {
             return Response("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.Unauthorized);
           } else {
             DebugPrint(Printf("[/ctfo/card] Token validated. Requested URL = '%s'", requested_url.c_str()));
-            auto& cards_mutator = data.card;
-            auto& author_cards_mutator = data.author_card;
-            const auto author_card = author_cards_mutator.GetEntryFromCol(cid);
+            const auto author_card = data.author_card.GetEntryFromCol(cid);
             if (Exists(author_card)) {
               const UID author_uid = Value(author_card).uid;
               if (author_uid != uid) {
                 return Response("NOT YOUR CARD BRO\n", HTTPResponseCode.Unauthorized);
               } else {
-                cards_mutator.Erase(cid);
-                author_cards_mutator.Erase(uid, cid);
-                auto& comments_mutator = data.comment;
+                data.card.Erase(cid);
+                data.author_card.Erase(uid, cid);
                 std::vector<OID> oids_to_delete;
-                const auto comments_per_card = comments_mutator.Rows()[cid];
-                for (const auto& c : comments_mutator.Row(cid)) {
+                const auto comments_per_card = data.comment.Rows()[cid];
+                for (const auto& c : data.comment.Row(cid)) {
                   oids_to_delete.push_back(c.oid);
                 }
                 for (const OID& o : oids_to_delete) {
-                  comments_mutator.Erase(cid, o);
+                  data.comment.Erase(cid, o);
                 }
                 ResponseDeleteCard response;
                 response.ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
@@ -1075,17 +1064,11 @@ class CTFOServer final {
                     card_author_uid = Value(element).uid;
                   }
 
-                  auto& comments_mutator = data.comment;
-
-                  Comment comment;
-                  comment.cid = cid;
-                  comment.oid = oid;
-                  comment.author_uid = uid;
-                  comment.text = request.text;
+                  Comment comment(cid, oid, OID::INVALID_COMMENT, uid, request.text);
 
                   if (parent_oid != OID::INVALID_COMMENT) {
                     comment.parent_oid = parent_oid;
-                    const auto v = comments_mutator.GetEntryFromCol(parent_oid);
+                    const auto v = data.comment.GetEntryFromCol(parent_oid);
                     if (Exists(v)) {
                       const Comment& parent_comment = Value(v);
                       if (parent_comment.parent_oid != OID::INVALID_COMMENT) {
@@ -1098,7 +1081,7 @@ class CTFOServer final {
                     }
                   }
 
-                  comments_mutator.Add(comment);
+                  data.comment.Add(comment);
 
                   // Emit the "new comment on my card" notification.
                   if (card_author_uid != UID::INVALID_USER && card_author_uid != uid) {
@@ -1165,17 +1148,16 @@ class CTFOServer final {
                   DebugPrint(Printf("[/ctfo/comments] Token validated. Requested URL = '%s'",
                                      requested_url.c_str()));
                   // TODO(dkorolev): Do something smart about non-existing comments.
-                  auto& comments_mutator = data.comment;
                   std::vector<OID> oids_to_delete;
                   oids_to_delete.push_back(oid);
-                  const auto comments_per_card = comments_mutator.Rows()[cid];
-                  for (const Comment& c : comments_mutator.Row(cid)) {
+                  const auto comments_per_card = data.comment.Rows()[cid];
+                  for (const Comment& c : data.comment.Row(cid)) {
                     if (c.parent_oid == oid) {
                       oids_to_delete.push_back(c.oid);
                     }
                   }
                   for (const OID& o : oids_to_delete) {
-                    comments_mutator.Erase(cid, o);
+                    data.comment.Erase(cid, o);
                   }
                   ResponseDeleteComment response;
                   response.ms =
@@ -1649,8 +1631,7 @@ class CTFOServer final {
                         Printf("[UpdateStateOnEvent] Nonexistent CID '%s' FAV/UNFAV.", cid_str.c_str()));
                     return;
                   }
-                  auto& favorites_mutator = data.favorite;
-                  favorites_mutator.Add(Favorite(uid, cid, (event == CTFO_EVENT::FAV_CARD)));
+                  data.favorite.Add(Favorite(uid, cid, (event == CTFO_EVENT::FAV_CARD)));
                   DebugPrint(Printf("[UpdateStateOnEvent] Added favorite: [%s, %s, %s]",
                                     UIDToString(uid).c_str(),
                                     CIDToString(cid).c_str(),

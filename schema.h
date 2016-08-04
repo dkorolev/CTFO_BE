@@ -167,11 +167,11 @@ const std::vector<Color> CARD_COLORS{{0x0A, 0xB2, 0xCB},
 CURRENT_STRUCT(User) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
   CURRENT_USE_FIELD_AS_KEY(uid);
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);
+  CURRENT_FIELD(us, std::chrono::microseconds, std::chrono::microseconds(0));
   CURRENT_FIELD(level, uint8_t, 0u);   // User level [0, 9].
   CURRENT_FIELD(score, uint64_t, 0u);  // User score.
 
-  CURRENT_DEFAULT_CONSTRUCTOR(User) : us(current::time::Now()) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(User) {}
 
   void InitializeOwnKey() {}
 };
@@ -253,7 +253,7 @@ CURRENT_STRUCT(PushNotificationsMarker) {
 CURRENT_STRUCT(Card) {
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_KEY(cid);
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);
+  CURRENT_FIELD(us, std::chrono::microseconds, std::chrono::microseconds(0));
   CURRENT_FIELD(text, std::string);
   CURRENT_FIELD(color, Color);
   CURRENT_FIELD(ctfo_count, uint32_t, 0u);    // Number of users, who said "CTFO" on this card.
@@ -261,7 +261,7 @@ CURRENT_STRUCT(Card) {
   CURRENT_FIELD(skip_count, uint32_t, 0u);    // Number of users, who said "SKIP" on this card.
   CURRENT_FIELD(startup_index, double, 0.0);  // Cards with `startup_index != 0` will be on the top.
 
-  CURRENT_DEFAULT_CONSTRUCTOR(Card) : us(current::time::Now()) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(Card) {}
   CURRENT_CONSTRUCTOR(Card)(CID cid, const std::string& text, const Color& color)
       : cid(cid), us(current::time::Now()), text(text), color(color) {}
 
@@ -273,9 +273,9 @@ CURRENT_STRUCT(AuthorCard) {
   CURRENT_USE_FIELD_AS_ROW(uid);
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_COL(cid);
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);
+  CURRENT_FIELD(us, std::chrono::microseconds, std::chrono::microseconds(0));
 
-  CURRENT_DEFAULT_CONSTRUCTOR(AuthorCard) : us(current::time::Now()) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(AuthorCard) {}
   CURRENT_CONSTRUCTOR(AuthorCard)(UID uid, CID cid) : uid(uid), cid(cid), us(current::time::Now()) {}
 };
 
@@ -295,10 +295,10 @@ CURRENT_STRUCT(Favorite) {
   CURRENT_USE_FIELD_AS_ROW(uid);
   CURRENT_FIELD(cid, CID, CID::INVALID_CARD);
   CURRENT_USE_FIELD_AS_COL(cid);
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);
+  CURRENT_FIELD(us, std::chrono::microseconds, std::chrono::microseconds(0));
   CURRENT_FIELD(favorited, bool, false);
 
-  CURRENT_DEFAULT_CONSTRUCTOR(Favorite) : us(current::time::Now()) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(Favorite) {}
   CURRENT_CONSTRUCTOR(Favorite)(const UID uid, const CID cid, bool favorited = false)
       : uid(uid), cid(cid), us(current::time::Now()), favorited(favorited) {}
 };
@@ -308,14 +308,14 @@ CURRENT_STRUCT(Comment) {
   CURRENT_USE_FIELD_AS_ROW(cid);
   CURRENT_FIELD(oid, OID, OID::INVALID_COMMENT);
   CURRENT_USE_FIELD_AS_COL(oid);
-  CURRENT_FIELD(us, std::chrono::microseconds, 0);
+  CURRENT_FIELD(us, std::chrono::microseconds, std::chrono::microseconds(0));
   CURRENT_FIELD(parent_oid,
                 OID,
                 OID::INVALID_COMMENT);  // `INVALID_COMMENT` for a top-level comment, parent OID otherwise.
   CURRENT_FIELD(author_uid, UID, UID::INVALID_USER);
   CURRENT_FIELD(text, std::string, "");
 
-  CURRENT_DEFAULT_CONSTRUCTOR(Comment) : us(current::time::Now()) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(Comment) {}
   CURRENT_CONSTRUCTOR(Comment)(
       const CID cid, const OID oid, const OID parent_oid, const UID author_uid, const std::string& text)
       : cid(cid),
@@ -595,7 +595,7 @@ struct ResponseNotificationBuilder {
 CURRENT_STRUCT(Notification) {
   CURRENT_FIELD(uid, UID, UID::INVALID_USER);
   CURRENT_USE_FIELD_AS_ROW(uid);
-  CURRENT_FIELD(timestamp, std::chrono::microseconds, 0);
+  CURRENT_FIELD(timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
   CURRENT_USE_FIELD_AS_COL(timestamp);
   CURRENT_FIELD(notification, T_NOTIFICATIONS_VARIANT);
 
@@ -605,7 +605,7 @@ CURRENT_STRUCT(Notification) {
     return std::chrono::microseconds((static_cast<int64_t>(us.count()) / 1000ll) * 1000ll);
   }
 
-  CURRENT_DEFAULT_CONSTRUCTOR(Notification) : timestamp(current::time::Now()) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(Notification) {}
   CURRENT_CONSTRUCTOR(Notification)(  // clang-format off
       UID uid, std::chrono::microseconds us, T_NOTIFICATIONS_VARIANT&& notification)
       : uid(uid), timestamp(RoundToMilliseconds(us)), notification(std::move(notification)) {}  // clang-format on
