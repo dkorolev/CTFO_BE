@@ -76,15 +76,15 @@ struct CTFOServerScope {
     current::random::SetRandomSeed(42);
 
     const CTFOServerParams params = CTFOServerParams()
-        .SetAPIPort(FLAGS_api_port)
-        .SetRESTPort(FLAGS_rest_port)
-        .SetMidichloriansPort(FLAGS_midichlorians_port)
-        .SetStorageFile(db_file)
-        .SetCardsFile(FLAGS_cards_file)
-        .SetRESTURLPrefix(FLAGS_rest_url_prefix)
-        .SetTickInterval(std::chrono::milliseconds(100))
+                                        .SetAPIPort(FLAGS_api_port)
+                                        .SetRESTPort(FLAGS_rest_port)
+                                        .SetMidichloriansPort(FLAGS_midichlorians_port)
+                                        .SetStorageFile(db_file)
+                                        .SetCardsFile(FLAGS_cards_file)
+                                        .SetRESTURLPrefix(FLAGS_rest_url_prefix)
+                                        .SetTickInterval(std::chrono::milliseconds(100))
 #ifdef CTFO_DEBUG
-        .SetDebugPrint(true)
+                                        .SetDebugPrint(true)
 #endif
         ;
     current::FileSystem::WriteStringToFile(JSON(params), config_file.c_str());
@@ -98,9 +98,7 @@ struct CTFOServerScope {
   std::unique_ptr<CTFOServer> ctfo_server_;
 };
 
-inline CTFOServerScope SpawnTestServer(const std::string& suffix) {
-  return CTFOServerScope(suffix);
-}
+inline CTFOServerScope SpawnTestServer(const std::string& suffix) { return CTFOServerScope(suffix); }
 
 template <typename T_RESPONSE>
 inline T_RESPONSE ParseResponse(const std::string& source) {
@@ -1399,7 +1397,8 @@ TEST(CTFO, SmokeTest) {
   {
     // Sanity check there is one favorited card.
     {
-      current::time::SetNow(std::chrono::microseconds(700 * 1000 * 1000), std::chrono::microseconds(700 * 1001 * 1000));
+      current::time::SetNow(std::chrono::microseconds(700 * 1000 * 1000),
+                            std::chrono::microseconds(700 * 1001 * 1000));
       const auto favs = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                                         FLAGS_api_port,
                                         actual_uid.c_str(),
@@ -1412,7 +1411,8 @@ TEST(CTFO, SmokeTest) {
 
     // Flag that card.
     {
-      current::time::SetNow(std::chrono::microseconds(701 * 1000 * 1000), std::chrono::microseconds(701 * 1001 * 1000));
+      current::time::SetNow(std::chrono::microseconds(701 * 1000 * 1000),
+                            std::chrono::microseconds(701 * 1001 * 1000));
       favorite_event.event = "FLAG_CARD";
       favorite_event.fields["uid"] = actual_uid;
       favorite_event.fields["token"] = actual_token;
@@ -1426,7 +1426,8 @@ TEST(CTFO, SmokeTest) {
 
     // Confirm it's gone.
     {
-      current::time::SetNow(std::chrono::microseconds(702 * 1000 * 1000), std::chrono::microseconds(702 * 1001 * 1000));
+      current::time::SetNow(std::chrono::microseconds(702 * 1000 * 1000),
+                            std::chrono::microseconds(702 * 1001 * 1000));
       const auto favs = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                                         FLAGS_api_port,
                                         actual_uid.c_str(),
