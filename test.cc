@@ -25,7 +25,11 @@ SOFTWARE.
 *******************************************************************************/
 
 #define CURRENT_MOCK_TIME  // `SetNow()`.
-#define CURRENT_CI  // Disable AdWords and OneSignal integrations.
+
+// Disable AdWords and OneSignal integrations while running the tests.
+#ifndef CURRENT_CI
+#define CURRENT_CI
+#endif
 
 #define MUST_IMPORT_INITIAL_CTFO_CARDS
 
