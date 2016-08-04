@@ -1209,7 +1209,9 @@ class CTFOServer final {
         : storage(storage),
           starting_from(last_pushed_notification_timestamp + std::chrono::microseconds(1)),
           transport(onesignal_app_id, onesignal_local_port) {
+#ifndef CURRENT_CI
       std::cerr << "Starting sending push notifications from " << starting_from.count() << " epoch us.\n";
+#endif  // CURRENT_CI
     }
 
     current::ss::EntryResponse operator()(const transaction_t& entry, idxts_t current, idxts_t) const {
