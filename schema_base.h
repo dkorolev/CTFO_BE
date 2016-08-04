@@ -87,9 +87,12 @@ CURRENT_ENUM(OID, uint64_t){INVALID_COMMENT = 0u};
 CURRENT_ENUM(NID, uint64_t){INVALID_NOTIFICATION = 0u};
 CURRENT_ENUM(ANSWER, int8_t){UNSEEN = 0, CTFO = 1, TFU = 2, SKIP = -1};
 CURRENT_ENUM(AUTH_TYPE, uint8_t){UNDEFINED = 0u, IOS = 1u};
+CURRENT_ENUM(SHARE_DESTINATION, uint8_t){UNDEFINED = 0u, FACEBOOK = 101};
+CURRENT_ENUM(SHARE_STATUS, uint8_t){
+    UNDEFINED = 0u, COMPLETED = 1u, INITIATED = 101u, CANCELED = 111u, FAILED = 112u};
 
 // To parse incoming Midichlorians logs.
-enum class LOG_EVENT : int {
+enum class CTFO_EVENT : int {
   SKIP = static_cast<int>(ANSWER::SKIP),
   CTFO = static_cast<int>(ANSWER::CTFO),
   TFU = static_cast<int>(ANSWER::TFU),
@@ -101,7 +104,11 @@ enum class LOG_EVENT : int {
   FLAG_CARD = 301,
   REPORT_USER = 401,
   BLOCK_USER = 402,
-  ONE_SIGNAL_USER_ID = 501
+  ONE_SIGNAL_USER_ID = 501,
+  COMPLETE_SHARE_TO_FACEBOOK = 601,
+  START_SHARE_TO_FACEBOOK = 602,
+  CANCEL_SHARE_TO_FACEBOOK = 603,
+  FAIL_SHARE_TO_FACEBOOK = 604
 };
 
 CURRENT_STRUCT(Color) {
@@ -113,8 +120,8 @@ CURRENT_STRUCT(Color) {
   CURRENT_CONSTRUCTOR(Color)(uint8_t red, uint8_t green, uint8_t blue) : red(red), green(green), blue(blue) {}
 };
 
-static current::sherlock::SherlockNamespaceName SchemaKey() {
-  return current::sherlock::SherlockNamespaceName("NewCTFOStorage", "TopLevelTransaction");
+inline current::sherlock::SherlockNamespaceName SchemaKey() {
+  return current::sherlock::SherlockNamespaceName("CTFO_2016_08_01", "CTFOLogEntry");
 }
 
 }  // namespace CTFO

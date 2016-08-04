@@ -51,19 +51,14 @@ using namespace current::midichlorians::server;
 std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
 #ifdef CTFO_DEBUG
   const std::string db_file = "unittest-db-" + suffix + ".log";
-  const std::string log_file = "unittest-log-" + suffix + ".log";
   const std::string config_file = "unittest-config-" + suffix + ".json";
   current::FileSystem::RmFile(db_file, current::FileSystem::RmFileParameters::Silent);
-  current::FileSystem::RmFile(log_file, current::FileSystem::RmFileParameters::Silent);
   current::FileSystem::RmFile(config_file, current::FileSystem::RmFileParameters::Silent);
 #else
   static_cast<void>(suffix);
 
   const std::string db_file = current::FileSystem::GenTmpFileName();
   current::FileSystem::ScopedRmFile scoped_rm_db_file(db_file);
-
-  const std::string log_file = current::FileSystem::GenTmpFileName();
-  current::FileSystem::ScopedRmFile scoped_rm_log_file(log_file);
 
   const std::string config_file = current::FileSystem::GenTmpFileName();
   current::FileSystem::ScopedRmFile scoped_rm_config_file(config_file);
@@ -80,7 +75,6 @@ std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
                                       .SetStorageFile(db_file)
                                       .SetCardsFile(FLAGS_cards_file)
                                       .SetRESTURLPrefix(FLAGS_rest_url_prefix)
-                                      .SetMidichloriansFile(log_file)
                                       .SetTickInterval(std::chrono::milliseconds(100))
 #ifdef CTFO_DEBUG
                                       .SetDebugPrint(true)

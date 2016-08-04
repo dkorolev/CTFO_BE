@@ -76,10 +76,8 @@ struct CTFOHypermedia
 #endif
 
   template <class HTTP_VERB, typename OPERATION, typename PARTICULAR_FIELD, typename ENTRY, typename KEY>
-  struct RESTfulDataHandler
-      : super_t::RESTfulDataHandler<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY> {
-    using restful_super_t =
-        super_t::RESTfulDataHandler<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY>;
+  struct RESTfulDataHandler : super_t::RESTfulDataHandler<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY> {
+    using restful_super_t = super_t::RESTfulDataHandler<HTTP_VERB, OPERATION, PARTICULAR_FIELD, ENTRY, KEY>;
     using headers_list_t = std::vector<current::net::http::Header>;
     headers_list_t headers;
 
@@ -121,8 +119,6 @@ CURRENT_STRUCT(CTFOServerParams) {
   CURRENT_FIELD_DESCRIPTION(storage_file, "The file to store the snapshot of the database in.");
   CURRENT_FIELD(cards_file, std::string);
   CURRENT_FIELD_DESCRIPTION(cards_file, "Cards data file in JSON format.");
-  CURRENT_FIELD(midichlorians_file, std::string);
-  CURRENT_FIELD_DESCRIPTION(midichlorians_file, "Log file to store events received by midichlorians server.");
   CURRENT_FIELD(rest_url_prefix, std::string);
   CURRENT_FIELD_DESCRIPTION(rest_url_prefix, "Hypermedia route prefix to spawn RESTful server on.");
   CURRENT_FIELD(rest_url_path, std::string, "/ctfo/rest");
@@ -176,10 +172,6 @@ CURRENT_STRUCT(CTFOServerParams) {
     cards_file = file;
     return *this;
   }
-  CTFOServerParams& SetMidichloriansFile(const std::string& file) {
-    midichlorians_file = file;
-    return *this;
-  }
   CTFOServerParams& SetRESTURLPrefix(const std::string& prefix) {
     rest_url_prefix = prefix;
     return *this;
@@ -206,12 +198,18 @@ CURRENT_STRUCT(CTFOServerParams) {
   }
 };
 
+using CTFOStorageTransaction = typename current::storage::transaction_t<CTFOStorage>;
+using CTFOLogEntry = Variant<CTFOStorageTransaction, current::midichlorians::server::EventLogEntry>;
+
 class CTFOServer final {
  public:
-  using Storage = CTFOStorage<SherlockStreamPersister>;
-  using MidichloriansServer = current::midichlorians::server::MidichloriansHTTPServer<CTFOServer>;
-  using RESTStorage = RESTfulStorage<Storage, CTFOHypermedia>;
-  using Config = current::SelfModifyingConfig<CTFOServerParams>;
+  using storage_t =
+      CTFOStorage<SherlockStreamPersister, current::storage::transaction_policy::Synchronous, CTFOLogEntry>;
+  using transaction_t = CTFOStorageTransaction;
+  using stream_t = current::sherlock::Stream<CTFOLogEntry, current::persistence::File>;
+  using midichlorians_server_t = current::midichlorians::server::MidichloriansHTTPServer<CTFOServer>;
+  using rest_t = RESTfulStorage<storage_t, CTFOHypermedia>;
+  using config_t = current::SelfModifyingConfig<CTFOServerParams>;
 
   explicit CTFOServer(const std::string& config_path)
       : config_(config_path),
@@ -220,7 +218,8 @@ class CTFOServer final {
                               config_.Config().tick_interval_ms,
                               config_.Config().midichlorians_url_path,
                               "OK\n"),
-        storage_(CTFO::SchemaKey(), config_.Config().storage_file),
+        stream_(CTFO::SchemaKey(), config_.Config().storage_file),
+        storage_(stream_),
         rest_(storage_,
               config_.Config().rest_port,
               config_.Config().rest_url_path,
@@ -228,7 +227,7 @@ class CTFOServer final {
         pusher_(storage_,
                 [this]() {
                   return Value(storage_.ReadOnlyTransaction(
-                                            [](ImmutableFields<Storage> fields) -> std::chrono::microseconds {
+                                            [](ImmutableFields<storage_t> fields) -> std::chrono::microseconds {
                                               const auto placeholder = fields.push_notifications_marker[""];
                                               if (Exists(placeholder)) {
                                                 return Value(placeholder).last_pushed_notification_timestamp;
@@ -239,14 +238,13 @@ class CTFOServer final {
                 }(),
                 config_.Config().onesignal_app_id,
                 config_.Config().onesignal_app_port),
-        push_notifications_sender_subcriber_scope_(storage_.InternalExposeStream().Subscribe(pusher_)),
+        push_notifications_sender_subcriber_scope_(
+            storage_.InternalExposeStream().Subscribe<transaction_t>(pusher_)),
         adwords_tracker_(config_.Config().adwords_config, config_.Config().adwords_app_port) {
-    midichlorians_stream_.open(config_.Config().midichlorians_file, std::ofstream::out | std::ofstream::app);
-
 #ifdef MUST_IMPORT_INITIAL_CTFO_CARDS
     std::ifstream cf(config_.Config().cards_file);
     assert(cf.good());
-    storage_.ReadWriteTransaction([&cf](MutableFields<Storage> data) {
+    storage_.ReadWriteTransaction([&cf](MutableFields<storage_t> data) {
       User admin_user;
       admin_user.uid = admin_uid;
       admin_user.level = 80;         // Superuser 80lvl.
@@ -292,7 +290,7 @@ class CTFOServer final {
   void operator()(const current::midichlorians::server::TickLogEntry&) {}
 
   void operator()(const current::midichlorians::server::EventLogEntry& e) {
-    midichlorians_stream_ << JSON(e) << std::endl;
+    stream_.Publish(e);
     e.event.Call(*this);
   }
 
@@ -302,23 +300,39 @@ class CTFOServer final {
     if (!event.device_id.empty()) {
       const auto& info = event.info;
       const auto cit = event.info.find("advertisingIdentifier");
-      if (cit != info.end() && !cit->second.empty()) {
-        const std::string& rdid = cit->second;
-        DebugPrint("iOSDeviceInfo for device ID " + event.device_id + ": AdId == " + rdid);
-        storage_.ReadWriteTransaction([this, rdid](MutableFields<Storage> data) {
-          const auto value = data.ios_adwords_install_tracked[rdid];
-          if (!Exists(value) || !Exists(Value(value).tracked)) {
-            DebugPrint("SendConversionEvent(" + rdid + ")");
-            if (adwords_tracker_.SendConversionEvent(rdid)) {
-              data.ios_adwords_install_tracked.Add(IOSAdWordsInstallTracked(rdid, current::time::Now()));
-              DebugPrint("SendConversionEvent(" + rdid + "): OK");
-            } else {
-              DebugPrint("SendConversionEvent(" + rdid + "): Fail");
-            }
-          }
-        }).Wait();
+      const std::string ad_id = (cit != info.end() ? cit->second : "");
+
+      if (!ad_id.empty()) {
+        DebugPrint("iOSDeviceInfo for device ID " + event.device_id + ": AdId == " + ad_id);
       } else {
         DebugPrint("iOSDeviceInfo for device ID " + event.device_id + ": AdId not found.");
+      }
+
+      const bool should_track =
+          Value(storage_.ReadWriteTransaction([this, &event, &ad_id](MutableFields<storage_t> data) {
+            Device saved_device;
+            saved_device.did = event.device_id;
+            saved_device.ad_id = ad_id;
+            saved_device.info = event;
+            data.device.Add(saved_device);
+
+            const auto value = data.ios_adwords_install_tracked[ad_id];
+            if (!Exists(value) || !Exists(Value(value).tracked)) {
+              DebugPrint("SendConversionEvent(" + ad_id + ")");
+              return true;
+            } else {
+              return false;
+            }
+          }).Go());
+      if (should_track) {
+        if (adwords_tracker_.SendConversionEvent(ad_id)) {
+          DebugPrint("SendConversionEvent(" + ad_id + "): OK");
+          storage_.ReadWriteTransaction([this, &ad_id](MutableFields<storage_t> data) {
+            data.ios_adwords_install_tracked.Add(IOSAdWordsInstallTracked(ad_id, current::time::Now()));
+          }).Wait();
+        } else {
+          DebugPrint("SendConversionEvent(" + ad_id + "): Fail");
+        }
       }
     }
   }
@@ -363,7 +377,7 @@ class CTFOServer final {
         const size_t feed_count = current::FromString<size_t>(r.url.query.get("feed_count", "20"));
         // Searching for users with the corresponding authentication key.
         storage_.ReadWriteTransaction(  // clang-format off
-            [this, device_id, app_key, feed_count, notification_since_ms](MutableFields<Storage> data) {
+            [this, device_id, app_key, feed_count, notification_since_ms](MutableFields<storage_t> data) {
               AuthKey auth_key("iOS::" + device_id + "::" + app_key, AUTH_TYPE::IOS);
               UID uid = UID::INVALID_USER;
               User user;
@@ -439,7 +453,7 @@ class CTFOServer final {
         const size_t feed_count = current::FromString<size_t>(r.url.query.get("feed_count", "20"));
         const std::string requested_url = r.url.ComposeURL();
         storage_.ReadOnlyTransaction(  // clang-format off
-            [this, uid, token, requested_url, feed_count, notification_since_ms](ImmutableFields<Storage> data) {
+            [this, uid, token, requested_url, feed_count, notification_since_ms](ImmutableFields<storage_t> data) {
               bool token_is_valid = false;
               const auto& auth_token_accessor = data.auth_token;
               if (auth_token_accessor.Cols().Has(token)) {
@@ -467,7 +481,7 @@ class CTFOServer final {
     }
   }
   void RouteInitialCards(Request r) {
-    storage_.ReadOnlyTransaction([this](ImmutableFields<Storage> data) {
+    storage_.ReadOnlyTransaction([this](ImmutableFields<storage_t> data) {
       return MakeResponse(
           GenerateResponseFeed(data, ResponseUserEntry(), 10000u, static_cast<uint64_t>(-1), 10000u, true));
     }, std::move(r)).Go();
@@ -486,7 +500,7 @@ class CTFOServer final {
         DebugPrint(Printf("[/ctfo/favs] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
       } else {
-        storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<Storage> data) {
+        storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<storage_t> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
           if (auth_token_accessor.Cols().Has(token)) {
@@ -601,7 +615,7 @@ class CTFOServer final {
         DebugPrint(Printf("[/ctfo/my_cards] Wrong UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED VALID UID-TOKEN PAIR\n", HTTPResponseCode.BadRequest);
       } else {
-        storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<Storage> data) {
+        storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<storage_t> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
           if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -713,7 +727,7 @@ class CTFOServer final {
             Printf("[/ctfo/card] Non-empty yet invalid UID. Requested URL = '%s'", r.url.ComposeURL().c_str()));
         r("NEED EMPTY OR VALID UID\n", HTTPResponseCode.BadRequest);
       } else {
-        storage_.ReadOnlyTransaction([this, cid, uid](ImmutableFields<Storage> data) {
+        storage_.ReadOnlyTransaction([this, cid, uid](ImmutableFields<storage_t> data) {
           const auto card_wrapper = data.card[cid];
           if (!Exists(card_wrapper)) {
             return Response("NO SUCH CARD\n", HTTPResponseCode.NotFound);
@@ -786,7 +800,7 @@ class CTFOServer final {
             request.color = CARD_COLORS[static_cast<uint64_t>(cid) % CARD_COLORS.size()];
           }
           storage_.ReadWriteTransaction(  // clang-format off
-              [this, cid, uid, token, request, requested_url](MutableFields<Storage> data) {
+              [this, cid, uid, token, request, requested_url](MutableFields<storage_t> data) {
                 bool token_is_valid = false;
                 const auto& auth_token_accessor = data.auth_token;
                 if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -842,7 +856,7 @@ class CTFOServer final {
         r("NEED VALID CID\n", HTTPResponseCode.BadRequest);
       } else {
         const std::string requested_url = r.url.ComposeURL();
-        storage_.ReadWriteTransaction([this, requested_url, uid, cid, token](MutableFields<Storage> data) {
+        storage_.ReadWriteTransaction([this, requested_url, uid, cid, token](MutableFields<storage_t> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
           if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -909,7 +923,7 @@ class CTFOServer final {
     } else {
       if (r.method == "GET") {
         const std::string requested_url = r.url.ComposeURL();
-        storage_.ReadOnlyTransaction([this, uid, cid, token, requested_url](ImmutableFields<Storage> data) {
+        storage_.ReadOnlyTransaction([this, uid, cid, token, requested_url](ImmutableFields<storage_t> data) {
           bool token_is_valid = false;
           const auto& auth_token_accessor = data.auth_token;
           if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -1032,7 +1046,7 @@ class CTFOServer final {
             request.text = short_request.text;
           }
           storage_.ReadWriteTransaction(  // clang-format off
-              [this, cid, uid, oid, token, request, requested_url](MutableFields<Storage> data) {
+              [this, cid, uid, oid, token, request, requested_url](MutableFields<storage_t> data) {
                 bool token_is_valid = false;
                 const auto& auth_token_accessor = data.auth_token;
                 if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -1133,7 +1147,7 @@ class CTFOServer final {
         } else {
           const std::string requested_url = r.url.ComposeURL();
           storage_.ReadWriteTransaction(  // clang-format off
-              [this, requested_url, uid, cid, token, oid](MutableFields<Storage> data) {
+              [this, requested_url, uid, cid, token, oid](MutableFields<storage_t> data) {
                 bool token_is_valid = false;
                 const auto& auth_token_accessor = data.auth_token;
                 if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -1182,13 +1196,13 @@ class CTFOServer final {
 
  private:
   struct PushNotificationsSender {
-    Storage& storage;
+    storage_t& storage;
     const std::chrono::microseconds starting_from;
     current::integrations::onesignal::IOSPushNotificationsSender transport;
 
-    using transaction_t = typename Storage::transaction_t;
+    using transaction_t = typename storage_t::transaction_t;
 
-    PushNotificationsSender(Storage& storage,
+    PushNotificationsSender(storage_t& storage,
                             std::chrono::microseconds last_pushed_notification_timestamp,
                             const std::string& onesignal_app_id,
                             uint16_t onesignal_local_port)
@@ -1204,7 +1218,7 @@ class CTFOServer final {
           if (Exists<Persisted_NotificationUpdated>(mutation)) {
             const UID uid = Value<Persisted_NotificationUpdated>(mutation).data.uid;
             const std::string player_id =
-                Value(storage.ReadOnlyTransaction([uid](ImmutableFields<Storage> fields) -> std::string {
+                Value(storage.ReadOnlyTransaction([uid](ImmutableFields<storage_t> fields) -> std::string {
                   const auto rhs = fields.uid_player_id[uid];
                   if (Exists(rhs)) {
                     return Value(rhs).player_id;
@@ -1217,7 +1231,7 @@ class CTFOServer final {
               if (transport.Push(player_id, 1)) {
                 const std::chrono::microseconds last_pushed_notification_timestamp = current.us;
                 storage.ReadWriteTransaction(
-                            [last_pushed_notification_timestamp](MutableFields<Storage> fields) {
+                            [last_pushed_notification_timestamp](MutableFields<storage_t> fields) {
                               PushNotificationsMarker marker;
                               marker.last_pushed_notification_timestamp = last_pushed_notification_timestamp;
                               fields.push_notifications_marker.Add(marker);
@@ -1238,33 +1252,44 @@ class CTFOServer final {
   };
 
  private:
-  Config config_;
-  std::ofstream midichlorians_stream_;
-  MidichloriansServer midichlorians_server_;
+  config_t config_;
+  midichlorians_server_t midichlorians_server_;
 
-  Storage storage_;
-  RESTStorage rest_;
-  current::ss::StreamSubscriber<PushNotificationsSender, typename Storage::transaction_t> pusher_;
+  stream_t stream_;
+  storage_t storage_;
+  rest_t rest_;
+
+  current::ss::StreamSubscriber<PushNotificationsSender, typename storage_t::transaction_t> pusher_;
   const current::sherlock::SubscriberScope push_notifications_sender_subcriber_scope_;
   const current::integrations::adwords::conversion_tracking::AdWordsMobileConversionEventsSender
       adwords_tracker_;
   HTTPRoutesScope scoped_http_routes_;
 
-  const std::map<std::string, LOG_EVENT> valid_responses_ = {
-      {"CTFO", LOG_EVENT::CTFO},
-      {"TFU", LOG_EVENT::TFU},
-      {"SKIP", LOG_EVENT::SKIP},
-      {"FAV", LOG_EVENT::FAV_CARD},
-      {"FAV_CARD", LOG_EVENT::FAV_CARD},
-      {"UNFAV", LOG_EVENT::UNFAV_CARD},
-      {"UNFAV_CARD", LOG_EVENT::UNFAV_CARD},
-      {"LIKE_COMMENT", LOG_EVENT::LIKE_COMMENT},
-      {"UNLIKE_COMMENT", LOG_EVENT::UNLIKE_COMMENT},
-      {"FLAG_COMMENT", LOG_EVENT::FLAG_COMMENT},
-      {"FLAG_CARD", LOG_EVENT::FLAG_CARD},
-      {"REPORT_USER", LOG_EVENT::REPORT_USER},
-      {"BLOCK_USER", LOG_EVENT::BLOCK_USER},
-      {"ONE_SIGNAL_USER_ID", LOG_EVENT::ONE_SIGNAL_USER_ID}};
+  const std::map<std::string, CTFO_EVENT> supported_events_ = {
+      {"CTFO", CTFO_EVENT::CTFO},
+      {"TFU", CTFO_EVENT::TFU},
+      {"SKIP", CTFO_EVENT::SKIP},
+      {"FAV", CTFO_EVENT::FAV_CARD},
+      {"FAV_CARD", CTFO_EVENT::FAV_CARD},
+      {"UNFAV", CTFO_EVENT::UNFAV_CARD},
+      {"UNFAV_CARD", CTFO_EVENT::UNFAV_CARD},
+      {"LIKE_COMMENT", CTFO_EVENT::LIKE_COMMENT},
+      {"UNLIKE_COMMENT", CTFO_EVENT::UNLIKE_COMMENT},
+      {"FLAG_COMMENT", CTFO_EVENT::FLAG_COMMENT},
+      {"FLAG_CARD", CTFO_EVENT::FLAG_CARD},
+      {"REPORT_USER", CTFO_EVENT::REPORT_USER},
+      {"BLOCK_USER", CTFO_EVENT::BLOCK_USER},
+      {"ONE_SIGNAL_USER_ID", CTFO_EVENT::ONE_SIGNAL_USER_ID},
+      {"COMPLETE_SHARE_TO_FACEBOOK", CTFO_EVENT::COMPLETE_SHARE_TO_FACEBOOK},
+      {"START_SHARE_TO_FACEBOOK", CTFO_EVENT::START_SHARE_TO_FACEBOOK},
+      {"CANCEL_SHARE_TO_FACEBOOK", CTFO_EVENT::CANCEL_SHARE_TO_FACEBOOK},
+      {"FAIL_SHARE_TO_FACEBOOK", CTFO_EVENT::FAIL_SHARE_TO_FACEBOOK}};
+
+  const std::map<CTFO_EVENT, SHARE_STATUS> valid_share_statuses_ = {
+      {CTFO_EVENT::COMPLETE_SHARE_TO_FACEBOOK, SHARE_STATUS::COMPLETED},
+      {CTFO_EVENT::START_SHARE_TO_FACEBOOK, SHARE_STATUS::INITIATED},
+      {CTFO_EVENT::CANCEL_SHARE_TO_FACEBOOK, SHARE_STATUS::CANCELED},
+      {CTFO_EVENT::FAIL_SHARE_TO_FACEBOOK, SHARE_STATUS::FAILED}};
 
   void DebugPrint(const std::string& message) {
     if (config_.Config().debug_print_to_stderr) {
@@ -1284,7 +1309,7 @@ class CTFOServer final {
     entry.banned = banned;
   }
 
-  ResponseFeed GenerateResponseFeed(ImmutableFields<Storage> data,
+  ResponseFeed GenerateResponseFeed(ImmutableFields<storage_t> data,
                                     ResponseUserEntry user_entry,
                                     size_t feed_size,
                                     uint64_t notifications_since_ms,
@@ -1484,12 +1509,13 @@ class CTFOServer final {
   }
 
   void UpdateStateOnEvent(const current::midichlorians::ios::iOSGenericEvent& ge) {
+    const auto now = current::time::Now();
     try {
-      if (!valid_responses_.count(ge.event)) {
+      if (!supported_events_.count(ge.event)) {
         DebugPrint(Printf("[UpdateStateOnEvent] Unhandled event: '%s'", ge.event.c_str()));
         return;
       }
-      const LOG_EVENT response = valid_responses_.at(ge.event);
+      const CTFO_EVENT event = supported_events_.at(ge.event);
       const std::string uid_str = ge.fields.at("uid");
       const std::string token = ge.fields.at("token");
       const std::string whom_str = ge.fields.count("whom") ? ge.fields.at("whom") : "";
@@ -1510,8 +1536,8 @@ class CTFOServer final {
                  user_id_str.c_str()));
       if (uid != UID::INVALID_USER) {  // clang-format off
         storage_.ReadWriteTransaction(
-            [this, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, user_id_str, response](
-                MutableFields<Storage> data) {
+            [this, now, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, user_id_str, event](
+                MutableFields<storage_t> data) {
               const auto& auth_token_accessor = data.auth_token;
               bool token_is_valid = false;
               if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
@@ -1524,8 +1550,7 @@ class CTFOServer final {
                   DebugPrint(Printf("[UpdateStateOnEvent] Nonexistent UID '%s'.", uid_str.c_str()));
                   return;
                 }
-                if (response == LOG_EVENT::SKIP || response == LOG_EVENT::CTFO ||
-                    response == LOG_EVENT::TFU) {
+                if (event == CTFO_EVENT::SKIP || event == CTFO_EVENT::CTFO || event == CTFO_EVENT::TFU) {
                   if (cid == CID::INVALID_CARD) {
                     DebugPrint("[UpdateStateOnEvent] No CID.");
                     return;
@@ -1537,20 +1562,20 @@ class CTFOServer final {
                   }
                   // Do not overwrite existing answers, except CTFO/TFU can and should overwrite SKIP.
                   const bool has_answer = Exists(data.answer.Get(uid, cid));
-                  const bool skip_to_overwrite = response != LOG_EVENT::SKIP && has_answer &&
+                  const bool skip_to_overwrite = event != CTFO_EVENT::SKIP && has_answer &&
                                                   Value(data.answer.Get(uid, cid)).answer == ANSWER::SKIP;
                   if (!has_answer || skip_to_overwrite) {
-                    data.answer.Add(Answer(uid, cid, static_cast<ANSWER>(response)));
+                    data.answer.Add(Answer(uid, cid, static_cast<ANSWER>(event)));
                     DebugPrint(Printf("[UpdateStateOnEvent] Added new answer: [%s, %s, %d]",
                                       UIDToString(uid).c_str(),
                                       CIDToString(cid).c_str(),
-                                      static_cast<int>(response)));
+                                      static_cast<int>(event)));
                     const auto optional_card = data.card[cid];
                     const auto optional_user = data.user[uid];
                     if (Exists(optional_card) && Exists(optional_user)) {
                       Card card = Value(optional_card);
                       User user = Value(optional_user);
-                      if (response == LOG_EVENT::SKIP) {
+                      if (event == CTFO_EVENT::SKIP) {
                         ++card.skip_count;
                       } else {
                         if (skip_to_overwrite) {
@@ -1559,7 +1584,7 @@ class CTFOServer final {
                             --card.skip_count;
                           }
                         }
-                        if (response == LOG_EVENT::CTFO) {
+                        if (event == CTFO_EVENT::CTFO) {
                           ++card.ctfo_count;
                           DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new ctfo_count = %u",
                                             CIDToString(cid).c_str(),
@@ -1569,7 +1594,7 @@ class CTFOServer final {
                               Printf("[UpdateStateOnEvent] User '%s' got %u points for 'CTFO' answer",
                                      UIDToString(uid).c_str(),
                                      50u));
-                        } else if (response == LOG_EVENT::TFU) {
+                        } else if (event == CTFO_EVENT::TFU) {
                           ++card.tfu_count;
                           DebugPrint(Printf("[UpdateStateOnEvent] Card '%s' new tfu_count = %u",
                                             CIDToString(cid).c_str(),
@@ -1582,7 +1607,7 @@ class CTFOServer final {
                         }
                       }
 
-                      if (response != LOG_EVENT::SKIP && user.level < LEVEL_SCORES.size() - 1 &&
+                      if (event != CTFO_EVENT::SKIP && user.level < LEVEL_SCORES.size() - 1 &&
                           user.score > LEVEL_SCORES[user.level + 1]) {
                         user.score -= LEVEL_SCORES[user.level + 1];
                         ++user.level;
@@ -1594,7 +1619,7 @@ class CTFOServer final {
                       data.card.Add(card);
                       data.user.Add(user);
 
-                      if (response != LOG_EVENT::SKIP) {
+                      if (event != CTFO_EVENT::SKIP) {
                         // Emit the "new votes on my card" notification.
                         const auto author = data.author_card.GetEntryFromCol(cid);
                         if (Exists(author)) {
@@ -1613,7 +1638,7 @@ class CTFOServer final {
                                       CIDToString(cid).c_str(),
                                       static_cast<int>(Value(data.answer.Get(uid, cid)).answer)));
                   }
-                } else if (response == LOG_EVENT::FAV_CARD || response == LOG_EVENT::UNFAV_CARD) {
+                } else if (event == CTFO_EVENT::FAV_CARD || event == CTFO_EVENT::UNFAV_CARD) {
                   if (cid == CID::INVALID_CARD) {
                     DebugPrint("[UpdateStateOnEvent] No CID.");
                     return;
@@ -1624,13 +1649,13 @@ class CTFOServer final {
                     return;
                   }
                   auto& favorites_mutator = data.favorite;
-                  favorites_mutator.Add(Favorite(uid, cid, (response == LOG_EVENT::FAV_CARD)));
+                  favorites_mutator.Add(Favorite(uid, cid, (event == CTFO_EVENT::FAV_CARD)));
                   DebugPrint(Printf("[UpdateStateOnEvent] Added favorite: [%s, %s, %s]",
                                     UIDToString(uid).c_str(),
                                     CIDToString(cid).c_str(),
-                                    (response == LOG_EVENT::FAV_CARD) ? "Favorite" : "Unfavorite"));
+                                    (event == CTFO_EVENT::FAV_CARD) ? "Favorite" : "Unfavorite"));
 
-                  if (response == LOG_EVENT::FAV_CARD) {
+                  if (event == CTFO_EVENT::FAV_CARD) {
                     // Emit the "my card starred" notification.
                     const auto star_notification_key = UIDAndCID(uid, cid);
                     if (!Exists(data.starred_notification_already_sent[star_notification_key])) {
@@ -1647,9 +1672,9 @@ class CTFOServer final {
                       }
                     }
                   }
-                } else if (response == LOG_EVENT::LIKE_COMMENT ||
-                           response == LOG_EVENT::UNLIKE_COMMENT ||
-                           response == LOG_EVENT::FLAG_COMMENT) {
+                } else if (event == CTFO_EVENT::LIKE_COMMENT ||
+                           event == CTFO_EVENT::UNLIKE_COMMENT ||
+                           event == CTFO_EVENT::FLAG_COMMENT) {
                   if (oid == OID::INVALID_COMMENT) {
                     DebugPrint("[UpdateStateOnEvent] No OID.");
                     return;
@@ -1659,7 +1684,7 @@ class CTFOServer final {
                                       oid_str.c_str()));
                     return;
                   }
-                  if (response == LOG_EVENT::LIKE_COMMENT) {
+                  if (event == CTFO_EVENT::LIKE_COMMENT) {
                     DebugPrint(Printf("[UpdateStateOnEvent] Like comment '%s' '%s'.",
                                       uid_str.c_str(),
                                       oid_str.c_str()));
@@ -1681,12 +1706,12 @@ class CTFOServer final {
                       }
                     }
 
-                  } else if (response == LOG_EVENT::UNLIKE_COMMENT) {
+                  } else if (event == CTFO_EVENT::UNLIKE_COMMENT) {
                     DebugPrint(Printf("[UpdateStateOnEvent] Unlike comment '%s' '%s'.",
                                       uid_str.c_str(),
                                       oid_str.c_str()));
                     data.comment_like.Erase(oid, uid);
-                  } else if (response == LOG_EVENT::FLAG_COMMENT) {
+                  } else if (event == CTFO_EVENT::FLAG_COMMENT) {
                     DebugPrint(Printf("[UpdateStateOnEvent] Flag comment '%s' '%s'.",
                                       uid_str.c_str(),
                                       oid_str.c_str()));
@@ -1697,12 +1722,12 @@ class CTFOServer final {
                   } else {
                     DebugPrint(Printf(
                         "[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
-                        static_cast<int>(response),
+                        static_cast<int>(event),
                         uid_str.c_str(),
                         cid_str.c_str(),
                         token.c_str()));
                   }
-                } else if (response == LOG_EVENT::FLAG_CARD) {
+                } else if (event == CTFO_EVENT::FLAG_CARD) {
                   if (cid == CID::INVALID_CARD) {
                     DebugPrint("[UpdateStateOnEvent] No CID.");
                     return;
@@ -1718,7 +1743,7 @@ class CTFOServer final {
                   flag.cid = cid;
                   flag.uid = uid;
                   data.flagged_card.Add(flag);
-                } else if (response == LOG_EVENT::REPORT_USER || response == LOG_EVENT::BLOCK_USER) {
+                } else if (event == CTFO_EVENT::REPORT_USER || event == CTFO_EVENT::BLOCK_USER) {
                   if (whom == UID::INVALID_USER) {
                     DebugPrint("[UpdateStateOnEvent] No WHOM.");
                     return;
@@ -1733,9 +1758,9 @@ class CTFOServer final {
                   }
                   DebugPrint(Printf("[UpdateStateOnEvent] '%s' %s '%s'.",
                                     uid_str.c_str(),
-                                    (response == LOG_EVENT::REPORT_USER) ? "reported" : "blocked",
+                                    (event == CTFO_EVENT::REPORT_USER) ? "reported" : "blocked",
                                     whom_str.c_str()));
-                  if (response == LOG_EVENT::REPORT_USER) {
+                  if (event == CTFO_EVENT::REPORT_USER) {
                     data.user_reported_user.Add(UserReportedUser(uid, whom));
                   } else {
                     data.user_blocked_user.Add(UserBlockedUser(uid, whom));
@@ -1748,7 +1773,7 @@ class CTFOServer final {
                       BanUser(data, whom);
                     }
                   }
-                } else if (response == LOG_EVENT::ONE_SIGNAL_USER_ID) {
+                } else if (event == CTFO_EVENT::ONE_SIGNAL_USER_ID) {
                   if (!user_id_str.empty()) {
                     UserNotificationPlayerID player_id_record;
                     player_id_record.uid = uid;
@@ -1757,10 +1782,36 @@ class CTFOServer final {
                   } else {
                     DebugPrint("[UpdateStateOnEvent] Ignoring `ONE_SIGNAL_USER_ID`, no `used_id` provided.\n");
                   }
+                } else if (valid_share_statuses_.count(event)) {
+                  const SHARE_STATUS share_status = valid_share_statuses_.at(event);
+                  DebugPrint(Printf(
+                      "[UpdateStateOnEvent] Share status `%d` for uid='%s', cid='%s',token='%s'",
+                      static_cast<int>(share_status),
+                      uid_str.c_str(),
+                      cid_str.c_str(),
+                      token.c_str()));
+
+                  if (share_status == SHARE_STATUS::COMPLETED) {
+                    Share share;
+                    share.uid = uid;
+                    share.cid = cid;
+                    share.destination = SHARE_DESTINATION::FACEBOOK;
+                    share.timestamp = now;
+                    data.share.Add(share);
+                    data.incomplete_share.Erase(uid, cid);
+                  } else {
+                    IncompleteShare incomplete;
+                    incomplete.uid = uid;
+                    incomplete.cid = cid;
+                    incomplete.destination = SHARE_DESTINATION::FACEBOOK;
+                    incomplete.status = share_status;
+                    incomplete.timestamp = now;
+                    data.incomplete_share.Add(incomplete);
+                  }
                 } else {
                   DebugPrint(Printf(
                       "[UpdateStateOnEvent] Ignoring: Response=<%d>, uid='%s', cid='%s',token='%s'",
-                      static_cast<int>(response),
+                      static_cast<int>(event),
                       uid_str.c_str(),
                       cid_str.c_str(),
                       token.c_str()));
@@ -1778,7 +1829,7 @@ class CTFOServer final {
     }
   }
 
-  void BanUser(MutableFields<Storage> data, const UID uid) {
+  void BanUser(MutableFields<storage_t> data, const UID uid) {
     if (!Exists(data.banned_user[uid])) {
       data.banned_user.Add(BannedUser(uid));
     }
