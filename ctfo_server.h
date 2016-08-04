@@ -1247,7 +1247,7 @@ class CTFOServer final {
     current::ss::TerminationResponse Terminate() const { return current::ss::TerminationResponse::Terminate; }
 
     current::ss::EntryResponse EntryResponseIfNoMorePassTypeFilter() const {
-      return current::ss::EntryResponse::Done;
+      return current::ss::EntryResponse::More;
     }
   };
 
