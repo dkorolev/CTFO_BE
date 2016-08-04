@@ -1439,7 +1439,7 @@ TEST(CTFO, SmokeTest) {
   }
 }
 
-TEST(CTFO, DISABLED_StrictAuth) {
+TEST(CTFO, StrictAuth) {
   const auto server_scope = SpawnTestServer("auth");
 
   const char* const some_uid = "u01000000000000000001";
