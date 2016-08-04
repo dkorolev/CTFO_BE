@@ -384,9 +384,8 @@ class CTFOServer final {
               ResponseUserEntry user_entry;
               std::string token;
 
-              const auto& uid_auth_accessor = data.uid_auth;
-              if (uid_auth_accessor.Cols().Has(auth_key)) {
-                uid = Value(uid_auth_accessor.GetEntryFromCol(auth_key)).uid;
+              if (data.uid_auth.Cols().Has(auth_key)) {
+                uid = Value(data.uid_auth.GetEntryFromCol(auth_key)).uid;
               }
 
               if (uid != UID::INVALID_USER) {
@@ -457,13 +456,11 @@ class CTFOServer final {
         storage_.ReadOnlyTransaction(  // clang-format off
             [this, uid, token, requested_url, feed_count, notification_since_ms](ImmutableFields<storage_t> data) {
               bool token_is_valid = false;
-              const auto& auth_token_accessor = data.auth_token;
-              if (auth_token_accessor.Cols().Has(token)) {
-                if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+              if (data.auth_token.Cols().Has(token)) {
+                if (Value(data.auth_token.GetEntryFromCol(token)).valid) {
                   // Double check, if the provided `uid` is correct as well.
-                  const auto& uid_auth_accessor = data.uid_auth;
-                  token_is_valid = Exists(uid_auth_accessor.Get(
-                    uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
+                  token_is_valid = Exists(data.uid_auth.Get(
+                    uid, Value(data.auth_token.GetEntryFromCol(token)).auth_key));
                 }
               }
               if (!token_is_valid) {
@@ -504,13 +501,11 @@ class CTFOServer final {
       } else {
         storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<storage_t> data) {
           bool token_is_valid = false;
-          const auto& auth_token_accessor = data.auth_token;
-          if (auth_token_accessor.Cols().Has(token)) {
-            if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+          if (data.auth_token.Cols().Has(token)) {
+            if (Value(data.auth_token.GetEntryFromCol(token)).valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto& uid_auth_accessor = data.uid_auth;
-              token_is_valid = Exists(
-                  uid_auth_accessor.Get(uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
+              token_is_valid =
+                  Exists(data.uid_auth.Get(uid, Value(data.auth_token.GetEntryFromCol(token)).auth_key));
             }
           }
           if (!token_is_valid) {
@@ -619,13 +614,11 @@ class CTFOServer final {
       } else {
         storage_.ReadOnlyTransaction([this, uid, token](ImmutableFields<storage_t> data) {
           bool token_is_valid = false;
-          const auto& auth_token_accessor = data.auth_token;
-          if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
-            if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+          if (Exists(data.auth_token.GetEntryFromCol(token))) {
+            if (Value(data.auth_token.GetEntryFromCol(token)).valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto& uid_auth_accessor = data.uid_auth;
-              token_is_valid = Exists(
-                  uid_auth_accessor.Get(uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
+              token_is_valid =
+                  Exists(data.uid_auth.Get(uid, Value(data.auth_token.GetEntryFromCol(token)).auth_key));
             }
           }
           if (!token_is_valid) {
@@ -804,13 +797,11 @@ class CTFOServer final {
           storage_.ReadWriteTransaction(  // clang-format off
               [this, cid, uid, token, request, requested_url](MutableFields<storage_t> data) {
                 bool token_is_valid = false;
-                const auto& auth_token_accessor = data.auth_token;
-                if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
-                  if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+                if (Exists(data.auth_token.GetEntryFromCol(token))) {
+                  if (Value(data.auth_token.GetEntryFromCol(token)).valid) {
                     // Double check, if the provided `uid` is correct as well.
-                    const auto& uid_auth_accessor = data.uid_auth;
-                    token_is_valid = Exists(uid_auth_accessor.Get(
-                        uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
+                    token_is_valid = Exists(data.uid_auth.Get(
+                        uid, Value(data.auth_token.GetEntryFromCol(token)).auth_key));
                   }
                 }
                 if (!token_is_valid) {
@@ -849,13 +840,11 @@ class CTFOServer final {
         const std::string requested_url = r.url.ComposeURL();
         storage_.ReadWriteTransaction([this, requested_url, uid, cid, token](MutableFields<storage_t> data) {
           bool token_is_valid = false;
-          const auto& auth_token_accessor = data.auth_token;
-          if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
-            if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+          if (Exists(data.auth_token.GetEntryFromCol(token))) {
+            if (Value(data.auth_token.GetEntryFromCol(token)).valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto& uid_auth_accessor = data.uid_auth;
-              token_is_valid = Exists(
-                  uid_auth_accessor.Get(uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
+              token_is_valid =
+                  Exists(data.uid_auth.Get(uid, Value(data.auth_token.GetEntryFromCol(token)).auth_key));
             }
           }
           if (!token_is_valid) {
@@ -913,13 +902,11 @@ class CTFOServer final {
         const std::string requested_url = r.url.ComposeURL();
         storage_.ReadOnlyTransaction([this, uid, cid, token, requested_url](ImmutableFields<storage_t> data) {
           bool token_is_valid = false;
-          const auto& auth_token_accessor = data.auth_token;
-          if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
-            if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+          if (Exists(data.auth_token.GetEntryFromCol(token))) {
+            if (Value(data.auth_token.GetEntryFromCol(token)).valid) {
               // Double check, if the provided `uid` is correct as well.
-              const auto& uid_auth_accessor = data.uid_auth;
-              token_is_valid = Exists(
-                  uid_auth_accessor.Get(uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
+              token_is_valid =
+                  Exists(data.uid_auth.Get(uid, Value(data.auth_token.GetEntryFromCol(token)).auth_key));
             }
           }
           if (!token_is_valid) {
@@ -934,15 +921,11 @@ class CTFOServer final {
             if (!Exists(user)) {
               return Response("NO SUCH USER\n", HTTPResponseCode.NotFound);
             } else {
-              const auto& users_accessor = data.user;
-              const auto& comments_accessor = data.comment;
-              const auto& comment_likes_accessor = data.comment_like;
-              const auto& comment_flagged_accessor = data.flagged_comment;
               std::vector<Comment> proto_comments;
               std::set<OID> flagged_comments;
-              if (!comments_accessor.Row(cid).Empty()) {
-                for (const auto& comment : comments_accessor.Row(cid)) {
-                  if (Exists(comment_flagged_accessor.Get(comment.oid, uid))) {
+              if (!data.comment.Row(cid).Empty()) {
+                for (const auto& comment : data.comment.Row(cid)) {
+                  if (Exists(data.flagged_comment.Get(comment.oid, uid))) {
                     flagged_comments.insert(comment.oid);
                   }
                   // Make sure to not return comments left by the users the current user has blocked,
@@ -954,7 +937,7 @@ class CTFOServer final {
                   } else if (Exists(data.banned_user[comment.author_uid])) {
                     comment_hidden_due_to_block_or_ban = true;
                   } else if (comment.parent_oid != OID::INVALID_COMMENT) {
-                    const auto top_level_comment = comments_accessor.GetEntryFromCol(comment.parent_oid);
+                    const auto top_level_comment = data.comment.GetEntryFromCol(comment.parent_oid);
                     if (Exists(top_level_comment)) {
                       const Comment& parent_comment = Value(top_level_comment);
                       if (Exists(data.user_blocked_user.Get(uid, parent_comment.author_uid))) {
@@ -969,7 +952,7 @@ class CTFOServer final {
                   }
                 }
               }
-              const auto sortkey = [&comments_accessor](const Comment& c) -> std::pair<uint64_t, uint64_t> {
+              const auto sortkey = [&data](const Comment& c) -> std::pair<uint64_t, uint64_t> {
                 uint64_t comment_timestamp = 0u;
                 uint64_t top_level_comment_timestamp = 0u;
                 if (c.parent_oid == OID::INVALID_COMMENT) {
@@ -978,7 +961,7 @@ class CTFOServer final {
                 } else {
                   // This is a 2nd-level comment.
                   comment_timestamp = c.us.count();
-                  const auto top_level_comment = comments_accessor.GetEntryFromCol(c.parent_oid);
+                  const auto top_level_comment = data.comment.GetEntryFromCol(c.parent_oid);
                   if (Exists(top_level_comment)) {
                     top_level_comment_timestamp = Value(top_level_comment).us.count();
                   }
@@ -1003,12 +986,12 @@ class CTFOServer final {
                 }
                 c.author_uid = UIDToString(comment.author_uid);
                 c.author_level = 0;
-                const auto user_data = users_accessor[comment.author_uid];
+                const auto user_data = data.user[comment.author_uid];
                 if (Exists(user_data)) {
                   c.author_level = Value(user_data).level;
                 }
                 c.text = comment.text;
-                const auto likers = comment_likes_accessor.Rows()[comment.oid];
+                const auto likers = data.comment_like.Rows()[comment.oid];
                 if (Exists(likers)) {
                   const auto v = Value(likers);
                   c.number_of_likes = v.Size();
@@ -1036,13 +1019,11 @@ class CTFOServer final {
           storage_.ReadWriteTransaction(  // clang-format off
               [this, cid, uid, oid, token, request, requested_url](MutableFields<storage_t> data) {
                 bool token_is_valid = false;
-                const auto& auth_token_accessor = data.auth_token;
-                if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
-                  if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+                if (Exists(data.auth_token.GetEntryFromCol(token))) {
+                  if (Value(data.auth_token.GetEntryFromCol(token)).valid) {
                     // Double check, if the provided `uid` is correct as well.
-                    const auto& uid_auth_accessor = data.uid_auth;
-                    token_is_valid = Exists(uid_auth_accessor.Get(
-                        uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
+                    token_is_valid = Exists(data.uid_auth.Get(
+                        uid, Value(data.auth_token.GetEntryFromCol(token)).auth_key));
                   }
                 }
                 if (!token_is_valid) {
@@ -1131,13 +1112,11 @@ class CTFOServer final {
           storage_.ReadWriteTransaction(  // clang-format off
               [this, requested_url, uid, cid, token, oid](MutableFields<storage_t> data) {
                 bool token_is_valid = false;
-                const auto& auth_token_accessor = data.auth_token;
-                if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
-                  if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+                if (Exists(data.auth_token.GetEntryFromCol(token))) {
+                  if (Value(data.auth_token.GetEntryFromCol(token)).valid) {
                     // Double check, if the provided `uid` is correct as well.
-                    const auto& uid_auth_accessor = data.uid_auth;
-                    token_is_valid = Exists(uid_auth_accessor.Get(
-                        uid, Value(auth_token_accessor.GetEntryFromCol(token)).auth_key));
+                    token_is_valid = Exists(data.uid_auth.Get(
+                        uid, Value(data.auth_token.GetEntryFromCol(token)).auth_key));
                   }
                 }
                 if (!token_is_valid) {
@@ -1521,10 +1500,9 @@ class CTFOServer final {
         storage_.ReadWriteTransaction(
             [this, now, uid, whom, cid, oid, uid_str, whom_str, cid_str, oid_str, token, user_id_str, event](
                 MutableFields<storage_t> data) {
-              const auto& auth_token_accessor = data.auth_token;
               bool token_is_valid = false;
-              if (Exists(auth_token_accessor.GetEntryFromCol(token))) {
-                if (Value(auth_token_accessor.GetEntryFromCol(token)).valid) {
+              if (Exists(data.auth_token.GetEntryFromCol(token))) {
+                if (Value(data.auth_token.GetEntryFromCol(token)).valid) {
                   token_is_valid = true;
                 }
               }

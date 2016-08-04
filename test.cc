@@ -72,7 +72,7 @@ struct CTFOServerScope {
 #endif
 
     current::time::ResetToZero();
-    current::time::SetNow(std::chrono::microseconds(1000), std::chrono::microseconds(2000));
+    current::time::SetNow(std::chrono::microseconds(1000), std::chrono::microseconds(3000));
     current::random::SetRandomSeed(42);
 
     const CTFOServerParams params = CTFOServerParams()
@@ -1465,7 +1465,7 @@ TEST(CTFO, StrictAuth) {
       POST(Printf("http://localhost:%d/ctfo/auth/ios?id=%s&key=%s", FLAGS_api_port, auth_id, auth_key), ""));
   EXPECT_EQ(200, static_cast<int>(auth_http_response.code));
   const auto auth_response = ParseResponse<ResponseFeed>(auth_http_response.body);
-  EXPECT_EQ(1u, auth_response.ms.count());
+  EXPECT_EQ(2u, auth_response.ms.count());
 }
 
 TEST(CTFO, UseRightHTTPVerbs) {
