@@ -24,8 +24,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 *******************************************************************************/
 
-#define MUST_IMPORT_INITIAL_CTFO_CARDS
 #define CURRENT_MOCK_TIME  // `SetNow()`.
+
+// Disable AdWords and OneSignal integrations while running the tests.
+#ifndef CURRENT_CI
+#define CURRENT_CI
+#endif
+
+#define MUST_IMPORT_INITIAL_CTFO_CARDS
 
 #include "ctfo_server.h"
 
@@ -48,45 +54,51 @@ using namespace current::midichlorians::server;
 // Uncomment the following line to have the unit test dump debug information to console.
 // #define CTFO_DEBUG
 
-std::unique_ptr<CTFOServer> SpawnTestServer(const std::string& suffix) {
+struct CTFOServerScope {
+  explicit CTFOServerScope(const std::string& suffix) {
 #ifdef CTFO_DEBUG
-  const std::string db_file = "unittest-db-" + suffix + ".log";
-  const std::string config_file = "unittest-config-" + suffix + ".json";
-  current::FileSystem::RmFile(db_file, current::FileSystem::RmFileParameters::Silent);
-  current::FileSystem::RmFile(config_file, current::FileSystem::RmFileParameters::Silent);
+    const std::string db_file = "unittest-db-" + suffix + ".log";
+    const std::string config_file = "unittest-config-" + suffix + ".json";
+    current::FileSystem::RmFile(db_file, current::FileSystem::RmFileParameters::Silent);
+    current::FileSystem::RmFile(config_file, current::FileSystem::RmFileParameters::Silent);
 #else
-  static_cast<void>(suffix);
+    static_cast<void>(suffix);
 
-  const std::string db_file = current::FileSystem::GenTmpFileName();
-  current::FileSystem::ScopedRmFile scoped_rm_db_file(db_file);
+    const std::string db_file = current::FileSystem::GenTmpFileName();
+    scoped_rm_db_file_ = std::make_unique<current::FileSystem::ScopedRmFile>(db_file);
 
-  const std::string config_file = current::FileSystem::GenTmpFileName();
-  current::FileSystem::ScopedRmFile scoped_rm_config_file(config_file);
+    const std::string config_file = current::FileSystem::GenTmpFileName();
+    scoped_rm_config_file_ = std::make_unique<current::FileSystem::ScopedRmFile>(config_file);
 #endif
 
-  current::time::ResetToZero();
-  current::time::SetNow(std::chrono::microseconds(1000));
-  current::random::SetRandomSeed(42);
+    current::time::ResetToZero();
+    current::time::SetNow(std::chrono::microseconds(1000), std::chrono::microseconds(3000));
+    current::random::SetRandomSeed(42);
 
-  const CTFOServerParams params = CTFOServerParams()
-                                      .SetAPIPort(FLAGS_api_port)
-                                      .SetRESTPort(FLAGS_rest_port)
-                                      .SetMidichloriansPort(FLAGS_midichlorians_port)
-                                      .SetStorageFile(db_file)
-                                      .SetCardsFile(FLAGS_cards_file)
-                                      .SetRESTURLPrefix(FLAGS_rest_url_prefix)
-                                      .SetTickInterval(std::chrono::milliseconds(100))
+    const CTFOServerParams params = CTFOServerParams()
+                                        .SetAPIPort(FLAGS_api_port)
+                                        .SetRESTPort(FLAGS_rest_port)
+                                        .SetMidichloriansPort(FLAGS_midichlorians_port)
+                                        .SetStorageFile(db_file)
+                                        .SetCardsFile(FLAGS_cards_file)
+                                        .SetRESTURLPrefix(FLAGS_rest_url_prefix)
+                                        .SetTickInterval(std::chrono::milliseconds(100))
 #ifdef CTFO_DEBUG
-                                      .SetDebugPrint(true)
+                                        .SetDebugPrint(true)
 #endif
-      ;
-  current::FileSystem::WriteStringToFile(JSON(params), config_file.c_str());
+        ;
+    current::FileSystem::WriteStringToFile(JSON(params), config_file.c_str());
 
-  auto server = std::make_unique<CTFOServer>(config_file);
+    ctfo_server_ = std::make_unique<CTFOServer>(config_file);
+  }
 
-  current::time::SetNow(std::chrono::microseconds(1001));
-  return server;
-}
+ private:
+  std::unique_ptr<current::FileSystem::ScopedRmFile> scoped_rm_db_file_;
+  std::unique_ptr<current::FileSystem::ScopedRmFile> scoped_rm_config_file_;
+  std::unique_ptr<CTFOServer> ctfo_server_;
+};
+
+inline CTFOServerScope SpawnTestServer(const std::string& suffix) { return CTFOServerScope(suffix); }
 
 template <typename T_RESPONSE>
 inline T_RESPONSE ParseResponse(const std::string& source) {
@@ -114,7 +126,7 @@ TEST(CTFO, SmokeTest) {
   const auto server_scope = SpawnTestServer("smoke");
 
   // Get authentication `uid` and `token`.
-  current::time::SetNow(std::chrono::microseconds(101 * 1000));
+  current::time::SetNow(std::chrono::microseconds(101 * 1000), std::chrono::microseconds(102 * 1000));
   const char* const auth_id = "A_BUNCH_OF_DIGITS";
   const char* const auth_key = "1234567890abcdef";
   const auto auth_http_response = HTTP(
@@ -127,7 +139,7 @@ TEST(CTFO, SmokeTest) {
   const std::string actual_token = auth_response.user.token;
 
   // Get authentication `uid` and `token` for another user.
-  current::time::SetNow(std::chrono::microseconds(201 * 1000));
+  current::time::SetNow(std::chrono::microseconds(201 * 1000), std::chrono::microseconds(202 * 1000));
   const char* const another_auth_id = "ANOTHER_BUNCH_OF_DIGITS";
   const char* const another_auth_key = "abcdef1234567890";
   const auto another_auth_http_response = HTTP(POST(
@@ -143,7 +155,7 @@ TEST(CTFO, SmokeTest) {
   EXPECT_NE(actual_uid, another_actual_uid);
   EXPECT_NE(actual_token, another_actual_token);
 
-  current::time::SetNow(std::chrono::microseconds(1001 * 1000));
+  current::time::SetNow(std::chrono::microseconds(1001 * 1000), std::chrono::microseconds(1002 * 1000));
 
   // Get the feed.
   std::unordered_set<std::string> hot_cids;
@@ -232,7 +244,7 @@ TEST(CTFO, SmokeTest) {
   iOSGenericEvent favorite_event;
 
   {
-    current::time::SetNow(std::chrono::microseconds(10001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(10001 * 1000), std::chrono::microseconds(10002 * 1000));
     favorite_event.event = "FAV";
     favorite_event.fields["uid"] = actual_uid;
     favorite_event.fields["cid"] = cid1;
@@ -242,7 +254,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(200, static_cast<int>(post_favorite_response_1.code));
     EXPECT_EQ("OK\n", post_favorite_response_1.body);
 
-    current::time::SetNow(std::chrono::microseconds(10002 * 1000));
+    current::time::SetNow(std::chrono::microseconds(10002 * 1000), std::chrono::microseconds(10003 * 1000));
     favorite_event.fields["cid"] = cid2;
     const auto post_favorite_response_2 = HTTP(POST(
         Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port), JSON(ios_variant_t(favorite_event))));
@@ -252,7 +264,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm that GET /ctfo/card returns card favorite status given the `uid`.
   {
-    current::time::SetNow(std::chrono::microseconds(10003 * 1000));
+    current::time::SetNow(std::chrono::microseconds(10003 * 1000), std::chrono::microseconds(10004 * 1000));
     {
       const auto get_card_response = HTTP(GET(Printf(
           "http://localhost:%d/ctfo/card?uid=%s&cid=%s", FLAGS_api_port, actual_uid.c_str(), cid1.c_str())));
@@ -283,7 +295,7 @@ TEST(CTFO, SmokeTest) {
 
   // Attempt to add a non-existing card to favorites.
   {
-    current::time::SetNow(std::chrono::microseconds(10004 * 1000));
+    current::time::SetNow(std::chrono::microseconds(10004 * 1000), std::chrono::microseconds(10005 * 1000));
     favorite_event.fields["cid"] = CIDToString(static_cast<CID>(987654321));  // A non-existent ID.
     const auto post_favorite_response_3 = HTTP(POST(
         Printf("http://localhost:%d/ctfo/log", FLAGS_midichlorians_port), JSON(ios_variant_t(favorite_event))));
@@ -293,7 +305,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm both are returned as favorites for this user.
   {
-    current::time::SetNow(std::chrono::microseconds(11001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(11001 * 1000), std::chrono::microseconds(11002 * 1000));
     const auto feed_with_2_favs_response = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                                                            FLAGS_api_port,
                                                            actual_uid.c_str(),
@@ -309,7 +321,7 @@ TEST(CTFO, SmokeTest) {
 
   // Unfavorite one card.
   {
-    current::time::SetNow(std::chrono::microseconds(12001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(12001 * 1000), std::chrono::microseconds(12002 * 1000));
     favorite_event.event = "UNFAV";
     favorite_event.fields["cid"] = cid1;
     const auto post_unfavorite_response = HTTP(POST(
@@ -320,7 +332,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the remaining one is returned as a favorite for this user.
   {
-    current::time::SetNow(std::chrono::microseconds(13001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(13001 * 1000), std::chrono::microseconds(13002 * 1000));
     const auto feed_with_1_fav_response = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                                                           FLAGS_api_port,
                                                           actual_uid.c_str(),
@@ -339,7 +351,7 @@ TEST(CTFO, SmokeTest) {
 
   // First, skip this card. This tests casting the "CTFO" vote is possible after the card was skipped.
   {
-    current::time::SetNow(std::chrono::microseconds(14001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(14001 * 1000), std::chrono::microseconds(14002 * 1000));
     iOSGenericEvent ctfo_event;
     ctfo_event.event = "SKIP";
     ctfo_event.fields["uid"] = actual_uid;
@@ -353,7 +365,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the card has one "SKIP" counter.
   {
-    current::time::SetNow(std::chrono::microseconds(14002 * 1000));
+    current::time::SetNow(std::chrono::microseconds(14002 * 1000), std::chrono::microseconds(14003 * 1000));
     const auto feed_with_skip_made_on_fav = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                                                             FLAGS_api_port,
                                                             actual_uid.c_str(),
@@ -372,7 +384,7 @@ TEST(CTFO, SmokeTest) {
 
   // Cast a vote on this card.
   {
-    current::time::SetNow(std::chrono::microseconds(14003 * 1000));
+    current::time::SetNow(std::chrono::microseconds(14003 * 1000), std::chrono::microseconds(14004 * 1000));
     iOSGenericEvent ctfo_event;
     ctfo_event.event = "CTFO";
     ctfo_event.fields["uid"] = actual_uid;
@@ -386,7 +398,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the card has one "CTFO" vote.
   {
-    current::time::SetNow(std::chrono::microseconds(15001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(15001 * 1000), std::chrono::microseconds(15002 * 1000));
     const auto feed_with_ctfo_cast_on_fav = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                                                             FLAGS_api_port,
                                                             actual_uid.c_str(),
@@ -406,7 +418,7 @@ TEST(CTFO, SmokeTest) {
   // Add a card.
   std::string added_card_cid;
   {
-    current::time::SetNow(std::chrono::microseconds(16001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(16001 * 1000), std::chrono::microseconds(16002 * 1000));
     RequestAddCard add_card_request;
     add_card_request.text = "Foo.";
     add_card_request.color.red = 1;
@@ -469,7 +481,7 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ("Foo.", feed_recent[0].text);
       EXPECT_TRUE(feed_recent[0].is_my_card);
       EXPECT_EQ(0u, feed_recent[0].number_of_comments);
-      EXPECT_DOUBLE_EQ(0.9, feed_recent[0].relevance);
+      EXPECT_NEAR(0.9, feed_recent[0].relevance, 0.01);
     }
 
     {
@@ -486,7 +498,7 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ("Foo.", feed_recent[0].text);
       EXPECT_TRUE(feed_recent[0].is_my_card);
       EXPECT_EQ(0u, feed_recent[0].number_of_comments);
-      EXPECT_DOUBLE_EQ(0.9 * 0.99, feed_recent[0].relevance);
+      EXPECT_NEAR(0.9 * 0.99, feed_recent[0].relevance, 0.01);
     }
 
     {
@@ -503,7 +515,7 @@ TEST(CTFO, SmokeTest) {
       EXPECT_EQ("Foo.", feed_recent[0].text);
       EXPECT_TRUE(feed_recent[0].is_my_card);
       EXPECT_EQ(0u, feed_recent[0].number_of_comments);
-      EXPECT_DOUBLE_EQ(0.9 * 0.99 * 0.99, feed_recent[0].relevance);
+      EXPECT_NEAR(0.9 * 0.99 * 0.99, feed_recent[0].relevance, 0.01);
     }
 
     // Restore the time back.
@@ -513,7 +525,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm this new card is not favorited by default.
   {
-    current::time::SetNow(std::chrono::microseconds(17001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(17001 * 1000), std::chrono::microseconds(17002 * 1000));
     const auto favs_including_my_card_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                         FLAGS_api_port,
@@ -533,7 +545,7 @@ TEST(CTFO, SmokeTest) {
 
   // Get a list of my cards, should be only one.
   {
-    current::time::SetNow(std::chrono::microseconds(18001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(18001 * 1000), std::chrono::microseconds(18002 * 1000));
     const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                           FLAGS_api_port,
                                           actual_uid.c_str(),
@@ -551,7 +563,7 @@ TEST(CTFO, SmokeTest) {
   // Add a second card, with full JSON body, specifying the color explicitly.
   std::string added_card2_cid;
   {
-    current::time::SetNow(std::chrono::microseconds(19001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(19001 * 1000), std::chrono::microseconds(19002 * 1000));
     const auto post_card_response =
         HTTP(POST(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s",
                          FLAGS_api_port,
@@ -567,7 +579,7 @@ TEST(CTFO, SmokeTest) {
 
   // Get a list of my cards, should be two.
   {
-    current::time::SetNow(std::chrono::microseconds(20001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(20001 * 1000), std::chrono::microseconds(20002 * 1000));
     const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                           FLAGS_api_port,
                                           actual_uid.c_str(),
@@ -587,7 +599,7 @@ TEST(CTFO, SmokeTest) {
   // Add a third card, not specifying color.
   std::string added_card3_cid;
   {
-    current::time::SetNow(std::chrono::microseconds(21001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(21001 * 1000), std::chrono::microseconds(21002 * 1000));
     const auto post_card_response = HTTP(POST(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s",
                                                      FLAGS_api_port,
                                                      actual_uid.c_str(),
@@ -617,7 +629,7 @@ TEST(CTFO, SmokeTest) {
 
   // Get a list of my cards, should be three.
   {
-    current::time::SetNow(std::chrono::microseconds(23001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(23001 * 1000), std::chrono::microseconds(23002 * 1000));
     const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                           FLAGS_api_port,
                                           actual_uid.c_str(),
@@ -657,7 +669,7 @@ TEST(CTFO, SmokeTest) {
 
   // Get comments for a non-exising card, expecting an error.
   {
-    current::time::SetNow(std::chrono::microseconds(100001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(100001 * 1000), std::chrono::microseconds(100002 * 1000));
     const auto get_comments_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                         FLAGS_api_port,
@@ -670,7 +682,7 @@ TEST(CTFO, SmokeTest) {
 
   // Get comments for the actual card, expecting valid response with no comments.
   {
-    current::time::SetNow(std::chrono::microseconds(101001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(101001 * 1000), std::chrono::microseconds(101002 * 1000));
     const auto get_comments_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                         FLAGS_api_port,
@@ -686,7 +698,7 @@ TEST(CTFO, SmokeTest) {
   // Add a top-level comment.
   std::string added_comment_oid;
   {
-    current::time::SetNow(std::chrono::microseconds(102001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(102001 * 1000), std::chrono::microseconds(102002 * 1000));
     RequestAddComment add_comment_request;
     add_comment_request.text = "Meh.";
     const auto post_comment_response =
@@ -705,7 +717,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the card payload lists the number of comments as "1" now.
   {
-    current::time::SetNow(std::chrono::microseconds(102501 * 1000));
+    current::time::SetNow(std::chrono::microseconds(102501 * 1000), std::chrono::microseconds(102502 * 1000));
     const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                           FLAGS_api_port,
                                           actual_uid.c_str(),
@@ -748,7 +760,7 @@ TEST(CTFO, SmokeTest) {
 
   // Get comments for the card where the comment was added, expecting one.
   {
-    current::time::SetNow(std::chrono::microseconds(103001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(103001 * 1000), std::chrono::microseconds(103002 * 1000));
     const auto get_comments_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                         FLAGS_api_port,
@@ -768,7 +780,7 @@ TEST(CTFO, SmokeTest) {
 
   // Get comments for the card where the comment was not added, expecting none.
   {
-    current::time::SetNow(std::chrono::microseconds(104001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(104001 * 1000), std::chrono::microseconds(104002 * 1000));
     const auto get_comments_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                         FLAGS_api_port,
@@ -784,7 +796,7 @@ TEST(CTFO, SmokeTest) {
   // Add another top-level comment.
   std::string added_second_comment_oid;
   {
-    current::time::SetNow(std::chrono::microseconds(105001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(105001 * 1000), std::chrono::microseconds(105002 * 1000));
     RequestAddCommentShort add_comment_request;
     add_comment_request.text = "Bla.";
     const auto post_comment_response =
@@ -803,7 +815,7 @@ TEST(CTFO, SmokeTest) {
 
   // Get comments, expecting two top-level comments.
   {
-    current::time::SetNow(std::chrono::microseconds(106001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(106001 * 1000), std::chrono::microseconds(106002 * 1000));
     const auto get_comments_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                         FLAGS_api_port,
@@ -829,7 +841,7 @@ TEST(CTFO, SmokeTest) {
   // Add 2nd level comment 1/2.
   std::string added_nested_comment_1_oid;
   {
-    current::time::SetNow(std::chrono::microseconds(107001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(107001 * 1000), std::chrono::microseconds(107002 * 1000));
     RequestAddComment add_comment_request;
     add_comment_request.text = "for";
     add_comment_request.parent_oid = added_second_comment_oid;
@@ -850,7 +862,7 @@ TEST(CTFO, SmokeTest) {
   // Add 2nd level comment 2/2, to confirm the final sort order of the GET is right.
   std::string added_nested_comment_2_oid;
   {
-    current::time::SetNow(std::chrono::microseconds(108001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(108001 * 1000), std::chrono::microseconds(108002 * 1000));
     RequestAddComment add_comment_request;
     add_comment_request.text = "real?";
     add_comment_request.parent_oid = added_second_comment_oid;
@@ -870,7 +882,7 @@ TEST(CTFO, SmokeTest) {
 
   // Get comments, expecting two top-level ones, and two 2nd level ones, in the right order.
   {
-    current::time::SetNow(std::chrono::microseconds(109001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(109001 * 1000), std::chrono::microseconds(109002 * 1000));
     const auto get_comments_response =
         HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                         FLAGS_api_port,
@@ -926,7 +938,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the card payload lists the number of comments as "4" now.
   {
-    current::time::SetNow(std::chrono::microseconds(109501 * 1000));
+    current::time::SetNow(std::chrono::microseconds(109501 * 1000), std::chrono::microseconds(109502 * 1000));
     const auto my_cards = HTTP(GET(Printf("http://localhost:%d/ctfo/my_cards?uid=%s&token=%s",
                                           FLAGS_api_port,
                                           actual_uid.c_str(),
@@ -950,7 +962,7 @@ TEST(CTFO, SmokeTest) {
 
   // Attempt to add a 3rd level comment, expecting an error.
   {
-    current::time::SetNow(std::chrono::microseconds(110001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(110001 * 1000), std::chrono::microseconds(110002 * 1000));
     RequestAddComment add_comment_request;
     add_comment_request.text = "Nah.";
     add_comment_request.parent_oid = added_nested_comment_2_oid;
@@ -967,7 +979,7 @@ TEST(CTFO, SmokeTest) {
 
   // Attempt to add a 2nd level comment to a non-existing 1st level comment.
   {
-    current::time::SetNow(std::chrono::microseconds(110001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(111001 * 1000), std::chrono::microseconds(111002 * 1000));
     RequestAddComment add_comment_request;
     add_comment_request.text = "Still nah.";
     add_comment_request.parent_oid = OIDToString(RandomOID());
@@ -984,7 +996,7 @@ TEST(CTFO, SmokeTest) {
 
   // Like the comment.
   {
-    current::time::SetNow(std::chrono::microseconds(110002 * 1000));
+    current::time::SetNow(std::chrono::microseconds(112001 * 1000), std::chrono::microseconds(112002 * 1000));
     iOSGenericEvent like_comment_event;
     like_comment_event.event = "LIKE_COMMENT";
     like_comment_event.fields["uid"] = actual_uid;
@@ -998,7 +1010,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the comment got liked.
   {
-    current::time::SetNow(std::chrono::microseconds(110003 * 1000));
+    current::time::SetNow(std::chrono::microseconds(113001 * 1000), std::chrono::microseconds(113002 * 1000));
     const auto comments = ParseResponse<ResponseComments>(
                               HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                                               FLAGS_api_port,
@@ -1034,7 +1046,7 @@ TEST(CTFO, SmokeTest) {
 
   // Unlike the comment.
   {
-    current::time::SetNow(std::chrono::microseconds(110004 * 1000));
+    current::time::SetNow(std::chrono::microseconds(114001 * 1000), std::chrono::microseconds(114002 * 1000));
     iOSGenericEvent unlike_comment_event;
     unlike_comment_event.event = "UNLIKE_COMMENT";
     unlike_comment_event.fields["uid"] = actual_uid;
@@ -1048,7 +1060,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the comment got unliked.
   {
-    current::time::SetNow(std::chrono::microseconds(110005 * 1000));
+    current::time::SetNow(std::chrono::microseconds(115001 * 1000), std::chrono::microseconds(115002 * 1000));
     const auto comments = ParseResponse<ResponseComments>(
                               HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                                               FLAGS_api_port,
@@ -1084,7 +1096,7 @@ TEST(CTFO, SmokeTest) {
 
   // Flag the comment.
   {
-    current::time::SetNow(std::chrono::microseconds(110006 * 1000));
+    current::time::SetNow(std::chrono::microseconds(116001 * 1000), std::chrono::microseconds(116002 * 1000));
     iOSGenericEvent flag_comment_event;
     flag_comment_event.event = "FLAG_COMMENT";
     flag_comment_event.fields["uid"] = actual_uid;
@@ -1098,7 +1110,7 @@ TEST(CTFO, SmokeTest) {
 
   // Confirm the flagged comment has the corresponding flag in the response.
   {
-    current::time::SetNow(std::chrono::microseconds(110007 * 1000));
+    current::time::SetNow(std::chrono::microseconds(117001 * 1000), std::chrono::microseconds(117002 * 1000));
     const auto comments = ParseResponse<ResponseComments>(
                               HTTP(GET(Printf("http://localhost:%d/ctfo/comments?uid=%s&token=%s&cid=%s",
                                               FLAGS_api_port,
@@ -1132,7 +1144,7 @@ TEST(CTFO, SmokeTest) {
   // Delete the top-level comment with no second level comments,
   // and confirm that the number of comments goes down from 4 to 3.
   {
-    current::time::SetNow(std::chrono::microseconds(600001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(600001 * 1000), std::chrono::microseconds(600002 * 1000));
     const auto delete_comment_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
                            FLAGS_api_port,
@@ -1181,7 +1193,7 @@ TEST(CTFO, SmokeTest) {
   // Delete one of two second-level comments, and confirm that
   // the number of comments goes down from 3 to 2.
   {
-    current::time::SetNow(std::chrono::microseconds(600002 * 1000));
+    current::time::SetNow(std::chrono::microseconds(600002 * 1000), std::chrono::microseconds(600003 * 1000));
     const auto delete_comment_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
                            FLAGS_api_port,
@@ -1219,7 +1231,7 @@ TEST(CTFO, SmokeTest) {
     // Add a comment to generate a notification.
     std::string comment_to_be_notified_about_oid;
     {
-      current::time::SetNow(std::chrono::microseconds(600003 * 1000));
+      current::time::SetNow(std::chrono::microseconds(600003 * 1000), std::chrono::microseconds(600004 * 1000));
       RequestAddComment add_comment_request;
       add_comment_request.text = "Ding!";
       const auto post_comment_response =
@@ -1236,7 +1248,7 @@ TEST(CTFO, SmokeTest) {
     }
     // Should be one notification.
     {
-      current::time::SetNow(std::chrono::microseconds(600004 * 1000));
+      current::time::SetNow(std::chrono::microseconds(600004 * 1000), std::chrono::microseconds(600005 * 1000));
       const auto feed_http_response =
           HTTP(GET(Printf("http://localhost:%d/ctfo/feed?uid=%s&token=%s&notifications_since=0",
                           FLAGS_api_port,
@@ -1272,7 +1284,7 @@ TEST(CTFO, SmokeTest) {
   // Delete the remaining top-level comment, and confirm that the number of comments
   // goes down from 2 to 0, since deleting the top-level comments deletes its children.
   {
-    current::time::SetNow(std::chrono::microseconds(601001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(601001 * 1000), std::chrono::microseconds(601002 * 1000));
     const auto delete_comment_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/comment?uid=%s&token=%s&cid=%s&oid=%s",
                            FLAGS_api_port,
@@ -1305,7 +1317,7 @@ TEST(CTFO, SmokeTest) {
                                                        actual_uid.c_str(),
                                                        actual_token.c_str()))).body).cards.size());
 
-    current::time::SetNow(std::chrono::microseconds(601501 * 1000));
+    current::time::SetNow(std::chrono::microseconds(601501 * 1000), std::chrono::microseconds(601502 * 1000));
     const auto unauthorized_delete_card_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
                            FLAGS_api_port,
@@ -1315,7 +1327,7 @@ TEST(CTFO, SmokeTest) {
     EXPECT_EQ(401, static_cast<int>(unauthorized_delete_card_response.code));
     EXPECT_EQ("NOT YOUR CARD BRO\n", unauthorized_delete_card_response.body);
 
-    current::time::SetNow(std::chrono::microseconds(602001 * 1000));
+    current::time::SetNow(std::chrono::microseconds(602001 * 1000), std::chrono::microseconds(602002 * 1000));
     const auto delete_card_response = HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
                                                          FLAGS_api_port,
                                                          actual_uid.c_str(),
@@ -1332,7 +1344,7 @@ TEST(CTFO, SmokeTest) {
                                                        actual_uid.c_str(),
                                                        actual_token.c_str()))).body).cards.size());
 
-    current::time::SetNow(std::chrono::microseconds(602501 * 1000));
+    current::time::SetNow(std::chrono::microseconds(602501 * 1000), std::chrono::microseconds(602502 * 1000));
     const auto nonexistent_card_delete_response =
         HTTP(DELETE(Printf("http://localhost:%d/ctfo/card?uid=%s&token=%s&cid=%s",
                            FLAGS_api_port,
@@ -1385,7 +1397,8 @@ TEST(CTFO, SmokeTest) {
   {
     // Sanity check there is one favorited card.
     {
-      current::time::SetNow(std::chrono::microseconds(700 * 1000 * 1000));
+      current::time::SetNow(std::chrono::microseconds(700 * 1000 * 1000),
+                            std::chrono::microseconds(700 * 1001 * 1000));
       const auto favs = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                                         FLAGS_api_port,
                                         actual_uid.c_str(),
@@ -1398,7 +1411,8 @@ TEST(CTFO, SmokeTest) {
 
     // Flag that card.
     {
-      current::time::SetNow(std::chrono::microseconds(701 * 1000 * 1000));
+      current::time::SetNow(std::chrono::microseconds(701 * 1000 * 1000),
+                            std::chrono::microseconds(701 * 1001 * 1000));
       favorite_event.event = "FLAG_CARD";
       favorite_event.fields["uid"] = actual_uid;
       favorite_event.fields["token"] = actual_token;
@@ -1412,7 +1426,8 @@ TEST(CTFO, SmokeTest) {
 
     // Confirm it's gone.
     {
-      current::time::SetNow(std::chrono::microseconds(702 * 1000 * 1000));
+      current::time::SetNow(std::chrono::microseconds(702 * 1000 * 1000),
+                            std::chrono::microseconds(702 * 1001 * 1000));
       const auto favs = HTTP(GET(Printf("http://localhost:%d/ctfo/favs?uid=%s&token=%s",
                                         FLAGS_api_port,
                                         actual_uid.c_str(),
@@ -1446,11 +1461,12 @@ TEST(CTFO, StrictAuth) {
   EXPECT_EQ("NEED VALID ID-KEY PAIR\n", no_device_id_auth_response.body);
 
   // Successful `ios` auth.
+  current::time::SetNow(std::chrono::microseconds(3 * 1000), std::chrono::microseconds(3 * 1000 + 999));
   const auto auth_http_response = HTTP(
       POST(Printf("http://localhost:%d/ctfo/auth/ios?id=%s&key=%s", FLAGS_api_port, auth_id, auth_key), ""));
   EXPECT_EQ(200, static_cast<int>(auth_http_response.code));
   const auto auth_response = ParseResponse<ResponseFeed>(auth_http_response.body);
-  EXPECT_EQ(1u, auth_response.ms.count());
+  EXPECT_EQ(3u, auth_response.ms.count());
 }
 
 TEST(CTFO, UseRightHTTPVerbs) {
