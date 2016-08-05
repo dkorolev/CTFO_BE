@@ -1461,11 +1461,12 @@ TEST(CTFO, StrictAuth) {
   EXPECT_EQ("NEED VALID ID-KEY PAIR\n", no_device_id_auth_response.body);
 
   // Successful `ios` auth.
+  current::time::SetNow(std::chrono::microseconds(3 * 1000), std::chrono::microseconds(3 * 1000 + 999));
   const auto auth_http_response = HTTP(
       POST(Printf("http://localhost:%d/ctfo/auth/ios?id=%s&key=%s", FLAGS_api_port, auth_id, auth_key), ""));
   EXPECT_EQ(200, static_cast<int>(auth_http_response.code));
   const auto auth_response = ParseResponse<ResponseFeed>(auth_http_response.body);
-  EXPECT_EQ(2u, auth_response.ms.count());
+  EXPECT_EQ(3u, auth_response.ms.count());
 }
 
 TEST(CTFO, UseRightHTTPVerbs) {
