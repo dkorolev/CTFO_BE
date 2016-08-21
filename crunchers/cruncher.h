@@ -38,7 +38,9 @@ struct EntryCruncherImpl : public IMPL {
   using TerminationResponse = current::ss::TerminationResponse;
   using entry_t = typename IMPL::entry_t;
 	
-  EntryCruncherImpl() {}
+  template <typename... ARGS>
+  EntryCruncherImpl(ARGS&&... args)
+    : IMPL(std::forward<ARGS>(args)...) {}
   virtual ~EntryCruncherImpl() {}
 
   EntryResponse operator()(const entry_t& entry, idxts_t current, idxts_t) {
