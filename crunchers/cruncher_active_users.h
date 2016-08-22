@@ -101,7 +101,7 @@ struct ActiveUsersCruncherImpl {
 };
 
 template <typename NAMESPACE>
-using ActiveUsersCruncher = current::sherlock::StreamCruncher<ActiveUsersCruncherImpl<NAMESPACE>>;
+using ActiveUsersCruncher = CTFO::StreamCruncher<ActiveUsersCruncherImpl<NAMESPACE>>;
 
 }  // namespace CTFO
 

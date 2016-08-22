@@ -28,9 +28,7 @@
 
 #include "../../Current/Blocks/SS/ss.h"
 
-namespace current {
-
-namespace sherlock {
+namespace CTFO {
 
 template <typename IMPL>
 struct EntryCruncherImpl : public IMPL {
@@ -55,8 +53,6 @@ struct EntryCruncherImpl : public IMPL {
 template <typename IMPL>
 using StreamCruncher = current::ss::StreamSubscriber<EntryCruncherImpl<IMPL>, typename IMPL::entry_t>;
 
-}  // namespace sherlock
-
-}  // namespace current
+}  // namespace CTFO
 
 #endif  // CRUNCHER_H
