@@ -45,7 +45,7 @@ struct ActiveUsersCruncherImpl {
     current_us_ = idxts.us;
     ++stream_size_;
     e.Call(*this);
-    while (!users_list_.empty() && users_list_.back().us + interval_ < current_us_) {
+    while (!users_list_.empty() && users_list_.back().us + interval_ <= current_us_) {
       users_map_.erase(users_list_.back().device_id);
       users_list_.pop_back();
     }
