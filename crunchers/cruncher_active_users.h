@@ -36,6 +36,8 @@ namespace CTFO {
 template <typename NAMESPACE>
 struct ActiveUsersCruncherImpl {
   using entry_t = typename NAMESPACE::CTFOLogEntry;
+  using EventLogEntry = typename NAMESPACE::EventLogEntry;
+  using iOSBaseEvent = typename NAMESPACE::iOSBaseEvent;
 
   ActiveUsersCruncherImpl(std::chrono::microseconds interval) : interval_(interval), stream_size_(0) {}
   virtual ~ActiveUsersCruncherImpl() = default;
@@ -43,7 +45,9 @@ struct ActiveUsersCruncherImpl {
   void OnEvent(const entry_t& e, idxts_t idxts) {
     current_us_ = idxts.us;
     ++stream_size_;
-    e.Call(*this);
+    if (Exists<EventLogEntry>(e)) {
+      OnEventLogEntry(Value<EventLogEntry>(e));
+    }
     while (!users_list_.empty() && users_list_.back().us + interval_ <= current_us_) {
       users_map_.erase(users_list_.back().device_id);
       users_list_.pop_back();
@@ -53,23 +57,6 @@ struct ActiveUsersCruncherImpl {
   uint64_t Count() const { return users_list_.size(); }
   uint64_t Size() const { return stream_size_; }
 
-  void operator()(const typename NAMESPACE::EventLogEntry& e) {
-    current_us_ = e.server_us;
-    e.event.Call(*this);
-  }
-
-  void operator()(const typename NAMESPACE::iOSGenericEvent& e) { OnIOSEvent(e); }
-
-  void operator()(const typename NAMESPACE::iOSFocusEvent& e) { OnIOSEvent(e); }
-
-  void operator()(const typename NAMESPACE::iOSIdentifyEvent& e) { OnIOSEvent(e); }
-
-  void operator()(const typename NAMESPACE::iOSAppLaunchEvent& e) { OnIOSEvent(e); }
-
-  void operator()(const typename NAMESPACE::iOSFirstLaunchEvent& e) { OnIOSEvent(e); }
-
-  template <typename ANYTHING>
-  void operator()(const ANYTHING&) {}
 
  private:
   struct ActiveUser final {
@@ -79,7 +66,14 @@ struct ActiveUsersCruncherImpl {
   using user_list_t = std::list<ActiveUser>;
   using user_map_t = std::unordered_map<std::string, typename user_list_t::iterator>;
 
-  void OnIOSEvent(const typename NAMESPACE::iOSBaseEvent& e) {
+  void OnEventLogEntry(const EventLogEntry& e) {
+    current_us_ = e.server_us;
+    if (Exists<iOSBaseEvent>(e.event)) {
+      OnIOSEvent(Value<iOSBaseEvent>(e.event));
+    }
+  }
+
+  void OnIOSEvent(const iOSBaseEvent& e) {
     const auto cit = users_map_.find(e.device_id);
     if (cit != users_map_.end()) {
       if (cit->second != users_list_.begin()) {
