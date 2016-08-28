@@ -3,7 +3,6 @@
 
  Copyright (c) 2016 Grigory Nikolaenko <nikolaenko.grigory@gmail.com>
 
-
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
  in the Software without restriction, including without limitation the rights
@@ -87,7 +86,7 @@ CURRENT_NAMESPACE(CTFO_Local) {
   CURRENT_NAMESPACE_TYPE(iOSBaseEvent, current::midichlorians::ios::iOSBaseEvent);
 };
 
-TEST(CTFOCrunchersTest, AcriveUsersCruncherTest) {
+TEST(CTFOCrunchersTest, ActiveUsersCruncherTest) {
   const auto schema_key = CTFO::SchemaKey();
   CTFO::CTFOServer::stream_t local_stream(schema_key, FLAGS_golden_filename);
   CTFO::CTFOServer::storage_t storage(local_stream);
@@ -104,76 +103,75 @@ TEST(CTFOCrunchersTest, AcriveUsersCruncherTest) {
   auto activeusers_cruncher_local = std::make_unique<CTFOActiveUsersCruncherLocal>(std::chrono::seconds(1u));
   auto activeusers_cruncher_remote = std::make_unique<CTFOActiveUsersCruncherRemote>(std::chrono::seconds(1u));
 
-#define SUBSCRIBE_AND_WAIT()                                                                      \
-  do {                                                                                            \
-    const auto scope_local = local_stream.Subscribe(*activeusers_cruncher_local);                 \
-    const auto scope_remote = remote_stream.Subscribe(*activeusers_cruncher_remote);              \
-    while (activeusers_cruncher_local->Size() < 80 || activeusers_cruncher_remote->Size() < 80) { \
-      std::this_thread::yield();                                                                  \
-    }                                                                                             \
-  } while (false)
+  const auto SubscribeAndWait = [&]() {
+    const auto scope_local = local_stream.Subscribe(*activeusers_cruncher_local);
+    const auto scope_remote = remote_stream.Subscribe(*activeusers_cruncher_remote);
+    while (activeusers_cruncher_local->Size() < 80 || activeusers_cruncher_remote->Size() < 80) {
+      std::this_thread::yield();
+    }
+  };
 
-  SUBSCRIBE_AND_WAIT();
+  SubscribeAndWait();
   EXPECT_EQ(1u, activeusers_cruncher_local->Count());
   EXPECT_EQ(1u, activeusers_cruncher_remote->Count());
 
   activeusers_cruncher_local = std::make_unique<CTFOActiveUsersCruncherLocal>(std::chrono::seconds(12u));
   activeusers_cruncher_remote = std::make_unique<CTFOActiveUsersCruncherRemote>(std::chrono::seconds(12u));
-  SUBSCRIBE_AND_WAIT();
+  SubscribeAndWait();
   EXPECT_EQ(12u, activeusers_cruncher_local->Count());
   EXPECT_EQ(12u, activeusers_cruncher_remote->Count());
 
   activeusers_cruncher_local = std::make_unique<CTFOActiveUsersCruncherLocal>(std::chrono::minutes(10u));
   activeusers_cruncher_remote = std::make_unique<CTFOActiveUsersCruncherRemote>(std::chrono::minutes(10u));
-  SUBSCRIBE_AND_WAIT();
+  SubscribeAndWait();
   EXPECT_EQ(12u, activeusers_cruncher_local->Count());
   EXPECT_EQ(12u, activeusers_cruncher_remote->Count());
 
   activeusers_cruncher_local = std::make_unique<CTFOActiveUsersCruncherLocal>(std::chrono::minutes(15u));
   activeusers_cruncher_remote = std::make_unique<CTFOActiveUsersCruncherRemote>(std::chrono::minutes(15u));
-  SUBSCRIBE_AND_WAIT();
+  SubscribeAndWait();
   EXPECT_EQ(14u, activeusers_cruncher_local->Count());
   EXPECT_EQ(14u, activeusers_cruncher_remote->Count());
 
   activeusers_cruncher_local = std::make_unique<CTFOActiveUsersCruncherLocal>(std::chrono::hours(10u));
   activeusers_cruncher_remote = std::make_unique<CTFOActiveUsersCruncherRemote>(std::chrono::hours(10u));
-  SUBSCRIBE_AND_WAIT();
+  SubscribeAndWait();
   EXPECT_EQ(14u, activeusers_cruncher_local->Count());
   EXPECT_EQ(14u, activeusers_cruncher_remote->Count());
 
   activeusers_cruncher_local = std::make_unique<CTFOActiveUsersCruncherLocal>(std::chrono::hours(17u));
   activeusers_cruncher_remote = std::make_unique<CTFOActiveUsersCruncherRemote>(std::chrono::hours(17u));
-  SUBSCRIBE_AND_WAIT();
+  SubscribeAndWait();
   EXPECT_EQ(16u, activeusers_cruncher_local->Count());
   EXPECT_EQ(16u, activeusers_cruncher_remote->Count());
 
   activeusers_cruncher_local = std::make_unique<CTFOActiveUsersCruncherLocal>(std::chrono::hours(600u));
   activeusers_cruncher_remote = std::make_unique<CTFOActiveUsersCruncherRemote>(std::chrono::hours(600u));
-  SUBSCRIBE_AND_WAIT();
+  SubscribeAndWait();
   EXPECT_EQ(16u, activeusers_cruncher_local->Count());
   EXPECT_EQ(16u, activeusers_cruncher_remote->Count());
 
   activeusers_cruncher_local = std::make_unique<CTFOActiveUsersCruncherLocal>(std::chrono::hours(1100u));
   activeusers_cruncher_remote = std::make_unique<CTFOActiveUsersCruncherRemote>(std::chrono::hours(1100u));
-  SUBSCRIBE_AND_WAIT();
+  SubscribeAndWait();
   EXPECT_EQ(18u, activeusers_cruncher_local->Count());
   EXPECT_EQ(18u, activeusers_cruncher_remote->Count());
 
   activeusers_cruncher_local = std::make_unique<CTFOActiveUsersCruncherLocal>(std::chrono::hours(36000u));
   activeusers_cruncher_remote = std::make_unique<CTFOActiveUsersCruncherRemote>(std::chrono::hours(36000u));
-  SUBSCRIBE_AND_WAIT();
+  SubscribeAndWait();
   EXPECT_EQ(18u, activeusers_cruncher_local->Count());
   EXPECT_EQ(18u, activeusers_cruncher_remote->Count());
 
   activeusers_cruncher_local = std::make_unique<CTFOActiveUsersCruncherLocal>(std::chrono::hours(73000u));
   activeusers_cruncher_remote = std::make_unique<CTFOActiveUsersCruncherRemote>(std::chrono::hours(73000u));
-  SUBSCRIBE_AND_WAIT();
+  SubscribeAndWait();
   EXPECT_EQ(19u, activeusers_cruncher_local->Count());
   EXPECT_EQ(19u, activeusers_cruncher_remote->Count());
 
   activeusers_cruncher_local = std::make_unique<CTFOActiveUsersCruncherLocal>(std::chrono::hours(73100u));
   activeusers_cruncher_remote = std::make_unique<CTFOActiveUsersCruncherRemote>(std::chrono::hours(73100u));
-  SUBSCRIBE_AND_WAIT();
+  SubscribeAndWait();
   EXPECT_EQ(20u, activeusers_cruncher_local->Count());
   EXPECT_EQ(20u, activeusers_cruncher_remote->Count());
 }
