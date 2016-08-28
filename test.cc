@@ -54,6 +54,9 @@ using namespace current::midichlorians::server;
 // Uncomment the following line to have the unit test dump debug information to console.
 // #define CTFO_DEBUG
 
+// Uncomment to disable CTFO crunchers tests
+//#define CTFO_CRUNCHERS_TESTS
+
 struct CTFOServerScope {
   explicit CTFOServerScope(const std::string& suffix) {
 #ifdef CTFO_DEBUG
@@ -1504,3 +1507,5 @@ TEST(CTFO, NotificationsSerializeWell) {
 }
 
 // TODO(dkorolev): Test the remaining notification types.
+
+#include "crunchers/test.cc"
