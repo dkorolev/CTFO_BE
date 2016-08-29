@@ -28,6 +28,8 @@
 #include <list>
 #include <unordered_map>
 
+#include "../../Current/Blocks/MMQ/mmq.h"
+
 #include "cruncher.h"
 #include "schema.h"
 
@@ -95,6 +97,62 @@ struct ActiveUsersCruncherImpl {
 
 template <typename NAMESPACE>
 using ActiveUsersCruncher = CTFO::StreamCruncher<ActiveUsersCruncherImpl<NAMESPACE>>;
+
+template <typename NAMESPACE>
+struct ActiveUsersMultiCruncherImpl {
+  using entry_t = typename NAMESPACE::CTFOLogEntry;
+  using cruncher_t = ActiveUsersCruncherImpl<NAMESPACE>;
+  using crunchers_list_t = std::vector<std::unique_ptr<cruncher_t>>;
+  using duration_list_t = std::vector<std::chrono::microseconds>;
+  using mmq_t = current::mmq::MMQ<entry_t, DummySubscriber<entry_t>, 1024*1024>;
+
+  ActiveUsersMultiCruncherImpl(const duration_list_t& intervals)
+    : unused_idxts_()
+    , last_event_us_(std::chrono::microseconds(0))
+    , events_seen_(0)
+    , dummy_subscriber_([this](const entry_t& entry, idxts_t idxts){ OnEventInternal(entry, idxts); })
+    , mmq_(dummy_subscriber_, 1024*1024)
+    , intervals_(intervals) {
+    crunchers_.reserve(intervals.size());
+    for (const auto interval : intervals) {
+      crunchers_.push_back(std::make_unique<cruncher_t>(interval));
+    }
+  }
+  virtual ~ActiveUsersMultiCruncherImpl() = default;
+  
+  void OnEvent(const entry_t& e, idxts_t idxts) {
+    mmq_.Publish(e, idxts.us);
+  }
+  
+  uint64_t Count(uint64_t ind) {
+    return crunchers_[ind]->Count();
+  }
+
+  uint64_t EventsSeen() {
+    return events_seen_;
+  }
+
+private:
+  void OnEventInternal(const entry_t& e, idxts_t idxts) {
+    last_event_us_ = idxts.us;
+    for (auto& cruncher : crunchers_) {
+      cruncher->OnEvent(e, idxts);
+    }
+    ++events_seen_;
+  }
+
+  const idxts_t unused_idxts_;
+  std::chrono::microseconds last_event_us_;
+  uint64_t events_seen_;
+  DummySubscriber<entry_t> dummy_subscriber_;
+  mmq_t mmq_;
+  duration_list_t intervals_;
+  crunchers_list_t crunchers_;
+};
+  
+template <typename NAMESPACE>
+using ActiveUsersMultiCruncher = CTFO::StreamCruncher<ActiveUsersMultiCruncherImpl<NAMESPACE>>;
+
 
 }  // namespace CTFO
 

@@ -102,45 +102,38 @@ TEST(CTFOCrunchersTest, ActiveUsersCruncherLocalTest) {
   const std::string golden_db_file_name = current::FileSystem::JoinPath("golden", "active_users_db.json");
   CTFO_Local::Sherlock local_stream(CTFO::SchemaKey(), golden_db_file_name);
 
-  using CTFOActiveUsersCruncher = CTFO::ActiveUsersCruncher<CTFO_Local>;
+  using CTFOActiveUsersCruncher = CTFO::ActiveUsersMultiCruncher<CTFO_Local>;
+  
+  std::vector<std::chrono::microseconds> intervals;
+  for (uint32_t i = 0; i < 12; ++i) {
+    intervals.push_back(std::chrono::seconds(i + 1));
+  }
+  for (uint32_t i = 0; i < 15; ++i) {
+    intervals.push_back(std::chrono::minutes(i + 1));
+  }
+  intervals.push_back(std::chrono::hours(3600 * 21));
 
-  std::unique_ptr<CTFOActiveUsersCruncher> activeusers_cruncher;
-
-  const auto SubscribeAndWait = [&]() {
+  auto activeusers_cruncher = std::make_unique<CTFOActiveUsersCruncher>(intervals);
+  {
     const auto scope = local_stream.Subscribe(*activeusers_cruncher);
     while (activeusers_cruncher->EventsSeen() < 80) {
       std::this_thread::yield();
     }
-  };
-
+  }
   // In the last 12 seconds there were 12 users, which appeared exactly one per second.
-  for (uint32_t i = 1; i <= 12; ++i) {
-    activeusers_cruncher = std::make_unique<CTFOActiveUsersCruncher>(std::chrono::seconds(i));
-    SubscribeAndWait();
-    EXPECT_EQ(i, activeusers_cruncher->Count());
+  for (uint32_t i = 0; i < 12; ++i) {
+    EXPECT_EQ(i + 1, activeusers_cruncher->Count(i));
   }
-
   // In the previous 12 minutes there were no 'new' users, only the same ones.
-  for (uint32_t i = 1; i <= 13; ++i) {
-    activeusers_cruncher = std::make_unique<CTFOActiveUsersCruncher>(std::chrono::minutes(i));
-    SubscribeAndWait();
-    EXPECT_EQ(12u, activeusers_cruncher->Count());
+  for (uint32_t i = 0; i < 13; ++i) {
+    EXPECT_EQ(12u, activeusers_cruncher->Count(i + 12));
   }
-
   // A minute before there was one more 'unique' active user.
-  activeusers_cruncher = std::make_unique<CTFOActiveUsersCruncher>(std::chrono::minutes(14));
-  SubscribeAndWait();
-  EXPECT_EQ(13u, activeusers_cruncher->Count());
-
+  EXPECT_EQ(13u, activeusers_cruncher->Count(25));
   // And a minute before that - another one.
-  activeusers_cruncher = std::make_unique<CTFOActiveUsersCruncher>(std::chrono::minutes(15));
-  SubscribeAndWait();
-  EXPECT_EQ(14u, activeusers_cruncher->Count());
-
+  EXPECT_EQ(14u, activeusers_cruncher->Count(26));
   // From the very beginning there were exactly 20 different active users.
-  activeusers_cruncher = std::make_unique<CTFOActiveUsersCruncher>(std::chrono::hours(3600 * 21));
-  SubscribeAndWait();
-  EXPECT_EQ(20u, activeusers_cruncher->Count());
+  EXPECT_EQ(20u, activeusers_cruncher->Count(27));
 }
 
 TEST(CTFOCrunchersTest, ActiveUsersCruncherRemoteTest) {
