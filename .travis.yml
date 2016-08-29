@@ -2,18 +2,19 @@ language: cpp
 
 matrix:
   include:
-    - script: ./ci.sh
-      env:
-      - NDEBUG=0
-      - CPLUSPLUS=g++-5
-      compiler: "g++-5, Job: ./ci.sh, "
-      os: linux
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-5
+    # Travis can't handle this. -- G.N.
+    #- script: ./ci.sh
+    #  env:
+    #  - NDEBUG=0
+    #  - CPLUSPLUS=g++-5
+    #  compiler: "g++-5, Job: ./ci.sh, "
+    #  os: linux
+    #  addons:
+    #    apt:
+    #      sources:
+    #        - ubuntu-toolchain-r-test
+    #      packages:
+    #        - g++-5
 
     - script: ./ci.sh
       env:
