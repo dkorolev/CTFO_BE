@@ -39,12 +39,12 @@ struct ActiveUsersCruncherImpl {
   using EventLogEntry = typename NAMESPACE::EventLogEntry;
   using iOSBaseEvent = typename NAMESPACE::iOSBaseEvent;
 
-  ActiveUsersCruncherImpl(std::chrono::microseconds interval) : interval_(interval), stream_size_(0) {}
+  ActiveUsersCruncherImpl(std::chrono::microseconds interval) : interval_(interval), events_seen_(0) {}
   virtual ~ActiveUsersCruncherImpl() = default;
 
   void OnEvent(const entry_t& e, idxts_t idxts) {
     current_us_ = idxts.us;
-    ++stream_size_;
+    ++events_seen_;
     if (Exists<EventLogEntry>(e)) {
       OnEventLogEntry(Value<EventLogEntry>(e));
     }
@@ -55,7 +55,7 @@ struct ActiveUsersCruncherImpl {
   }
 
   uint64_t Count() const { return users_list_.size(); }
-  uint64_t Size() const { return stream_size_; }
+  uint64_t EventsSeen() const { return events_seen_; }
 
 
  private:
@@ -90,7 +90,7 @@ struct ActiveUsersCruncherImpl {
   user_map_t users_map_;
   std::chrono::microseconds current_us_;
   std::chrono::microseconds interval_;
-  uint64_t stream_size_;
+  uint64_t events_seen_;
 };
 
 template <typename NAMESPACE>
