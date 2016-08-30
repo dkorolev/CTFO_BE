@@ -104,14 +104,13 @@ struct ActiveUsersMultiCruncherImpl {
   using cruncher_t = ActiveUsersCruncherImpl<NAMESPACE>;
   using crunchers_list_t = std::vector<std::unique_ptr<cruncher_t>>;
   using duration_list_t = std::vector<std::chrono::microseconds>;
-  using mmq_t = current::mmq::MMQ<entry_t, DummySubscriber<entry_t>, 1024*1024>;
+  using mmq_t = current::mmq::MMQ<entry_t, IntermediateSubscriber<entry_t>, 1024*1024>;
 
   ActiveUsersMultiCruncherImpl(const duration_list_t& intervals)
-    : unused_idxts_()
-    , last_event_us_(std::chrono::microseconds(0))
+	: last_event_us_(std::chrono::microseconds(0))
     , events_seen_(0)
-    , dummy_subscriber_([this](const entry_t& entry, idxts_t idxts){ OnEventInternal(entry, idxts); })
-    , mmq_(dummy_subscriber_, 1024*1024)
+    , mmq_subscriber_([this](const entry_t& entry, idxts_t idxts){ OnEventInternal(entry, idxts); })
+    , mmq_(mmq_subscriber_, 1024*1024)
     , intervals_(intervals) {
     crunchers_.reserve(intervals.size());
     for (const auto interval : intervals) {
@@ -141,10 +140,9 @@ private:
     ++events_seen_;
   }
 
-  const idxts_t unused_idxts_;
   std::chrono::microseconds last_event_us_;
   uint64_t events_seen_;
-  DummySubscriber<entry_t> dummy_subscriber_;
+  IntermediateSubscriber<entry_t> mmq_subscriber_;
   mmq_t mmq_;
   duration_list_t intervals_;
   crunchers_list_t crunchers_;

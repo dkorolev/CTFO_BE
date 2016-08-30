@@ -53,15 +53,15 @@ template <typename IMPL>
 using StreamCruncher = current::ss::StreamSubscriber<EntryCruncherImpl<IMPL>, typename IMPL::entry_t>;
 
 template <typename ENTRY>
-struct DummySubscriberImpl {
+struct IntermediateSubscriberImpl {
   using EntryResponse = current::ss::EntryResponse;
   using TerminationResponse = current::ss::TerminationResponse;
   using entry_t = ENTRY;
   using subscriber_callback_t = std::function<void(const entry_t&, idxts_t)>;
 
-  DummySubscriberImpl(subscriber_callback_t callback)
+  IntermediateSubscriberImpl(subscriber_callback_t callback)
     : actual_subscriber_(callback) {}
-  virtual ~DummySubscriberImpl() {}
+  virtual ~IntermediateSubscriberImpl() {}
   
   EntryResponse operator()(const entry_t& entry, idxts_t current, idxts_t) {
     actual_subscriber_(entry, current);
@@ -76,7 +76,7 @@ private:
 };
 
 template <typename ENTRY>
-using DummySubscriber = current::ss::StreamSubscriber<DummySubscriberImpl<ENTRY>, ENTRY>;
+using IntermediateSubscriber = current::ss::StreamSubscriber<IntermediateSubscriberImpl<ENTRY>, ENTRY>;
 
 }  // namespace CTFO
 
