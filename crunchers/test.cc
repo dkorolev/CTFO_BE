@@ -42,6 +42,7 @@ DEFINE_bool(write_ctfo_storage_golden_files, false, "Set to `true` to [over]writ
 DEFINE_int32(sherlock_http_test_port,
              PickPortForUnitTest(),
              "Local port to use remote subscription unit test.");
+DEFINE_int32(cruncher_http_test_port, PickPortForUnitTest(), "Local port to expose crunchers on.");
 
 CURRENT_NAMESPACE(CTFO_Local) {
   CURRENT_NAMESPACE_TYPE(CTFOStorageTransaction, typename current::storage::transaction_t<CTFOStorage>);
@@ -103,7 +104,7 @@ TEST(CTFOCrunchersTest, ActiveUsersCruncherLocalTest) {
   CTFO_Local::Sherlock local_stream(CTFO::SchemaKey(), golden_db_file_name);
 
   using CTFOActiveUsersCruncher = CTFO::ActiveUsersMultiCruncher<CTFO_Local>;
-  
+
   std::vector<std::chrono::microseconds> intervals;
   for (uint32_t i = 0; i < 12; ++i) {
     intervals.push_back(std::chrono::seconds(i + 1));
@@ -113,7 +114,8 @@ TEST(CTFOCrunchersTest, ActiveUsersCruncherLocalTest) {
   }
   intervals.push_back(std::chrono::hours(3600 * 21));
 
-  auto activeusers_cruncher = std::make_unique<CTFOActiveUsersCruncher>(intervals);
+  auto activeusers_cruncher =
+      std::make_unique<CTFOActiveUsersCruncher>(intervals, FLAGS_cruncher_http_test_port, "/active_users");
   {
     const auto scope = local_stream.Subscribe(*activeusers_cruncher);
     while (activeusers_cruncher->EventsSeen() < 80) {

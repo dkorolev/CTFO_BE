@@ -26,8 +26,10 @@
 #define CRUNCHER_ACTIVE_USERS_H
 
 #include <list>
+#include <vector>
 #include <unordered_map>
 
+#include "../../Current/Blocks/HTTP/api.h"
 #include "../../Current/Blocks/MMQ/mmq.h"
 
 #include "cruncher.h"
@@ -101,38 +103,55 @@ using ActiveUsersCruncher = CTFO::StreamCruncher<ActiveUsersCruncherImpl<NAMESPA
 template <typename NAMESPACE>
 struct ActiveUsersMultiCruncherImpl {
   using entry_t = typename NAMESPACE::CTFOLogEntry;
+  using request_ptr_t = std::unique_ptr<Request>;
+
+  struct MMQMessage {
+    MMQMessage() = default;
+    MMQMessage(entry_t event) : event(event), type(Event) {}
+    MMQMessage(Request&& r) : request(new Request(std::move(r))), type(GetData) {}
+    entry_t event;
+    std::unique_ptr<Request> request;
+    enum { Event, GetData } type;
+  };
+
   using cruncher_t = ActiveUsersCruncherImpl<NAMESPACE>;
   using crunchers_list_t = std::vector<std::unique_ptr<cruncher_t>>;
   using duration_list_t = std::vector<std::chrono::microseconds>;
-  using mmq_t = current::mmq::MMQ<entry_t, IntermediateSubscriber<entry_t>, 1024*1024>;
+  using mmq_t = current::mmq::MMQ<MMQMessage, IntermediateSubscriber<MMQMessage>, 1024 * 1024>;
 
-  ActiveUsersMultiCruncherImpl(const duration_list_t& intervals)
-	: last_event_us_(std::chrono::microseconds(0))
-    , events_seen_(0)
-    , mmq_subscriber_([this](const entry_t& entry, idxts_t idxts){ OnEventInternal(entry, idxts); })
-    , mmq_(mmq_subscriber_, 1024*1024)
-    , intervals_(intervals) {
+  ActiveUsersMultiCruncherImpl(const duration_list_t& intervals, uint16_t port, const std::string& route)
+      : last_event_us_(std::chrono::microseconds(0)),
+        events_seen_(0),
+        mmq_subscriber_([this](MMQMessage&& message, idxts_t idxts) {
+          switch (message.type) {
+            case MMQMessage::Event:
+              OnEventInternal(std::move(message.event), idxts);
+              break;
+            case MMQMessage::GetData:
+              HandleGetDataInternal(std::move(*message.request));
+              break;
+          }
+        }),
+        mmq_(mmq_subscriber_, 1024 * 1024),
+        intervals_(intervals) {
     crunchers_.reserve(intervals.size());
     for (const auto interval : intervals) {
       crunchers_.push_back(std::make_unique<cruncher_t>(interval));
     }
+    scoped_http_routes_ +=
+        HTTP(port).Register(route + "/healthz", [](Request r) { r("OK\n"); }) +
+        HTTP(port).Register(route + "/data", [this](Request r) { mmq_.Publish(std::move(r)); });
   }
   virtual ~ActiveUsersMultiCruncherImpl() = default;
-  
-  void OnEvent(const entry_t& e, idxts_t idxts) {
-    mmq_.Publish(e, idxts.us);
-  }
-  
-  uint64_t Count(uint64_t ind) {
-    return crunchers_[ind]->Count();
-  }
 
-  uint64_t EventsSeen() {
-    return events_seen_;
-  }
+  void OnEvent(const entry_t& e, idxts_t idxts) { mmq_.Publish(e, idxts.us); }
 
-private:
-  void OnEventInternal(const entry_t& e, idxts_t idxts) {
+  uint64_t Count(uint64_t ind) { return crunchers_[ind]->Count(); }
+
+  uint64_t EventsSeen() { return events_seen_; }
+
+ private:
+  void OnEventInternal(entry_t&& e, idxts_t idxts) {
     last_event_us_ = idxts.us;
     for (auto& cruncher : crunchers_) {
       cruncher->OnEvent(e, idxts);
@@ -140,17 +159,23 @@ private:
     ++events_seen_;
   }
 
+  void HandleGetDataInternal(Request&& r) {
+    uint64_t ind = current::FromString<uint64_t>(r.url.query.get("id", "0"));
+    printf("Wow, request (%llu)!\n", ind);
+    r(Printf("{\"count\":%llu}", ind), HTTPResponseCode.OK, current::net::constants::kDefaultJSONContentType);
+  }
+
   std::chrono::microseconds last_event_us_;
   uint64_t events_seen_;
-  IntermediateSubscriber<entry_t> mmq_subscriber_;
+  IntermediateSubscriber<MMQMessage> mmq_subscriber_;
   mmq_t mmq_;
   duration_list_t intervals_;
   crunchers_list_t crunchers_;
+  HTTPRoutesScope scoped_http_routes_;
 };
-  
+
 template <typename NAMESPACE>
 using ActiveUsersMultiCruncher = CTFO::StreamCruncher<ActiveUsersMultiCruncherImpl<NAMESPACE>>;
-
 
 }  // namespace CTFO
 

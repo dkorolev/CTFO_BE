@@ -57,21 +57,20 @@ struct IntermediateSubscriberImpl {
   using EntryResponse = current::ss::EntryResponse;
   using TerminationResponse = current::ss::TerminationResponse;
   using entry_t = ENTRY;
-  using subscriber_callback_t = std::function<void(const entry_t&, idxts_t)>;
+  using subscriber_callback_t = std::function<void(entry_t&&, idxts_t)>;
 
-  IntermediateSubscriberImpl(subscriber_callback_t callback)
-    : actual_subscriber_(callback) {}
+  IntermediateSubscriberImpl(subscriber_callback_t callback) : actual_subscriber_(callback) {}
   virtual ~IntermediateSubscriberImpl() {}
-  
-  EntryResponse operator()(const entry_t& entry, idxts_t current, idxts_t) {
-    actual_subscriber_(entry, current);
+
+  EntryResponse operator()(entry_t&& entry, idxts_t current, idxts_t) {
+    actual_subscriber_(std::move(entry), current);
     return EntryResponse::More;
   }
-  
+
   EntryResponse EntryResponseIfNoMorePassTypeFilter() const { return EntryResponse::More; }
   TerminationResponse Terminate() const { return TerminationResponse::Terminate; }
 
-private:
+ private:
   subscriber_callback_t actual_subscriber_;
 };
 
