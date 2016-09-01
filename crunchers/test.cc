@@ -114,28 +114,36 @@ TEST(CTFOCrunchersTest, ActiveUsersCruncherLocalTest) {
   }
   intervals.push_back(std::chrono::hours(3600 * 21));
 
+  const std::string base_url = Printf("http://localhost:%u/active_users", FLAGS_cruncher_http_test_port);
   auto activeusers_cruncher =
       std::make_unique<CTFOActiveUsersCruncher>(intervals, FLAGS_cruncher_http_test_port, "/active_users");
+
+  const auto GetActiveUsers = [&](uint64_t ind) -> CTFO::ResponseGetActiveUsers {
+    const auto response = HTTP(GET(base_url + "/data?id=" + current::ToString(ind)));
+    EXPECT_EQ(HTTPResponseCode.OK, response.code);
+    return ParseJSON<CTFO::ResponseGetActiveUsers>(response.body);
+  };
+
   {
     const auto scope = local_stream.Subscribe(*activeusers_cruncher);
-    while (activeusers_cruncher->EventsSeen() < 80) {
+    while (GetActiveUsers(0).timestamp < current::time::Now()) {
       std::this_thread::yield();
     }
   }
   // In the last 12 seconds there were 12 users, which appeared exactly one per second.
   for (uint32_t i = 0; i < 12; ++i) {
-    EXPECT_EQ(i + 1, activeusers_cruncher->Count(i));
+    EXPECT_EQ(i + 1, GetActiveUsers(i).count);
   }
   // In the previous 12 minutes there were no 'new' users, only the same ones.
   for (uint32_t i = 0; i < 13; ++i) {
-    EXPECT_EQ(12u, activeusers_cruncher->Count(i + 12));
+    EXPECT_EQ(12u, GetActiveUsers(i + 12).count);
   }
   // A minute before there was one more 'unique' active user.
-  EXPECT_EQ(13u, activeusers_cruncher->Count(25));
+  EXPECT_EQ(13u, GetActiveUsers(25).count);
   // And a minute before that - another one.
-  EXPECT_EQ(14u, activeusers_cruncher->Count(26));
+  EXPECT_EQ(14u, GetActiveUsers(26).count);
   // From the very beginning there were exactly 20 different active users.
-  EXPECT_EQ(20u, activeusers_cruncher->Count(27));
+  EXPECT_EQ(20u, GetActiveUsers(27).count);
 }
 
 TEST(CTFOCrunchersTest, ActiveUsersCruncherRemoteTest) {

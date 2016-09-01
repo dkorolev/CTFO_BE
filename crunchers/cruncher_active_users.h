@@ -100,16 +100,22 @@ struct ActiveUsersCruncherImpl {
 template <typename NAMESPACE>
 using ActiveUsersCruncher = CTFO::StreamCruncher<ActiveUsersCruncherImpl<NAMESPACE>>;
 
+CURRENT_STRUCT(ResponseGetActiveUsers) {
+  CURRENT_FIELD(count, uint64_t, 0);
+  CURRENT_FIELD(timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
+};
+
 template <typename NAMESPACE>
 struct ActiveUsersMultiCruncherImpl {
   using entry_t = typename NAMESPACE::CTFOLogEntry;
   using request_ptr_t = std::unique_ptr<Request>;
 
-  struct MMQMessage {
+  struct MMQMessage final {
     MMQMessage() = default;
-    MMQMessage(entry_t event) : event(event), type(Event) {}
-    MMQMessage(Request&& r) : request(new Request(std::move(r))), type(GetData) {}
+    MMQMessage(const entry_t& event, idxts_t idxts) : event(event), idxts(idxts), type(Event) {}
+    explicit MMQMessage(Request&& r) : request(new Request(std::move(r))), type(GetData) {}
     entry_t event;
+    idxts_t idxts;
     std::unique_ptr<Request> request;
     enum { Event, GetData } type;
   };
@@ -122,10 +128,10 @@ struct ActiveUsersMultiCruncherImpl {
   ActiveUsersMultiCruncherImpl(const duration_list_t& intervals, uint16_t port, const std::string& route)
       : last_event_us_(std::chrono::microseconds(0)),
         events_seen_(0),
-        mmq_subscriber_([this](MMQMessage&& message, idxts_t idxts) {
+        mmq_subscriber_([this](MMQMessage&& message, idxts_t) {
           switch (message.type) {
             case MMQMessage::Event:
-              OnEventInternal(std::move(message.event), idxts);
+              OnEventInternal(std::move(message.event), message.idxts);
               break;
             case MMQMessage::GetData:
               HandleGetDataInternal(std::move(*message.request));
@@ -140,29 +146,31 @@ struct ActiveUsersMultiCruncherImpl {
     }
     scoped_http_routes_ +=
         HTTP(port).Register(route + "/healthz", [](Request r) { r("OK\n"); }) +
-        HTTP(port).Register(route + "/data", [this](Request r) { mmq_.Publish(std::move(r)); });
+        HTTP(port).Register(route + "/data", [this](Request r) { mmq_.Publish(MMQMessage(std::move(r))); });
   }
   virtual ~ActiveUsersMultiCruncherImpl() = default;
 
-  void OnEvent(const entry_t& e, idxts_t idxts) { mmq_.Publish(e, idxts.us); }
+  void OnEvent(const entry_t& e, idxts_t idxts) { mmq_.Publish(MMQMessage(e, idxts), idxts.us); }
 
-  uint64_t Count(uint64_t ind) { return crunchers_[ind]->Count(); }
+  uint64_t Count(uint64_t ind) const { return crunchers_[ind]->Count(); }
 
-  uint64_t EventsSeen() { return events_seen_; }
+  uint64_t EventsSeen() const { return events_seen_; }
 
  private:
   void OnEventInternal(entry_t&& e, idxts_t idxts) {
-    last_event_us_ = idxts.us;
     for (auto& cruncher : crunchers_) {
       cruncher->OnEvent(e, idxts);
     }
+    last_event_us_ = idxts.us;
     ++events_seen_;
   }
 
   void HandleGetDataInternal(Request&& r) {
     uint64_t ind = current::FromString<uint64_t>(r.url.query.get("id", "0"));
-    printf("Wow, request (%llu)!\n", ind);
-    r(Printf("{\"count\":%llu}", ind), HTTPResponseCode.OK, current::net::constants::kDefaultJSONContentType);
+    ResponseGetActiveUsers response;
+    response.count = Count(ind);
+    response.timestamp = last_event_us_;
+    r(response);
   }
 
   std::chrono::microseconds last_event_us_;
