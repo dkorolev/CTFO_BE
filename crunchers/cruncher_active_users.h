@@ -43,12 +43,11 @@ struct ActiveUsersCruncherImpl {
   using EventLogEntry = typename NAMESPACE::EventLogEntry;
   using iOSBaseEvent = typename NAMESPACE::iOSBaseEvent;
 
-  ActiveUsersCruncherImpl(std::chrono::microseconds interval) : interval_(interval), events_seen_(0) {}
+  ActiveUsersCruncherImpl(std::chrono::microseconds interval) : interval_(interval) {}
   virtual ~ActiveUsersCruncherImpl() = default;
 
   void OnEvent(const entry_t& e, idxts_t idxts) {
     current_us_ = idxts.us;
-    ++events_seen_;
     if (Exists<EventLogEntry>(e)) {
       OnEventLogEntry(Value<EventLogEntry>(e));
     }
@@ -59,8 +58,6 @@ struct ActiveUsersCruncherImpl {
   }
 
   uint64_t Count() const { return users_list_.size(); }
-  uint64_t EventsSeen() const { return events_seen_; }
-
 
  private:
   struct ActiveUser final {
@@ -94,7 +91,6 @@ struct ActiveUsersCruncherImpl {
   user_map_t users_map_;
   std::chrono::microseconds current_us_;
   std::chrono::microseconds interval_;
-  uint64_t events_seen_;
 };
 
 template <typename NAMESPACE>
@@ -127,7 +123,6 @@ struct ActiveUsersMultiCruncherImpl {
 
   ActiveUsersMultiCruncherImpl(const duration_list_t& intervals, uint16_t port, const std::string& route)
       : last_event_us_(std::chrono::microseconds(0)),
-        events_seen_(0),
         mmq_subscriber_([this](MMQMessage&& message, idxts_t) {
           switch (message.type) {
             case MMQMessage::Event:
@@ -152,29 +147,27 @@ struct ActiveUsersMultiCruncherImpl {
 
   void OnEvent(const entry_t& e, idxts_t idxts) { mmq_.Publish(MMQMessage(e, idxts), idxts.us); }
 
-  uint64_t Count(uint64_t ind) const { return crunchers_[ind]->Count(); }
-
-  uint64_t EventsSeen() const { return events_seen_; }
-
  private:
   void OnEventInternal(entry_t&& e, idxts_t idxts) {
     for (auto& cruncher : crunchers_) {
       cruncher->OnEvent(e, idxts);
     }
     last_event_us_ = idxts.us;
-    ++events_seen_;
   }
 
   void HandleGetDataInternal(Request&& r) {
     uint64_t ind = current::FromString<uint64_t>(r.url.query.get("id", "0"));
-    ResponseGetActiveUsers response;
-    response.count = Count(ind);
-    response.timestamp = last_event_us_;
-    r(response);
+    if (ind < crunchers_.size()) {
+      ResponseGetActiveUsers response;
+      response.count = crunchers_[ind]->Count();
+      response.timestamp = last_event_us_;
+      r(response);
+    } else {
+      r("OUT OF RANGE\n", HTTPResponseCode.BadRequest);
+    }
   }
 
   std::chrono::microseconds last_event_us_;
-  uint64_t events_seen_;
   IntermediateSubscriber<MMQMessage> mmq_subscriber_;
   mmq_t mmq_;
   duration_list_t intervals_;
