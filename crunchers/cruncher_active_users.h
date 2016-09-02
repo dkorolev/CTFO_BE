@@ -96,9 +96,15 @@ struct ActiveUsersCruncherImpl {
 template <typename NAMESPACE>
 using ActiveUsersCruncher = CTFO::StreamCruncher<ActiveUsersCruncherImpl<NAMESPACE>>;
 
-CURRENT_STRUCT(ResponseGetActiveUsers) {
+CURRENT_STRUCT(ResponseGetActiveUsersShort) {
   CURRENT_FIELD(count, uint64_t, 0);
   CURRENT_FIELD(timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
+};
+
+CURRENT_STRUCT(ResponseGetActiveUsers) {
+  CURRENT_FIELD(comment, std::string);
+  CURRENT_FIELD(timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
+  CURRENT_FIELD(active_users, std::vector<uint64_t>);
 };
 
 template <typename NAMESPACE>
@@ -133,8 +139,7 @@ struct ActiveUsersMultiCruncherImpl {
               break;
           }
         }),
-        mmq_(mmq_subscriber_, 1024 * 1024),
-        intervals_(intervals) {
+        mmq_(mmq_subscriber_, 1024 * 1024) {
     crunchers_.reserve(intervals.size());
     for (const auto interval : intervals) {
       crunchers_.push_back(std::make_unique<cruncher_t>(interval));
@@ -156,21 +161,33 @@ struct ActiveUsersMultiCruncherImpl {
   }
 
   void HandleGetDataInternal(Request&& r) {
-    uint64_t ind = current::FromString<uint64_t>(r.url.query.get("id", "0"));
-    if (ind < crunchers_.size()) {
-      ResponseGetActiveUsers response;
-      response.count = crunchers_[ind]->Count();
-      response.timestamp = last_event_us_;
-      r(response);
+    if (r.url.query.has("i")) {
+      uint64_t ind = current::FromString<uint64_t>(r.url.query.get("i", "0"));
+      if (ind < crunchers_.size()) {
+        ResponseGetActiveUsersShort response;
+        response.count = crunchers_[ind]->Count();
+        response.timestamp = last_event_us_;
+        r(response);
+      } else {
+        r("OUT OF RANGE\n", HTTPResponseCode.BadRequest);
+      }
     } else {
-      r("OUT OF RANGE\n", HTTPResponseCode.BadRequest);
+      ResponseGetActiveUsers response;
+      response.comment = Printf(
+          "Last processed event was %llu minutes ago",
+          std::chrono::duration_cast<std::chrono::minutes>(current::time::Now() - last_event_us_).count());
+      response.timestamp = last_event_us_;
+      response.active_users.reserve(crunchers_.size());
+      for (const auto& cruncher : crunchers_) {
+        response.active_users.push_back(cruncher->Count());
+      }
+      r(response);
     }
   }
 
   std::chrono::microseconds last_event_us_;
   IntermediateSubscriber<MMQMessage> mmq_subscriber_;
   mmq_t mmq_;
-  duration_list_t intervals_;
   crunchers_list_t crunchers_;
   HTTPRoutesScope scoped_http_routes_;
 };
