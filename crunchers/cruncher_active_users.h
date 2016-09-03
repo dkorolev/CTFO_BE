@@ -129,7 +129,8 @@ struct ActiveUsersMultiCruncherImpl {
   using mmq_t = current::mmq::MMQ<Message, IntermediateSubscriber<Message>, 1024 * 1024>;
 
   ActiveUsersMultiCruncherImpl(const duration_list_t& intervals, uint16_t port, const std::string& route)
-      : last_event_us_(std::chrono::microseconds(0)),
+      : port_(port),
+        last_event_us_(std::chrono::microseconds(0)),
         mmq_subscriber_([this](Message&& message, idxts_t) {
           switch (message.type) {
             case Message::Event:
@@ -150,6 +151,8 @@ struct ActiveUsersMultiCruncherImpl {
         HTTP(port).Register(route + "/data", [this](Request r) { mmq_.Publish(Message(std::move(r))); });
   }
   virtual ~ActiveUsersMultiCruncherImpl() = default;
+
+  void Join() { HTTP(port_).Join(); }
 
   void OnEvent(const entry_t& e, idxts_t idxts) { mmq_.Publish(Message(e, idxts), idxts.us); }
   void OnEvent(entry_t&& e, idxts_t idxts) { mmq_.Publish(Message(std::move(e), idxts)); }
@@ -187,6 +190,7 @@ struct ActiveUsersMultiCruncherImpl {
     }
   }
 
+  const uint16_t port_;
   std::chrono::microseconds last_event_us_;
   IntermediateSubscriber<Message> mmq_subscriber_;
   mmq_t mmq_;
