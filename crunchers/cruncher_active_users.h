@@ -112,12 +112,13 @@ struct ActiveUsersMultiCruncherImpl {
   using entry_t = typename NAMESPACE::CTFOLogEntry;
   using request_ptr_t = std::unique_ptr<Request>;
 
-  struct MMQMessage final {
-    MMQMessage() = default;
-    MMQMessage(const entry_t& event, idxts_t idxts) : event(event), idxts(idxts), type(Event) {}
-    explicit MMQMessage(Request&& r) : request(new Request(std::move(r))), type(GetData) {}
-    entry_t event;
+  struct Message final {
+    Message() = default;
+    Message(const entry_t& e, idxts_t idxts) : idxts(idxts), event(new entry_t(e)), type(Event) {}
+    Message(entry_t&& e, idxts_t idxts) : idxts(idxts), event(new entry_t(std::move(e))), type(Event) {}
+    explicit Message(Request&& r) : request(new Request(std::move(r))), type(GetData) {}
     idxts_t idxts;
+    std::unique_ptr<entry_t> event;
     std::unique_ptr<Request> request;
     enum { Event, GetData } type;
   };
@@ -125,16 +126,16 @@ struct ActiveUsersMultiCruncherImpl {
   using cruncher_t = ActiveUsersCruncherImpl<NAMESPACE>;
   using crunchers_list_t = std::vector<std::unique_ptr<cruncher_t>>;
   using duration_list_t = std::vector<std::chrono::microseconds>;
-  using mmq_t = current::mmq::MMQ<MMQMessage, IntermediateSubscriber<MMQMessage>, 1024 * 1024>;
+  using mmq_t = current::mmq::MMQ<Message, IntermediateSubscriber<Message>, 1024 * 1024>;
 
   ActiveUsersMultiCruncherImpl(const duration_list_t& intervals, uint16_t port, const std::string& route)
       : last_event_us_(std::chrono::microseconds(0)),
-        mmq_subscriber_([this](MMQMessage&& message, idxts_t) {
+        mmq_subscriber_([this](Message&& message, idxts_t) {
           switch (message.type) {
-            case MMQMessage::Event:
-              OnEventInternal(std::move(message.event), message.idxts);
+            case Message::Event:
+              OnEventInternal(std::move(*message.event), message.idxts);
               break;
-            case MMQMessage::GetData:
+            case Message::GetData:
               HandleGetDataInternal(std::move(*message.request));
               break;
           }
@@ -146,11 +147,12 @@ struct ActiveUsersMultiCruncherImpl {
     }
     scoped_http_routes_ +=
         HTTP(port).Register(route + "/healthz", [](Request r) { r("OK\n"); }) +
-        HTTP(port).Register(route + "/data", [this](Request r) { mmq_.Publish(MMQMessage(std::move(r))); });
+        HTTP(port).Register(route + "/data", [this](Request r) { mmq_.Publish(Message(std::move(r))); });
   }
   virtual ~ActiveUsersMultiCruncherImpl() = default;
 
-  void OnEvent(const entry_t& e, idxts_t idxts) { mmq_.Publish(MMQMessage(e, idxts), idxts.us); }
+  void OnEvent(const entry_t& e, idxts_t idxts) { mmq_.Publish(Message(e, idxts), idxts.us); }
+  void OnEvent(entry_t&& e, idxts_t idxts) { mmq_.Publish(Message(std::move(e), idxts)); }
 
  private:
   void OnEventInternal(entry_t&& e, idxts_t idxts) {
@@ -186,7 +188,7 @@ struct ActiveUsersMultiCruncherImpl {
   }
 
   std::chrono::microseconds last_event_us_;
-  IntermediateSubscriber<MMQMessage> mmq_subscriber_;
+  IntermediateSubscriber<Message> mmq_subscriber_;
   mmq_t mmq_;
   crunchers_list_t crunchers_;
   HTTPRoutesScope scoped_http_routes_;

@@ -45,6 +45,11 @@ struct EntryCruncherImpl : public IMPL {
     return EntryResponse::More;
   }
 
+  EntryResponse operator()(entry_t&& entry, idxts_t current, idxts_t) {
+    IMPL::OnEvent(std::move(entry), current);
+    return EntryResponse::More;
+  }
+
   EntryResponse EntryResponseIfNoMorePassTypeFilter() const { return EntryResponse::More; }
   TerminationResponse Terminate() const { return TerminationResponse::Terminate; }
 };
