@@ -109,8 +109,8 @@ CURRENT_STRUCT(ResponseGetActiveUsers) {
 
 template <typename NAMESPACE>
 struct ActiveUsersMultiCruncherImpl {
+  using cruncher_t = ActiveUsersCruncherImpl<NAMESPACE>;
   using entry_t = typename NAMESPACE::CTFOLogEntry;
-  using request_ptr_t = std::unique_ptr<Request>;
 
   struct Message final {
     Message() = default;
@@ -122,13 +122,11 @@ struct ActiveUsersMultiCruncherImpl {
     std::unique_ptr<Request> request;
     enum { Event, GetData } type;
   };
-
-  using cruncher_t = ActiveUsersCruncherImpl<NAMESPACE>;
-  using crunchers_list_t = std::vector<std::unique_ptr<cruncher_t>>;
-  using duration_list_t = std::vector<std::chrono::microseconds>;
   using mmq_t = current::mmq::MMQ<Message, IntermediateSubscriber<Message>, 1024 * 1024>;
 
-  ActiveUsersMultiCruncherImpl(const duration_list_t& intervals, uint16_t port, const std::string& route)
+  ActiveUsersMultiCruncherImpl(const std::vector<std::chrono::microseconds>& intervals,
+                               uint16_t port,
+                               const std::string& route)
       : port_(port),
         last_event_us_(std::chrono::microseconds(0)),
         mmq_subscriber_([this](Message&& message, idxts_t) {
@@ -194,7 +192,7 @@ struct ActiveUsersMultiCruncherImpl {
   std::chrono::microseconds last_event_us_;
   IntermediateSubscriber<Message> mmq_subscriber_;
   mmq_t mmq_;
-  crunchers_list_t crunchers_;
+  std::vector<std::unique_ptr<cruncher_t>> crunchers_;
   HTTPRoutesScope scoped_http_routes_;
 };
 
