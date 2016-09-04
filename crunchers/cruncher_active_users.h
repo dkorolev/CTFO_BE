@@ -109,21 +109,21 @@ CURRENT_STRUCT(ResponseGetActiveUsers) {
 
 template <typename NAMESPACE>
 struct ActiveUsersMultiCruncherImpl {
-  using this_t = ActiveUsersMultiCruncherImpl<NAMESPACE>;
+  using self_t = ActiveUsersMultiCruncherImpl<NAMESPACE>;
   using cruncher_t = ActiveUsersCruncherImpl<NAMESPACE>;
   using entry_t = typename NAMESPACE::CTFOLogEntry;
 
   class Message {
    public:
     virtual ~Message() = default;
-    virtual void Handle(this_t& cruncher) = 0;
+    virtual void Handle(self_t& self) = 0;
   };
 
   class EventMessage final : public Message {
    public:
     EventMessage(entry_t&& e, idxts_t idxts) : event_(std::move(e)), idxts_(idxts) {}
     EventMessage(const entry_t& e, idxts_t idxts) : event_(e), idxts_(idxts) {}
-    void Handle(this_t& cruncher) override { cruncher.OnEventInternal(std::move(event_), idxts_); }
+    void Handle(self_t& self) override { self.OnEventInternal(std::move(event_), idxts_); }
 
    private:
     entry_t event_;
@@ -133,7 +133,7 @@ struct ActiveUsersMultiCruncherImpl {
   class RequestMessage final : public Message {
    public:
     RequestMessage(Request&& r) : request_(std::move(r)) {}
-    void Handle(this_t& cruncher) override { cruncher.OnRequestInternal(std::move(request_)); }
+    void Handle(self_t& self) override { self.OnRequestInternal(std::move(request_)); }
 
    private:
     Request request_;
