@@ -45,12 +45,42 @@ struct EntryCruncherImpl : public IMPL {
     return EntryResponse::More;
   }
 
+  EntryResponse operator()(entry_t&& entry, idxts_t current, idxts_t) {
+    IMPL::OnEvent(std::move(entry), current);
+    return EntryResponse::More;
+  }
+
   EntryResponse EntryResponseIfNoMorePassTypeFilter() const { return EntryResponse::More; }
   TerminationResponse Terminate() const { return TerminationResponse::Terminate; }
 };
 
 template <typename IMPL>
 using StreamCruncher = current::ss::StreamSubscriber<EntryCruncherImpl<IMPL>, typename IMPL::entry_t>;
+
+template <typename ENTRY>
+struct IntermediateSubscriberImpl {
+  using EntryResponse = current::ss::EntryResponse;
+  using TerminationResponse = current::ss::TerminationResponse;
+  using entry_t = ENTRY;
+  using subscriber_callback_t = std::function<void(entry_t&&, idxts_t)>;
+
+  IntermediateSubscriberImpl(subscriber_callback_t callback) : actual_subscriber_(callback) {}
+  virtual ~IntermediateSubscriberImpl() {}
+
+  EntryResponse operator()(entry_t&& entry, idxts_t current, idxts_t) {
+    actual_subscriber_(std::move(entry), current);
+    return EntryResponse::More;
+  }
+
+  EntryResponse EntryResponseIfNoMorePassTypeFilter() const { return EntryResponse::More; }
+  TerminationResponse Terminate() const { return TerminationResponse::Terminate; }
+
+ private:
+  subscriber_callback_t actual_subscriber_;
+};
+
+template <typename ENTRY>
+using IntermediateSubscriber = current::ss::StreamSubscriber<IntermediateSubscriberImpl<ENTRY>, ENTRY>;
 
 }  // namespace CTFO
 
