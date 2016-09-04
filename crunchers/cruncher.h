@@ -29,34 +29,6 @@
 
 namespace CTFO {
 
-template <typename IMPL>
-struct EntryCruncherImpl : public IMPL {
-  using EntryResponse = current::ss::EntryResponse;
-  using TerminationResponse = current::ss::TerminationResponse;
-  using entry_t = typename IMPL::entry_t;
-
-  template <typename... ARGS>
-  EntryCruncherImpl(ARGS&&... args)
-      : IMPL(std::forward<ARGS>(args)...) {}
-  virtual ~EntryCruncherImpl() {}
-
-  EntryResponse operator()(const entry_t& entry, idxts_t current, idxts_t) {
-    IMPL::OnEvent(entry, current);
-    return EntryResponse::More;
-  }
-
-  EntryResponse operator()(entry_t&& entry, idxts_t current, idxts_t) {
-    IMPL::OnEvent(std::move(entry), current);
-    return EntryResponse::More;
-  }
-
-  EntryResponse EntryResponseIfNoMorePassTypeFilter() const { return EntryResponse::More; }
-  TerminationResponse Terminate() const { return TerminationResponse::Terminate; }
-};
-
-template <typename IMPL>
-using StreamCruncher = current::ss::StreamSubscriber<EntryCruncherImpl<IMPL>, typename IMPL::entry_t>;
-
 template <typename ENTRY>
 struct IntermediateSubscriberImpl {
   using EntryResponse = current::ss::EntryResponse;
@@ -81,6 +53,145 @@ struct IntermediateSubscriberImpl {
 
 template <typename ENTRY>
 using IntermediateSubscriber = current::ss::StreamSubscriber<IntermediateSubscriberImpl<ENTRY>, ENTRY>;
+
+template <typename IMPL>
+struct GenericCruncherImpl : public IMPL {
+  using EntryResponse = current::ss::EntryResponse;
+  using TerminationResponse = current::ss::TerminationResponse;
+  using event_t = typename IMPL::event_t;
+
+  class Message {
+   public:
+    virtual ~Message() = default;
+    virtual void Handle(IMPL& cruncher) = 0;
+  };
+
+  class EventMessage final : public Message {
+   public:
+    EventMessage(event_t&& e, idxts_t idxts) : event_(std::move(e)), idxts_(idxts) {}
+    EventMessage(const event_t& e, idxts_t idxts) : event_(e), idxts_(idxts) {}
+    void Handle(IMPL& cruncher) override { cruncher.OnEvent(std::move(event_), idxts_); }
+
+   private:
+    event_t event_;
+    const idxts_t idxts_;
+  };
+
+  class RequestMessage final : public Message {
+   public:
+    RequestMessage(Request&& r) : request_(std::move(r)) {}
+    void Handle(IMPL& cruncher) override { cruncher.OnRequest(std::move(request_)); }
+
+   private:
+    Request request_;
+  };
+
+  using mmq_message_t = std::unique_ptr<Message>;
+  using mmq_t = current::mmq::MMQ<mmq_message_t, IntermediateSubscriber<mmq_message_t>, 1024 * 1024>;
+
+  template <typename... ARGS>
+  GenericCruncherImpl(uint16_t port, const std::string& route, ARGS&&... args)
+      : IMPL(std::forward<ARGS>(args)...),
+        port_(port),
+        mmq_subscriber_([this](mmq_message_t&& message, idxts_t) { message->Handle(*this); }),
+        mmq_(mmq_subscriber_, 1024 * 1024) {
+    scoped_http_routes_ += HTTP(port).Register(route + "/healthz", [](Request r) { r("OK\n"); }) +
+                           HTTP(port).Register(route + "/data",
+                                               [this](Request r) {
+                                                 mmq_.Publish(std::make_unique<RequestMessage>(std::move(r)));
+                                               });
+  }
+  virtual ~GenericCruncherImpl() = default;
+
+  void Join() { HTTP(port_).Join(); }
+
+  EntryResponse operator()(const event_t& event, idxts_t current, idxts_t) {
+    mmq_.Publish(std::make_unique<EventMessage>(event, current));
+    return EntryResponse::More;
+  }
+
+  EntryResponse operator()(event_t&& event, idxts_t current, idxts_t) {
+    mmq_.Publish(std::make_unique<EventMessage>(std::move(event), current));
+    return EntryResponse::More;
+  }
+
+  EntryResponse EntryResponseIfNoMorePassTypeFilter() const { return EntryResponse::More; }
+  TerminationResponse Terminate() const { return TerminationResponse::Terminate; }
+
+ private:
+  const uint16_t port_;
+  HTTPRoutesScope scoped_http_routes_;
+  IntermediateSubscriber<mmq_message_t> mmq_subscriber_;
+  mmq_t mmq_;
+};
+
+template <typename IMPL>
+using StreamCruncher = current::ss::StreamSubscriber<GenericCruncherImpl<IMPL>, typename IMPL::event_t>;
+
+CURRENT_STRUCT_T(CruncherResponse) {
+  CURRENT_FIELD(comment, std::string);
+  CURRENT_FIELD(timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
+  CURRENT_FIELD(value, T);
+};
+
+template <typename CRUNCHER>
+class MultiCruncher {
+ public:
+  using cruncher_t = CRUNCHER;
+  using event_t = typename cruncher_t::event_t;
+  using value_t = typename cruncher_t::value_t;
+  using value_list_t = std::vector<value_t>;
+  using response_t = CruncherResponse<value_list_t>;
+  using response_short_t = CruncherResponse<value_t>;
+
+  template <typename ARG>
+  MultiCruncher(const std::vector<ARG>& args)
+      : last_event_us_(std::chrono::microseconds(0)) {
+    crunchers_.reserve(args.size());
+    for (const auto& arg : args) {
+      crunchers_.push_back(std::make_unique<cruncher_t>(arg));
+    }
+  }
+  virtual ~MultiCruncher() = default;
+
+  void OnEvent(event_t&& event, idxts_t idxts) {
+    last_event_us_ = idxts.us;
+    for (auto& cruncher : crunchers_) {
+      cruncher->OnEvent(std::move(event), idxts);
+    }
+  }
+
+  void OnRequest(Request&& r) {
+    const std::string comment =
+        Printf("Last processed event was %llu minutes ago",
+               std::chrono::duration_cast<std::chrono::minutes>(current::time::Now() - last_event_us_).count());
+    if (r.url.query.has("i")) {
+      uint64_t ind = current::FromString<uint64_t>(r.url.query.get("i", "0"));
+      if (ind < crunchers_.size()) {
+        response_short_t response;
+        response.comment = comment;
+        response.timestamp = last_event_us_;
+        response.value = crunchers_[ind]->GetValue();
+        r(response);
+      } else {
+        r("OUT OF RANGE\n", HTTPResponseCode.BadRequest);
+      }
+    } else {
+      response_t response;
+      response.comment = comment;
+      response.timestamp = last_event_us_;
+      response.value.reserve(crunchers_.size());
+      for (const auto& cruncher : crunchers_) {
+        response.value.push_back(cruncher->GetValue());
+      }
+      r(response);
+    }
+  }
+
+ private:
+  std::chrono::microseconds last_event_us_;
+  std::vector<std::unique_ptr<cruncher_t>> crunchers_;
+};
 
 }  // namespace CTFO
 
