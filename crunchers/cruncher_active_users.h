@@ -39,14 +39,15 @@ namespace CTFO {
 
 template <typename NAMESPACE>
 struct ActiveUsersCruncherImpl {
-  using entry_t = typename NAMESPACE::CTFOLogEntry;
   using EventLogEntry = typename NAMESPACE::EventLogEntry;
   using iOSBaseEvent = typename NAMESPACE::iOSBaseEvent;
+  using event_t = typename NAMESPACE::CTFOLogEntry;
+  using value_t = uint64_t;
 
   ActiveUsersCruncherImpl(std::chrono::microseconds interval) : interval_(interval) {}
   virtual ~ActiveUsersCruncherImpl() = default;
 
-  void OnEvent(const entry_t& e, idxts_t idxts) {
+  void OnEvent(const event_t& e, idxts_t idxts) {
     current_us_ = idxts.us;
     if (Exists<EventLogEntry>(e)) {
       OnEventLogEntry(Value<EventLogEntry>(e));
@@ -57,7 +58,7 @@ struct ActiveUsersCruncherImpl {
     }
   }
 
-  uint64_t Count() const { return users_list_.size(); }
+  value_t GetValue() const { return users_list_.size(); }
 
  private:
   struct ActiveUser final {
@@ -94,123 +95,7 @@ struct ActiveUsersCruncherImpl {
 };
 
 template <typename NAMESPACE>
-using ActiveUsersCruncher = CTFO::StreamCruncher<ActiveUsersCruncherImpl<NAMESPACE>>;
-
-CURRENT_STRUCT(ResponseGetActiveUsersShort) {
-  CURRENT_FIELD(count, uint64_t, 0);
-  CURRENT_FIELD(timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
-};
-
-CURRENT_STRUCT(ResponseGetActiveUsers) {
-  CURRENT_FIELD(comment, std::string);
-  CURRENT_FIELD(timestamp, std::chrono::microseconds, std::chrono::microseconds(0));
-  CURRENT_FIELD(active_users, std::vector<uint64_t>);
-};
-
-template <typename NAMESPACE>
-struct ActiveUsersMultiCruncherImpl {
-  using self_t = ActiveUsersMultiCruncherImpl<NAMESPACE>;
-  using cruncher_t = ActiveUsersCruncherImpl<NAMESPACE>;
-  using entry_t = typename NAMESPACE::CTFOLogEntry;
-
-  class Message {
-   public:
-    virtual ~Message() = default;
-    virtual void Handle(self_t& self) = 0;
-  };
-
-  class EventMessage final : public Message {
-   public:
-    EventMessage(entry_t&& e, idxts_t idxts) : event_(std::move(e)), idxts_(idxts) {}
-    EventMessage(const entry_t& e, idxts_t idxts) : event_(e), idxts_(idxts) {}
-    void Handle(self_t& self) override { self.OnEventInternal(std::move(event_), idxts_); }
-
-   private:
-    entry_t event_;
-    const idxts_t idxts_;
-  };
-
-  class RequestMessage final : public Message {
-   public:
-    RequestMessage(Request&& r) : request_(std::move(r)) {}
-    void Handle(self_t& self) override { self.OnRequestInternal(std::move(request_)); }
-
-   private:
-    Request request_;
-  };
-
-  using mmq_message_t = std::unique_ptr<Message>;
-  using mmq_t = current::mmq::MMQ<mmq_message_t, IntermediateSubscriber<mmq_message_t>, 1024 * 1024>;
-
-  ActiveUsersMultiCruncherImpl(const std::vector<std::chrono::microseconds>& intervals,
-                               uint16_t port,
-                               const std::string& route)
-      : port_(port),
-        last_event_us_(std::chrono::microseconds(0)),
-        mmq_subscriber_([this](mmq_message_t&& message, idxts_t) { message->Handle(*this); }),
-        mmq_(mmq_subscriber_, 1024 * 1024) {
-    crunchers_.reserve(intervals.size());
-    for (const auto interval : intervals) {
-      crunchers_.push_back(std::make_unique<cruncher_t>(interval));
-    }
-    scoped_http_routes_ += HTTP(port).Register(route + "/healthz", [](Request r) { r("OK\n"); }) +
-                           HTTP(port).Register(route + "/data",
-                                               [this](Request r) {
-                                                 mmq_.Publish(std::make_unique<RequestMessage>(std::move(r)));
-                                               });
-  }
-  virtual ~ActiveUsersMultiCruncherImpl() = default;
-
-  void Join() { HTTP(port_).Join(); }
-
-  void OnEvent(const entry_t& e, idxts_t idxts) { mmq_.Publish(std::make_unique<EventMessage>(e, idxts)); }
-  void OnEvent(entry_t&& e, idxts_t idxts) {
-    mmq_.Publish(std::make_unique<EventMessage>(std::move(e), idxts));
-  }
-
- private:
-  void OnEventInternal(entry_t&& e, idxts_t idxts) {
-    for (auto& cruncher : crunchers_) {
-      cruncher->OnEvent(e, idxts);
-    }
-    last_event_us_ = idxts.us;
-  }
-
-  void OnRequestInternal(Request&& r) {
-    if (r.url.query.has("i")) {
-      uint64_t ind = current::FromString<uint64_t>(r.url.query.get("i", "0"));
-      if (ind < crunchers_.size()) {
-        ResponseGetActiveUsersShort response;
-        response.count = crunchers_[ind]->Count();
-        response.timestamp = last_event_us_;
-        r(response);
-      } else {
-        r("OUT OF RANGE\n", HTTPResponseCode.BadRequest);
-      }
-    } else {
-      ResponseGetActiveUsers response;
-      response.comment = Printf(
-          "Last processed event was %llu minutes ago",
-          std::chrono::duration_cast<std::chrono::minutes>(current::time::Now() - last_event_us_).count());
-      response.timestamp = last_event_us_;
-      response.active_users.reserve(crunchers_.size());
-      for (const auto& cruncher : crunchers_) {
-        response.active_users.push_back(cruncher->Count());
-      }
-      r(response);
-    }
-  }
-
-  const uint16_t port_;
-  std::chrono::microseconds last_event_us_;
-  IntermediateSubscriber<mmq_message_t> mmq_subscriber_;
-  mmq_t mmq_;
-  std::vector<std::unique_ptr<cruncher_t>> crunchers_;
-  HTTPRoutesScope scoped_http_routes_;
-};
-
-template <typename NAMESPACE>
-using ActiveUsersMultiCruncher = CTFO::StreamCruncher<ActiveUsersMultiCruncherImpl<NAMESPACE>>;
+using ActiveUsersCruncher = CTFO::StreamCruncher<MultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>>>;
 
 }  // namespace CTFO
 

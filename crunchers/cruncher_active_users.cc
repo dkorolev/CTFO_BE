@@ -68,10 +68,10 @@ int main(int argc, char **argv) {
       params = ParseJSON<ActiveUsersCruncherParams>(current::FileSystem::ReadFileAsString(FLAGS_config_file));
     }
 
-    using CTFOActiveUsersCruncher = CTFO::ActiveUsersMultiCruncher<CTFO_2016_08_01>;
+    using CTFOActiveUsersCruncher = CTFO::ActiveUsersCruncher<CTFO_2016_08_01>;
     current::sherlock::SubscribableRemoteStream<CTFO_2016_08_01::CTFOLogEntry> remote_stream(
         params.remote_url, "CTFOLogEntry", "CTFO_2016_08_01");
-    CTFOActiveUsersCruncher cruncher(params.intervals, params.port, params.route);
+    CTFOActiveUsersCruncher cruncher(params.port, params.route, params.intervals);
     const auto scope = remote_stream.Subscribe(cruncher);
     cruncher.Join();
   }
