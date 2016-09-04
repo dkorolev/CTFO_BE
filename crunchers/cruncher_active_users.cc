@@ -39,7 +39,8 @@ CURRENT_STRUCT(ActiveUsersCruncherParams) {
   CURRENT_FIELD_DESCRIPTION(port, "Port to spawn the cruncher on.");
   CURRENT_FIELD(intervals, std::vector<std::chrono::microseconds>);
   CURRENT_FIELD_DESCRIPTION(intervals, "List of the cruncher sliding window sizes.");
-  CURRENT_DEFAULT_CONSTRUCTOR(ActiveUsersCruncherParams) {}
+  CURRENT_DEFAULT_CONSTRUCTOR(ActiveUsersCruncherParams)
+      : intervals{std::chrono::seconds(10), std::chrono::hours(1), std::chrono::hours(24)} {}
 };
 
 }  // namespace CTFO
@@ -62,7 +63,6 @@ int main(int argc, char **argv) {
   } else {
     ActiveUsersCruncherParams params;
     if (FLAGS_defaultconfig) {
-      params.intervals = {std::chrono::seconds(10), std::chrono::hours(1), std::chrono::hours(24)};
       current::FileSystem::WriteStringToFile(JSON(params), FLAGS_config_file.c_str());
     } else {
       params = ParseJSON<ActiveUsersCruncherParams>(current::FileSystem::ReadFileAsString(FLAGS_config_file));
