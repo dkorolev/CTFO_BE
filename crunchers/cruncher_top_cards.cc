@@ -53,7 +53,7 @@ DEFINE_string(config_file,
 DEFINE_bool(helpconfig, false, "Display the config format information.");
 DEFINE_bool(defaultconfig, false, "Use default configuration and save it to config_file.");
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   ParseDFlags(&argc, &argv);
 
   if (FLAGS_helpconfig) {
@@ -73,9 +73,8 @@ int main(int argc, char **argv) {
         params.remote_url, "CTFOLogEntry", "CTFO_2016_08_01");
     std::vector<TopCardsCruncherArgs> cruncher_params;
     cruncher_params.reserve(params.intervals.size());
-    const auto calculator = [](uint64_t ctfo, uint64_t skip, uint64_t tfu, uint64_t fav, uint64_t) -> uint64_t {
-      return ctfo + skip + tfu + fav;
-    };
+    const auto calculator = [](uint64_t ctfo, uint64_t skip, uint64_t tfu, uint64_t fav, uint64_t)
+                                -> uint64_t { return ctfo + skip + tfu + fav; };
     for (const auto& interval : params.intervals) {
       cruncher_params.emplace_back(TopCardsCruncherArgs{interval, 10, calculator});
     }

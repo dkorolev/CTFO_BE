@@ -1,18 +1,18 @@
 /*******************************************************************************
  The MIT License (MIT)
- 
+
  Copyright (c) 2016 Grigory Nikolaenko <nikolaenko.grigory@gmail.com>
- 
+
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
  in the Software without restriction, including without limitation the rights
  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  copies of the Software, and to permit persons to whom the Software is
  furnished to do so, subject to the following conditions:
- 
+
  The above copyright notice and this permission notice shall be included in all
  copies or substantial portions of the Software.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -54,7 +54,9 @@ CURRENT_STRUCT_T(TopCardsCruncherResponse) {
   CURRENT_FIELD(fav_count, uint64_t, 0);
   CURRENT_FIELD(seen_count, uint64_t, 0);
 
-  bool Empty() { return ctfo_count == 0 && skip_count == 0 && tfu_count == 0 && fav_count == 0 && seen_count == 0; }
+  bool Empty() {
+    return ctfo_count == 0 && skip_count == 0 && tfu_count == 0 && fav_count == 0 && seen_count == 0;
+  }
 };
 
 template <typename NAMESPACE>
@@ -72,8 +74,8 @@ struct TopCardsCruncherImpl {
   virtual ~TopCardsCruncherImpl() = default;
 
   void OnEvent(const event_t& e, idxts_t idxts) {
-	  current_us_ = idxts.us;
-	  if (Exists<Transaction_Z>(e)) {
+    current_us_ = idxts.us;
+    if (Exists<Transaction_Z>(e)) {
       const auto& transaction = Value<Transaction_Z>(e);
       for (const auto& mutation : transaction.mutations) {
         if (Exists<CardDeleted>(mutation)) {
@@ -83,12 +85,12 @@ struct TopCardsCruncherImpl {
     } else if (Exists<EventLogEntry>(e)) {
       OnEventLogEntry(Value<EventLogEntry>(e));
     }
-	  while (!events_list_.empty() && events_list_.back().us + args_.interval <= current_us_) {
+    while (!events_list_.empty() && events_list_.back().us + args_.interval <= current_us_) {
       time_window_left(events_list_.back());
       events_list_.pop_back();
-	  }
+    }
   }
-		
+
   value_t GetValue(size_t n = 0) const {
     if (!n) n = args_.top_size;
     value_t result;
@@ -106,62 +108,34 @@ struct TopCardsCruncherImpl {
   }
 
  private:
-  enum class CTFO_EVENT : int {
-    SEEN,
-    SKIP,
-    CTFO,
-    TFU,
-    FAV_CARD,
-    UNFAV_CARD,
-    LIKE_COMMENT,
-    UNLIKE_COMMENT,
-    FLAG_COMMENT,
-    FLAG_CARD,
-    REPORT_USER,
-    BLOCK_USER,
-    ONE_SIGNAL_USER_ID,
-    COMPLETE_SHARE_TO_FACEBOOK,
-    START_SHARE_TO_FACEBOOK,
-    CANCEL_SHARE_TO_FACEBOOK,
-    FAIL_SHARE_TO_FACEBOOK
-  };
-  
-  const std::map<std::string, CTFO_EVENT> supported_events_ = {
-    {"CTFO", CTFO_EVENT::CTFO},
-    {"TFU", CTFO_EVENT::TFU},
-    {"SKIP", CTFO_EVENT::SKIP},
-    {"FAV", CTFO_EVENT::FAV_CARD},
-    {"FAV_CARD", CTFO_EVENT::FAV_CARD},
-    {"UNFAV", CTFO_EVENT::UNFAV_CARD},
-    {"UNFAV_CARD", CTFO_EVENT::UNFAV_CARD},
-    {"LIKE_COMMENT", CTFO_EVENT::LIKE_COMMENT},
-    {"UNLIKE_COMMENT", CTFO_EVENT::UNLIKE_COMMENT},
-    {"FLAG_COMMENT", CTFO_EVENT::FLAG_COMMENT},
-    {"FLAG_CARD", CTFO_EVENT::FLAG_CARD},
-    {"REPORT_USER", CTFO_EVENT::REPORT_USER},
-    {"BLOCK_USER", CTFO_EVENT::BLOCK_USER},
-    {"ONE_SIGNAL_USER_ID", CTFO_EVENT::ONE_SIGNAL_USER_ID},
-    {"COMPLETE_SHARE_TO_FACEBOOK", CTFO_EVENT::COMPLETE_SHARE_TO_FACEBOOK},
-    {"START_SHARE_TO_FACEBOOK", CTFO_EVENT::START_SHARE_TO_FACEBOOK},
-    {"CANCEL_SHARE_TO_FACEBOOK", CTFO_EVENT::CANCEL_SHARE_TO_FACEBOOK},
-    {"FAIL_SHARE_TO_FACEBOOK", CTFO_EVENT::FAIL_SHARE_TO_FACEBOOK}};
+  enum class CTFO_EVENT : int { SEEN, SKIP, CTFO, TFU, FAV_CARD, UNFAV_CARD };
+
+  const std::map<std::string, CTFO_EVENT> supported_events_ = {{"SEEN", CTFO_EVENT::SEEN},
+                                                               {"CTFO", CTFO_EVENT::CTFO},
+                                                               {"TFU", CTFO_EVENT::TFU},
+                                                               {"SKIP", CTFO_EVENT::SKIP},
+                                                               {"FAV", CTFO_EVENT::FAV_CARD},
+                                                               {"FAV_CARD", CTFO_EVENT::FAV_CARD},
+                                                               {"UNFAV", CTFO_EVENT::UNFAV_CARD},
+                                                               {"UNFAV_CARD", CTFO_EVENT::UNFAV_CARD}};
 
   struct CardEvent final {
-	  std::chrono::microseconds us;
+    std::chrono::microseconds us;
     CTFO_EVENT type;
-	  CID cid;
+    CID cid;
   };
   using event_list_t = std::list<CardEvent>;
   using cards_map_t = std::unordered_map<CID, card_t, current::CurrentHashFunction<CID>>;
-  using top_cards_map_t = std::map<uint64_t, std::unordered_set<CID, current::CurrentHashFunction<CID>>, std::greater<uint64_t>>;
-  
+  using top_cards_map_t =
+      std::map<uint64_t, std::unordered_set<CID, current::CurrentHashFunction<CID>>, std::greater<uint64_t>>;
+
   inline CID StringToCID(const std::string& s) {
     if (s.length() == 21 && s[0] == 'c') {  // 'c' + 20 digits of `uint64_t` decimal representation.
       return static_cast<CID>(current::FromString<uint64_t>(s.substr(1)));
     }
     return static_cast<CID>(0u);
   }
-  
+
   void time_window_enter(CardEvent&& e) {
     const auto cit = cards_map_.find(e.cid);
     if (cit != cards_map_.end()) {
@@ -176,7 +150,7 @@ struct TopCardsCruncherImpl {
     }
     events_list_.emplace_back(std::move(e));
   }
-  
+
   void time_window_left(const CardEvent& e) {
     auto& card = cards_map_[e.cid];
     top_cards_map_[card.rate].erase(e.cid);
@@ -191,15 +165,29 @@ struct TopCardsCruncherImpl {
   void ApplyCardEvent(card_t& card, CTFO_EVENT event, bool rollback) {
     int v = rollback ? -1 : 1;
     switch (event) {
-      case CTFO_EVENT::SEEN: card.seen_count += v; break;
-      case CTFO_EVENT::SKIP: card.skip_count += v; break;
-      case CTFO_EVENT::CTFO: card.ctfo_count += v; break;
-      case CTFO_EVENT::TFU: card.tfu_count += v; break;
-      case CTFO_EVENT::FAV_CARD: card.fav_count += v; break;
-      case CTFO_EVENT::UNFAV_CARD: card.fav_count -= v; break;
-      default: return;
+      case CTFO_EVENT::SEEN:
+        card.seen_count += v;
+        break;
+      case CTFO_EVENT::SKIP:
+        card.skip_count += v;
+        break;
+      case CTFO_EVENT::CTFO:
+        card.ctfo_count += v;
+        break;
+      case CTFO_EVENT::TFU:
+        card.tfu_count += v;
+        break;
+      case CTFO_EVENT::FAV_CARD:
+        card.fav_count += v;
+        break;
+      case CTFO_EVENT::UNFAV_CARD:
+        card.fav_count -= v;
+        break;
+      default:
+        return;
     }
-    card.rate = args_.rate_calculator(card.ctfo_count, card.skip_count, card.tfu_count, card.fav_count, card.seen_count);
+    card.rate = args_.rate_calculator(
+        card.ctfo_count, card.skip_count, card.tfu_count, card.fav_count, card.seen_count);
   }
 
   void OnCardDeleted(const CardDeleted& e) {
@@ -211,12 +199,12 @@ struct TopCardsCruncherImpl {
   }
 
   void OnEventLogEntry(const EventLogEntry& e) {
-	  current_us_ = e.server_us;
-	  if (Exists<iOSGenericEvent>(e.event)) {
-		  OnIOSGenericEvent(Value<iOSGenericEvent>(e.event));
-	  }
+    current_us_ = e.server_us;
+    if (Exists<iOSGenericEvent>(e.event)) {
+      OnIOSGenericEvent(Value<iOSGenericEvent>(e.event));
+    }
   }
-		
+
   void OnIOSGenericEvent(const iOSGenericEvent& e) {
     const CTFO_EVENT event = supported_events_.at(e.event);
     const std::string cid_str = e.fields.count("cid") ? e.fields.at("cid") : "";
@@ -229,10 +217,10 @@ struct TopCardsCruncherImpl {
   std::chrono::microseconds current_us_;
   const TopCardsCruncherArgs args_;
 };
-	
+
 template <typename NAMESPACE>
 using TopCardsCruncher = CTFO::StreamCruncher<MultiCruncher<TopCardsCruncherImpl<NAMESPACE>>>;
-	
+
 }  // namespace CTFO
 
 #endif  // CRUNCHER_TOP_CARDS_H
