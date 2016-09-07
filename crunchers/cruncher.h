@@ -27,6 +27,8 @@
 
 #include "../../Current/Blocks/SS/ss.h"
 
+#include "../schema.h"
+
 namespace CTFO {
 
 template <typename ENTRY>
@@ -99,7 +101,10 @@ struct GenericCruncherImpl : public IMPL {
                            HTTP(port).Register(route + "/data",
                                                [this](Request r) {
                                                  mmq_.Publish(std::make_unique<RequestMessage>(std::move(r)));
-                                               });
+                                               }) +
+                           HTTP(port).Register(route + "/html", [this](Request r) {
+                             RenderExampleHTML(std::move(r));
+                           });
   }
   virtual ~GenericCruncherImpl() = default;
 
@@ -117,6 +122,38 @@ struct GenericCruncherImpl : public IMPL {
 
   EntryResponse EntryResponseIfNoMorePassTypeFilter() const { return EntryResponse::More; }
   TerminationResponse Terminate() const { return TerminationResponse::Terminate; }
+
+ private:
+  static std::string CardAsHTML(const CTFO::Card card) {
+    return current::strings::Printf(
+      "<div class='ctfo-card' style='background-color: rgb(%d, %d, %d);'><div class='ctfo-card__text'>%s</div></div>",
+      card.color.red,
+      card.color.green,
+      card.color.blue,
+      card.text.c_str());  // TODO(...): Escape the string, at least the `<>` parts of it.
+  }
+  static void RenderExampleHTML(Request r) {
+    CTFO::Card c1;
+    c1.text = "Poverty is not a lack of character. It's a lack of cash.";
+    c1.color.red = 182;
+    c1.color.green = 105;
+    c1.color.blue = 255;
+
+    CTFO::Card c2;
+    c2.text = "HTML used to work in Windows 3.1 times, and it's still here.";
+    c2.color.red = 0;
+    c2.color.green = 128;
+    c2.color.blue = 128;
+
+    std::ostringstream os;
+    os << "<html lang='en'>\n  <head>\n    <title>CTFO Card</title>\n    <style>\n      .ctfo-card {\n        display: inline-block;\n        vertical-align: top;\n        -webkit-box-sizing: border-box;\n        -moz-box-sizing: border-box;\n        box-sizing: border-box;\n        width: 320px;\n        height: auto;\n        min-height: 460px;\n        margin: 0;\n        padding: 24px 20px;\n        background-color: rgb(0, 0, 0);\n        font-family: \'Arial\', sans-serif;\n        font-size: 32px;\n        line-height: 48px;\n        text-align: left;\n      }\n      .ctfo-card__text {\n        display: inline;\n        padding: 4px 6px;\n        background-color: rgb(0, 0, 0);\n        color: rgb(255, 255, 255);\n      }\n    </style>\n  </head>\n";
+    os << "<h1>Test</h1>\n";
+    os << "<table>";
+    os << "<tr><td>" << CardAsHTML(c1) << "</td><td><font size=+5>All this</font></td></tr>";
+    os << "<tr><td>" << CardAsHTML(c2) << "</td><td><font size=+5>is awesome</font></td></tr>";
+    os << "</table>";
+    r(os.str(), HTTPResponseCode.OK, current::net::constants::kDefaultHTMLContentType);
+  }
 
  private:
   const uint16_t port_;
