@@ -1,0 +1,6 @@
+{
+  "remote_url":"http://localhost:8383/raw_log",
+  "route":"/top_cards",
+  "port":8373,
+  "intervals":[10000000,3600000000,86400000000]
+}
