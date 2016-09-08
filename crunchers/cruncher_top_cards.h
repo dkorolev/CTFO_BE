@@ -145,6 +145,7 @@ struct TopCardsCruncherImpl {
       top_cards_map_[card.rate].insert(e.cid);
     } else {
       card_t& card = cards_map_[e.cid];
+      card.cid = e.cid;
       ApplyCardEvent(card, e.type, false /*rollback*/);
       top_cards_map_[card.rate].insert(e.cid);
     }
@@ -152,13 +153,16 @@ struct TopCardsCruncherImpl {
   }
 
   void time_window_left(const CardEvent& e) {
-    auto& card = cards_map_[e.cid];
-    top_cards_map_[card.rate].erase(e.cid);
-    ApplyCardEvent(card, e.type, true /*rollback*/);
-    if (!card.Empty()) {
-      top_cards_map_[card.rate].insert(e.cid);
-    } else {
-      cards_map_.erase(e.cid);
+    const auto cit = cards_map_.find(e.cid);
+    if (cit != cards_map_.end()) {
+      auto& card = cit->second;
+      top_cards_map_[card.rate].erase(e.cid);
+      ApplyCardEvent(card, e.type, true /*rollback*/);
+      if (!card.Empty()) {
+        top_cards_map_[card.rate].insert(e.cid);
+      } else {
+        cards_map_.erase(e.cid);
+      }
     }
   }
 
@@ -193,8 +197,12 @@ struct TopCardsCruncherImpl {
   void OnCardDeleted(const CardDeleted& e) {
     const auto cit = cards_map_.find(e.key);
     if (cit != cards_map_.end()) {
-      top_cards_map_[cit->second.rate].erase(e.key);
+      auto& top_bucket = top_cards_map_[cit->second.rate];
+      top_bucket.erase(e.key);
       cards_map_.erase(cit);
+      if (top_bucket.empty()) {
+        top_cards_map_.erase(cit->second.rate);
+      }
     }
   }
 
