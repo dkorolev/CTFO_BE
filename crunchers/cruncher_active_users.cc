@@ -60,14 +60,10 @@ int main(int argc, char **argv) {
     current::reflection::StructSchema schema;
     schema.AddType<ActiveUsersCruncherParams>();
     std::cout << schema.GetSchemaInfo().Describe<current::reflection::Language::FSharp>(false);
+  } else if (FLAGS_defaultconfig) {
+    std::cout << JSON(ActiveUsersCruncherParams()) << std::endl;
   } else {
-    ActiveUsersCruncherParams params;
-    if (FLAGS_defaultconfig) {
-      current::FileSystem::WriteStringToFile(JSON(params), FLAGS_config_file.c_str());
-    } else {
-      params = ParseJSON<ActiveUsersCruncherParams>(current::FileSystem::ReadFileAsString(FLAGS_config_file));
-    }
-
+    const auto params = ParseJSON<ActiveUsersCruncherParams>(current::FileSystem::ReadFileAsString(FLAGS_config_file));
     using CTFOActiveUsersCruncher = CTFO::ActiveUsersCruncher<CTFO_2016_08_01>;
     current::sherlock::SubscribableRemoteStream<CTFO_2016_08_01::CTFOLogEntry> remote_stream(
         params.remote_url, "CTFOLogEntry", "CTFO_2016_08_01");

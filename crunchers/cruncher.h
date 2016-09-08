@@ -93,8 +93,8 @@ struct GenericCruncherImpl : public IMPL {
   GenericCruncherImpl(uint16_t port, const std::string& route, ARGS&&... args)
       : IMPL(std::forward<ARGS>(args)...),
         port_(port),
-        mmq_subscriber_([this](mmq_message_t&& message, idxts_t) { message->Handle(*this); }),
-        mmq_(mmq_subscriber_, 1024 * 1024) {
+        mmq_worker_([this](mmq_message_t&& message, idxts_t) { message->Handle(*this); }),
+        mmq_(mmq_worker_, 1024 * 1024) {
     scoped_http_routes_ += HTTP(port).Register(route + "/healthz", [](Request r) { r("OK\n"); }) +
                            HTTP(port).Register(route + "/data",
                                                [this](Request r) {
@@ -121,7 +121,7 @@ struct GenericCruncherImpl : public IMPL {
  private:
   const uint16_t port_;
   HTTPRoutesScope scoped_http_routes_;
-  IntermediateSubscriber<mmq_message_t> mmq_subscriber_;
+  IntermediateSubscriber<mmq_message_t> mmq_worker_;
   mmq_t mmq_;
 };
 
