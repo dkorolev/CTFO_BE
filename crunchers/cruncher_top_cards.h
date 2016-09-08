@@ -120,9 +120,9 @@ struct TopCardsCruncherImpl {
                                                                {"UNFAV_CARD", CTFO_EVENT::UNFAV_CARD}};
 
   struct CardEvent final {
-    std::chrono::microseconds us;
-    CTFO_EVENT type;
     CID cid;
+    CTFO_EVENT type;
+    std::chrono::microseconds us;
   };
   using event_list_t = std::list<CardEvent>;
   using cards_map_t = std::unordered_map<CID, card_t, current::CurrentHashFunction<CID>>;
@@ -206,9 +206,13 @@ struct TopCardsCruncherImpl {
   }
 
   void OnIOSGenericEvent(const iOSGenericEvent& e) {
-    const CTFO_EVENT event = supported_events_.at(e.event);
-    const std::string cid_str = e.fields.count("cid") ? e.fields.at("cid") : "";
-    time_window_enter(CardEvent{current_us_, event, StringToCID(cid_str)});
+    try {
+      const CTFO_EVENT event = supported_events_.at(e.event);
+      const std::string cid_str = e.fields.count("cid") ? e.fields.at("cid") : "";
+      time_window_enter(CardEvent{StringToCID(cid_str), event, current_us_});
+    } catch (const std::out_of_range&) {
+      // ignore unsupported events
+    }
   }
 
   event_list_t events_list_;
