@@ -149,7 +149,7 @@ struct TopCardsCruncherImpl {
       ApplyCardEvent(card, e.type, false /*rollback*/);
       top_cards_map_[card.rate].insert(e.cid);
     }
-    events_list_.emplace_back(std::move(e));
+    events_list_.push_front(std::move(e));
   }
 
   void time_window_left(const CardEvent& e) {
