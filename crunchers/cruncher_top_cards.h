@@ -43,10 +43,13 @@ struct TopCardsCruncherArgs final {
   std::chrono::microseconds interval;
   uint64_t top_size;
   rate_callback_t rate_calculator;
+
+  TopCardsCruncherArgs(std::chrono::microseconds interval, uint64_t size, rate_callback_t rate_calculator)
+      : interval(interval), top_size(size), rate_calculator(rate_calculator) {}
 };
 
-CURRENT_STRUCT_T(TopCardsCruncherResponse) {
-  CURRENT_FIELD(cid, T);
+CURRENT_STRUCT(TopCardsCruncherResponseItem) {
+  CURRENT_FIELD(cid, uint64_t, 0);
   CURRENT_FIELD(rate, uint64_t, 0);
   CURRENT_FIELD(ctfo_count, uint64_t, 0);
   CURRENT_FIELD(skip_count, uint64_t, 0);
@@ -59,6 +62,8 @@ CURRENT_STRUCT_T(TopCardsCruncherResponse) {
   }
 };
 
+using TopCardsCruncherResponse = std::vector<TopCardsCruncherResponseItem>;
+
 template <typename NAMESPACE>
 struct TopCardsCruncherImpl {
   using Transaction_Z = typename NAMESPACE::Transaction_T9220981828355492272;
@@ -67,7 +72,7 @@ struct TopCardsCruncherImpl {
   using iOSGenericEvent = typename NAMESPACE::iOSGenericEvent;
   using CID = typename NAMESPACE::CID;
   using event_t = typename NAMESPACE::CTFOLogEntry;
-  using card_t = TopCardsCruncherResponse<CID>;
+  using card_t = TopCardsCruncherResponseItem;
   using value_t = std::vector<card_t>;
 
   TopCardsCruncherImpl(const TopCardsCruncherArgs& args) : args_(args) {}
@@ -145,7 +150,7 @@ struct TopCardsCruncherImpl {
       top_cards_map_[card.rate].insert(e.cid);
     } else {
       card_t& card = cards_map_[e.cid];
-      card.cid = e.cid;
+      card.cid = static_cast<uint64_t>(e.cid);
       ApplyCardEvent(card, e.type, false /*rollback*/);
       top_cards_map_[card.rate].insert(e.cid);
     }
