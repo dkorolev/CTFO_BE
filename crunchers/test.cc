@@ -39,7 +39,7 @@
 #include "cruncher_top_cards.h"
 #include "schema.h"
 
-DEFINE_bool(write_ctfo_storage_golden_files, true, "Set to `true` to [over]write golden files.");
+DEFINE_bool(write_ctfo_storage_golden_files, false, "Set to `true` to [over]write golden files.");
 DEFINE_int32(sherlock_http_test_port,
              PickPortForUnitTest(),
              "Local port to use remote subscription unit test.");
