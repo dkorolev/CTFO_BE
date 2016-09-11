@@ -72,14 +72,10 @@ int main(int argc, char** argv) {
     current::reflection::StructSchema schema;
     schema.AddType<TopCardsCruncherParams>();
     std::cout << schema.GetSchemaInfo().Describe<current::reflection::Language::FSharp>(false);
+  } else if (FLAGS_defaultconfig) {
+    std::cout << JSON(TopCardsCruncherParams()) << std::endl;
   } else {
-    TopCardsCruncherParams params;
-    if (FLAGS_defaultconfig) {
-      current::FileSystem::WriteStringToFile(JSON(params), FLAGS_config_file.c_str());
-    } else {
-      params = ParseJSON<TopCardsCruncherParams>(current::FileSystem::ReadFileAsString(FLAGS_config_file));
-    }
-
+    const auto params = ParseJSON<TopCardsCruncherParams>(current::FileSystem::ReadFileAsString(FLAGS_config_file));
     using CTFOTopCardsCruncher = CTFO::TopCardsCruncher<CTFO_2016_08_01>;
     current::sherlock::SubscribableRemoteStream<CTFO_2016_08_01::CTFOLogEntry> remote_stream(
         params.remote_url, "CTFOLogEntry", "CTFO_2016_08_01");
