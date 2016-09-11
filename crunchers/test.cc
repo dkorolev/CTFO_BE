@@ -257,8 +257,9 @@ TEST(CTFOCrunchersTest, TopCardsCruncherLocalTest) {
   using CTFOTopCardsCruncher = CTFO::TopCardsCruncher<CTFO_Local>;
 
   std::vector<CTFO::TopCardsCruncherArgs> args;
-  const auto calculator = [](uint64_t ctfo, uint64_t skip, uint64_t tfu, uint64_t fav, uint64_t seen)
-                              -> uint64_t { return 160000 * seen + 8000 * ctfo + 400 * skip + 20 * tfu + fav; };
+  const auto calculator =
+      [](uint64_t ctfo, uint64_t skip, uint64_t tfu, uint64_t fav, uint64_t unfav, uint64_t seen)
+          -> int64_t { return 160000 * seen + 8000 * ctfo + 400 * skip + 20 * tfu + fav - unfav; };
   for (uint32_t i = 0; i < 12; ++i) {
     args.emplace_back(std::chrono::seconds(i + 1), 20, calculator);
   }
@@ -346,8 +347,9 @@ TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTest) {
   using CTFOTopCardsCruncher = CTFO::TopCardsCruncher<CTFO_2016_08_01>;
 
   std::vector<CTFO::TopCardsCruncherArgs> args;
-  const auto calculator = [](uint64_t ctfo, uint64_t skip, uint64_t tfu, uint64_t fav, uint64_t seen)
-                              -> uint64_t { return 160000 * seen + 8000 * ctfo + 400 * skip + 20 * tfu + fav; };
+  const auto calculator =
+      [](uint64_t ctfo, uint64_t skip, uint64_t tfu, uint64_t fav, uint64_t unfav, uint64_t seen)
+          -> int64_t { return 160000 * seen + 8000 * ctfo + 400 * skip + 20 * tfu + fav - unfav; };
   for (uint32_t i = 0; i < 12; ++i) {
     args.emplace_back(std::chrono::seconds(i + 1), 20, calculator);
   }

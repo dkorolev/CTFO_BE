@@ -39,7 +39,7 @@
 namespace CTFO {
 
 struct TopCardsCruncherArgs final {
-  using rate_callback_t = std::function<uint64_t(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t)>;
+  using rate_callback_t = std::function<int64_t(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t)>;
 
   std::chrono::microseconds interval;
   uint64_t top_size;
@@ -51,15 +51,17 @@ struct TopCardsCruncherArgs final {
 
 CURRENT_STRUCT(TopCardsCruncherResponseItem) {
   CURRENT_FIELD(cid, uint64_t, 0);
-  CURRENT_FIELD(rate, uint64_t, 0);
+  CURRENT_FIELD(rate, int64_t, 0);
   CURRENT_FIELD(ctfo_count, uint64_t, 0);
   CURRENT_FIELD(skip_count, uint64_t, 0);
   CURRENT_FIELD(tfu_count, uint64_t, 0);
   CURRENT_FIELD(fav_count, uint64_t, 0);
+  CURRENT_FIELD(unfav_count, uint64_t, 0);
   CURRENT_FIELD(seen_count, uint64_t, 0);
 
   bool Empty() {
-    return ctfo_count == 0 && skip_count == 0 && tfu_count == 0 && fav_count == 0 && seen_count == 0;
+    return ctfo_count == 0 && skip_count == 0 && tfu_count == 0 && fav_count == 0 && unfav_count == 0 &&
+           seen_count == 0;
   }
 };
 
@@ -124,7 +126,7 @@ struct TopCardsCruncherImpl {
   using event_list_t = std::deque<CardEvent>;
   using cards_map_t = std::unordered_map<CID, card_t, current::CurrentHashFunction<CID>>;
   using top_cards_map_t =
-      std::map<uint64_t, std::unordered_set<CID, current::CurrentHashFunction<CID>>, std::greater<uint64_t>>;
+      std::map<int64_t, std::unordered_set<CID, current::CurrentHashFunction<CID>>, std::greater<uint64_t>>;
 
   void TimeWindowsEnter(CardEvent&& e) {
     const auto cit = cards_map_.find(e.cid);
@@ -177,13 +179,13 @@ struct TopCardsCruncherImpl {
         card.fav_count += sign;
         break;
       case CTFO_EVENT::UNFAV_CARD:
-        card.fav_count -= sign;
+        card.unfav_count += sign;
         break;
       default:
         return;
     }
     card.rate = args_.rate_calculator(
-        card.ctfo_count, card.skip_count, card.tfu_count, card.fav_count, card.seen_count);
+        card.ctfo_count, card.skip_count, card.tfu_count, card.fav_count, card.unfav_count, card.seen_count);
   }
 
   void OnCardDeleted(const CardDeleted& e) {
