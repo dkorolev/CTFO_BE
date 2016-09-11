@@ -130,9 +130,11 @@ struct TopCardsCruncherImpl {
     const auto cit = cards_map_.find(e.cid);
     if (cit != cards_map_.end()) {
       card_t& card = cit->second;
-      top_cards_map_[card.rate].erase(e.cid);
+      auto it = top_cards_map_.find(card.rate);
+      it->second.erase(e.cid);
       ApplyCardEvent(card, e.type, false /*rollback*/);
       top_cards_map_[card.rate].insert(e.cid);
+      if (it->second.empty()) top_cards_map_.erase(it);
     } else {
       card_t& card = cards_map_[e.cid];
       card.cid = static_cast<uint64_t>(e.cid);
