@@ -30,17 +30,29 @@
 
 namespace CTFO {
 
+CURRENT_STRUCT(TopCardsSubCruncherParams) {
+  CURRENT_FIELD(interval, std::chrono::microseconds);
+  CURRENT_FIELD_DESCRIPTION(interval, "Size of the cruncher sliding window.");
+  CURRENT_FIELD(top_size, uint64_t);
+  CURRENT_FIELD_DESCRIPTION(top_size, "Maximum number of items in the top cards list.");
+  CURRENT_DEFAULT_CONSTRUCTOR(TopCardsSubCruncherParams) {}
+  CURRENT_CONSTRUCTOR(TopCardsSubCruncherParams)(std::chrono::microseconds interval, uint64_t top_size)
+      : interval(interval), top_size(top_size) {}
+};
+
 CURRENT_STRUCT(TopCardsCruncherParams) {
   CURRENT_FIELD(remote_url, std::string, "http://localhost:8383/raw_log");
   CURRENT_FIELD_DESCRIPTION(remote_url, "Remote CTFOServer URL to subscribe to.");
   CURRENT_FIELD(route, std::string, "/top_cards");
   CURRENT_FIELD_DESCRIPTION(route, "The HTTP url path to expose the cruncher in.");
-  CURRENT_FIELD(port, uint16_t, 8373);
+  CURRENT_FIELD(port, uint16_t, 8374);
   CURRENT_FIELD_DESCRIPTION(port, "Port to spawn the cruncher on.");
-  CURRENT_FIELD(intervals, std::vector<std::chrono::microseconds>);
-  CURRENT_FIELD_DESCRIPTION(intervals, "List of the cruncher sliding window sizes.");
+  CURRENT_FIELD(args, std::vector<TopCardsSubCruncherParams>);
+  CURRENT_FIELD_DESCRIPTION(args, "List of params for several individual cruncher instances.");
   CURRENT_DEFAULT_CONSTRUCTOR(TopCardsCruncherParams)
-      : intervals{std::chrono::seconds(10), std::chrono::hours(1), std::chrono::hours(24)} {}
+      : args{TopCardsSubCruncherParams(std::chrono::seconds(10), 3),
+             TopCardsSubCruncherParams(std::chrono::hours(1), 5),
+             TopCardsSubCruncherParams(std::chrono::hours(24), 10)} {}
 };
 
 }  // namespace CTFO
@@ -72,11 +84,11 @@ int main(int argc, char** argv) {
     current::sherlock::SubscribableRemoteStream<CTFO_2016_08_01::CTFOLogEntry> remote_stream(
         params.remote_url, "CTFOLogEntry", "CTFO_2016_08_01");
     std::vector<TopCardsCruncherArgs> cruncher_params;
-    cruncher_params.reserve(params.intervals.size());
+    cruncher_params.reserve(params.args.size());
     const auto calculator = [](uint64_t ctfo, uint64_t skip, uint64_t tfu, uint64_t fav, uint64_t)
                                 -> uint64_t { return ctfo + skip + tfu + fav; };
-    for (const auto& interval : params.intervals) {
-      cruncher_params.emplace_back(TopCardsCruncherArgs{interval, 10, calculator});
+    for (const auto& arg : params.args) {
+      cruncher_params.emplace_back(arg.interval, arg.top_size, calculator);
     }
     CTFOTopCardsCruncher cruncher(params.port, params.route, cruncher_params);
     const auto scope = remote_stream.Subscribe(cruncher);

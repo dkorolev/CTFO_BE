@@ -25,7 +25,7 @@
 #ifndef CRUNCHER_TOP_CARDS_H
 #define CRUNCHER_TOP_CARDS_H
 
-#include <list>
+#include <deque>
 #include <vector>
 #include <unordered_map>
 
@@ -91,7 +91,7 @@ struct TopCardsCruncherImpl {
       OnEventLogEntry(Value<EventLogEntry>(e));
     }
     while (!events_list_.empty() && events_list_.back().us + args_.interval <= current_us_) {
-      time_window_left(events_list_.back());
+      TimeWindowLeft(events_list_.back());
       events_list_.pop_back();
     }
   }
@@ -129,19 +129,12 @@ struct TopCardsCruncherImpl {
     CTFO_EVENT type;
     std::chrono::microseconds us;
   };
-  using event_list_t = std::list<CardEvent>;
+  using event_list_t = std::deque<CardEvent>;
   using cards_map_t = std::unordered_map<CID, card_t, current::CurrentHashFunction<CID>>;
   using top_cards_map_t =
       std::map<uint64_t, std::unordered_set<CID, current::CurrentHashFunction<CID>>, std::greater<uint64_t>>;
 
-  inline CID StringToCID(const std::string& s) {
-    if (s.length() == 21 && s[0] == 'c') {  // 'c' + 20 digits of `uint64_t` decimal representation.
-      return static_cast<CID>(current::FromString<uint64_t>(s.substr(1)));
-    }
-    return static_cast<CID>(0u);
-  }
-
-  void time_window_enter(CardEvent&& e) {
+  void TimeWindowsEnter(CardEvent&& e) {
     const auto cit = cards_map_.find(e.cid);
     if (cit != cards_map_.end()) {
       card_t& card = cit->second;
@@ -157,7 +150,7 @@ struct TopCardsCruncherImpl {
     events_list_.push_front(std::move(e));
   }
 
-  void time_window_left(const CardEvent& e) {
+  void TimeWindowLeft(const CardEvent& e) {
     const auto cit = cards_map_.find(e.cid);
     if (cit != cards_map_.end()) {
       auto& card = cit->second;
@@ -172,25 +165,25 @@ struct TopCardsCruncherImpl {
   }
 
   void ApplyCardEvent(card_t& card, CTFO_EVENT event, bool rollback) {
-    int v = rollback ? -1 : 1;
+    int sign = rollback ? -1 : 1;
     switch (event) {
       case CTFO_EVENT::SEEN:
-        card.seen_count += v;
+        card.seen_count += sign;
         break;
       case CTFO_EVENT::SKIP:
-        card.skip_count += v;
+        card.skip_count += sign;
         break;
       case CTFO_EVENT::CTFO:
-        card.ctfo_count += v;
+        card.ctfo_count += sign;
         break;
       case CTFO_EVENT::TFU:
-        card.tfu_count += v;
+        card.tfu_count += sign;
         break;
       case CTFO_EVENT::FAV_CARD:
-        card.fav_count += v;
+        card.fav_count += sign;
         break;
       case CTFO_EVENT::UNFAV_CARD:
-        card.fav_count -= v;
+        card.fav_count -= sign;
         break;
       default:
         return;
@@ -222,10 +215,17 @@ struct TopCardsCruncherImpl {
     try {
       const CTFO_EVENT event = supported_events_.at(e.event);
       const std::string cid_str = e.fields.count("cid") ? e.fields.at("cid") : "";
-      time_window_enter(CardEvent{StringToCID(cid_str), event, current_us_});
+      TimeWindowsEnter(CardEvent{StringToCID(cid_str), event, current_us_});
     } catch (const std::out_of_range&) {
       // ignore unsupported events
     }
+  }
+
+  CID StringToCID(const std::string& s) {
+    if (s.length() == 21 && s[0] == 'c') {  // 'c' + 20 digits of `uint64_t` decimal representation.
+      return static_cast<CID>(current::FromString<uint64_t>(s.substr(1)));
+    }
+    return static_cast<CID>(0u);
   }
 
   event_list_t events_list_;
