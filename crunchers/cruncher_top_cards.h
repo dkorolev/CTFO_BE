@@ -38,8 +38,26 @@
 
 namespace CTFO {
 
+CURRENT_STRUCT(CardCounters) {
+  CURRENT_FIELD(ctfo, uint64_t, 0);
+  CURRENT_FIELD(skip, uint64_t, 0);
+  CURRENT_FIELD(tfu, uint64_t, 0);
+  CURRENT_FIELD(fav, uint64_t, 0);
+  CURRENT_FIELD(unfav, uint64_t, 0);
+  CURRENT_FIELD(seen, uint64_t, 0);
+
+  bool Empty() const { return ctfo == 0 && skip == 0 && tfu == 0 && fav == 0 && unfav == 0 && seen == 0; }
+};
+
+CURRENT_STRUCT(TopCardResponseItem, CardCounters) {
+  CURRENT_FIELD(cid, uint64_t, 0);
+  CURRENT_FIELD(rate, int64_t, 0);
+};
+
+using TopCardsCruncherResponse = std::vector<TopCardResponseItem>;
+
 struct TopCardsCruncherArgs final {
-  using rate_callback_t = std::function<int64_t(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t)>;
+  using rate_callback_t = std::function<int64_t(const CardCounters&)>;
 
   std::chrono::microseconds interval;
   uint64_t top_size;
@@ -49,24 +67,6 @@ struct TopCardsCruncherArgs final {
       : interval(interval), top_size(size), rate_calculator(rate_calculator) {}
 };
 
-CURRENT_STRUCT(TopCardsCruncherResponseItem) {
-  CURRENT_FIELD(cid, uint64_t, 0);
-  CURRENT_FIELD(rate, int64_t, 0);
-  CURRENT_FIELD(ctfo_count, uint64_t, 0);
-  CURRENT_FIELD(skip_count, uint64_t, 0);
-  CURRENT_FIELD(tfu_count, uint64_t, 0);
-  CURRENT_FIELD(fav_count, uint64_t, 0);
-  CURRENT_FIELD(unfav_count, uint64_t, 0);
-  CURRENT_FIELD(seen_count, uint64_t, 0);
-
-  bool Empty() {
-    return ctfo_count == 0 && skip_count == 0 && tfu_count == 0 && fav_count == 0 && unfav_count == 0 &&
-           seen_count == 0;
-  }
-};
-
-using TopCardsCruncherResponse = std::vector<TopCardsCruncherResponseItem>;
-
 template <typename NAMESPACE>
 struct TopCardsCruncherImpl {
   using Transaction_Z = typename NAMESPACE::Transaction_T9220981828355492272;
@@ -75,8 +75,8 @@ struct TopCardsCruncherImpl {
   using iOSGenericEvent = typename NAMESPACE::iOSGenericEvent;
   using CID = typename NAMESPACE::CID;
   using event_t = typename NAMESPACE::CTFOLogEntry;
-  using card_t = TopCardsCruncherResponseItem;
-  using value_t = std::vector<card_t>;
+  using card_t = TopCardResponseItem;
+  using value_t = TopCardsCruncherResponse;
 
   TopCardsCruncherImpl(const TopCardsCruncherArgs& args) : args_(args) {}
   virtual ~TopCardsCruncherImpl() = default;
@@ -128,19 +128,19 @@ struct TopCardsCruncherImpl {
   using top_cards_map_t =
       std::map<int64_t, std::unordered_set<CID, current::CurrentHashFunction<CID>>, std::greater<uint64_t>>;
 
-  void TimeWindowsEnter(CardEvent&& e) {
+  void TimeWindowEntered(CardEvent&& e) {
     const auto cit = cards_map_.find(e.cid);
     if (cit != cards_map_.end()) {
       card_t& card = cit->second;
       auto it = top_cards_map_.find(card.rate);
       it->second.erase(e.cid);
-      ApplyCardEvent(card, e.type, false /*rollback*/);
+      ApplyCardEvent(card, e.type, Delta::Enter);
       top_cards_map_[card.rate].insert(e.cid);
       if (it->second.empty()) top_cards_map_.erase(it);
     } else {
       card_t& card = cards_map_[e.cid];
       card.cid = static_cast<uint64_t>(e.cid);
-      ApplyCardEvent(card, e.type, false /*rollback*/);
+      ApplyCardEvent(card, e.type, Delta::Enter);
       top_cards_map_[card.rate].insert(e.cid);
     }
     events_list_.push_front(std::move(e));
@@ -151,7 +151,7 @@ struct TopCardsCruncherImpl {
     if (cit != cards_map_.end()) {
       auto& card = cit->second;
       top_cards_map_[card.rate].erase(e.cid);
-      ApplyCardEvent(card, e.type, true /*rollback*/);
+      ApplyCardEvent(card, e.type, Delta::Leave);
       if (!card.Empty()) {
         top_cards_map_[card.rate].insert(e.cid);
       } else {
@@ -160,32 +160,32 @@ struct TopCardsCruncherImpl {
     }
   }
 
-  void ApplyCardEvent(card_t& card, CTFO_EVENT event, bool rollback) {
-    int sign = rollback ? -1 : 1;
+  enum class Delta : int { Enter = +1, Leave = -1 };
+  void ApplyCardEvent(card_t& card, CTFO_EVENT event, Delta delta) {
+    const int d = static_cast<int>(delta);
     switch (event) {
       case CTFO_EVENT::SEEN:
-        card.seen_count += sign;
+        card.seen += d;
         break;
       case CTFO_EVENT::SKIP:
-        card.skip_count += sign;
+        card.skip += d;
         break;
       case CTFO_EVENT::CTFO:
-        card.ctfo_count += sign;
+        card.ctfo += d;
         break;
       case CTFO_EVENT::TFU:
-        card.tfu_count += sign;
+        card.tfu += d;
         break;
       case CTFO_EVENT::FAV_CARD:
-        card.fav_count += sign;
+        card.fav += d;
         break;
       case CTFO_EVENT::UNFAV_CARD:
-        card.unfav_count += sign;
+        card.unfav += d;
         break;
       default:
         return;
     }
-    card.rate = args_.rate_calculator(
-        card.ctfo_count, card.skip_count, card.tfu_count, card.fav_count, card.unfav_count, card.seen_count);
+    card.rate = args_.rate_calculator(card);
   }
 
   void OnCardDeleted(const CardDeleted& e) {
@@ -222,13 +222,15 @@ struct TopCardsCruncherImpl {
     try {
       const CTFO_EVENT event = supported_events.at(e.event);
       const std::string cid_str = e.fields.count("cid") ? e.fields.at("cid") : "";
-      TimeWindowsEnter(CardEvent{StringToCID(cid_str), event, current_us_});
+      TimeWindowEntered(CardEvent{StringToCID(cid_str), event, current_us_});
     } catch (const std::out_of_range&) {
       // ignore unsupported events
     }
   }
 
-  CID StringToCID(const std::string& s) {
+  // this code is copied from ../util.h
+  // TODO(grixa): make it possible to use util.h directly
+  static CID StringToCID(const std::string& s) {
     if (s.length() == 21 && s[0] == 'c') {  // 'c' + 20 digits of `uint64_t` decimal representation.
       return static_cast<CID>(current::FromString<uint64_t>(s.substr(1)));
     }

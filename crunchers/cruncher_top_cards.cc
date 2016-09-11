@@ -77,14 +77,14 @@ int main(int argc, char** argv) {
   } else {
     const auto params =
         ParseJSON<TopCardsCruncherParams>(current::FileSystem::ReadFileAsString(FLAGS_config_file));
-    using CTFOTopCardsCruncher = CTFO::TopCardsCruncher<CTFO_2016_08_01>;
+    using CTFOTopCardsCruncher = TopCardsCruncher<CTFO_2016_08_01>;
     current::sherlock::SubscribableRemoteStream<CTFO_2016_08_01::CTFOLogEntry> remote_stream(
         params.remote_url, "CTFOLogEntry", "CTFO_2016_08_01");
     std::vector<TopCardsCruncherArgs> cruncher_params;
     cruncher_params.reserve(params.args.size());
-    const auto calculator =
-        [](uint64_t ctfo, uint64_t skip, uint64_t tfu, uint64_t fav, uint64_t unfav, uint64_t)
-            -> int64_t { return ctfo + skip + tfu + fav - unfav; };
+    const auto calculator = [](const CardCounters& counters) -> int64_t {
+      return counters.ctfo + counters.skip + counters.tfu + counters.fav - counters.unfav;
+    };
     for (const auto& arg : params.args) {
       cruncher_params.emplace_back(arg.interval, arg.top_size, calculator);
     }
