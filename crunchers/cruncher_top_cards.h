@@ -31,7 +31,6 @@
 
 #include "../../Current/Blocks/HTTP/api.h"
 #include "../../Current/Blocks/MMQ/mmq.h"
-#include "../../Current/Bricks/util/singleton.h"
 
 #include "../util.h"
 
@@ -211,17 +210,14 @@ struct TopCardsCruncherImpl {
   }
 
   void OnIOSGenericEvent(const iOSGenericEvent& e) {
-    auto& supported_events = current::ThreadLocalSingleton<std::map<std::string, CTFO_EVENT>>();
-    if (supported_events.empty()) {
-      supported_events.emplace("SEEN", CTFO_EVENT::SEEN);
-      supported_events.emplace("CTFO", CTFO_EVENT::CTFO);
-      supported_events.emplace("TFU", CTFO_EVENT::TFU);
-      supported_events.emplace("SKIP", CTFO_EVENT::SKIP);
-      supported_events.emplace("FAV", CTFO_EVENT::FAV_CARD);
-      supported_events.emplace("FAV_CARD", CTFO_EVENT::FAV_CARD);
-      supported_events.emplace("UNFAV", CTFO_EVENT::UNFAV_CARD);
-      supported_events.emplace("UNFAV_CARD", CTFO_EVENT::UNFAV_CARD);
-    }
+    static std::map<std::string, CTFO_EVENT> supported_events = {{"SEEN", CTFO_EVENT::SEEN},
+                                                                 {"CTFO", CTFO_EVENT::CTFO},
+                                                                 {"TFU", CTFO_EVENT::TFU},
+                                                                 {"SKIP", CTFO_EVENT::SKIP},
+                                                                 {"FAV", CTFO_EVENT::FAV_CARD},
+                                                                 {"FAV_CARD", CTFO_EVENT::FAV_CARD},
+                                                                 {"UNFAV", CTFO_EVENT::UNFAV_CARD},
+                                                                 {"UNFAV_CARD", CTFO_EVENT::UNFAV_CARD}};
     try {
       const CTFO_EVENT event = supported_events.at(e.event);
       const std::string cid_str = e.fields.count("cid") ? e.fields.at("cid") : "";
