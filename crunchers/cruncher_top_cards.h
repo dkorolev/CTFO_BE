@@ -96,13 +96,14 @@ struct TopCardsCruncherImpl {
       OnEventLogEntry(Value<EventLogEntry>(e));
     }
     while (!events_list_.empty() && events_list_.back().us + args_.interval <= current_us_) {
-      TimeWindowLeft(events_list_.back());
-      events_list_.pop_back();
+      TimeWindowLeft();
     }
   }
 
   value_t GetValue(size_t n = 0) const {
-    if (!n) n = args_.top_size;
+    if (!n) {
+      n = args_.top_size;
+    }
     value_t result;
     result.reserve(n);
     for (const auto& bucket : top_cards_map_) {
@@ -131,24 +132,23 @@ struct TopCardsCruncherImpl {
       std::map<int64_t, std::unordered_set<CID, current::CurrentHashFunction<CID>>, std::greater<uint64_t>>;
 
   void TimeWindowEntered(CardEvent&& e) {
-    const auto cit = cards_map_.find(e.cid);
-    if (cit != cards_map_.end()) {
-      card_t& card = cit->second;
+    card_t& card = cards_map_[e.cid];
+    if (card.Empty()) {
+      card.cid = static_cast<uint64_t>(e.cid);
+    } else {
       auto it = top_cards_map_.find(card.rate);
       it->second.erase(e.cid);
-      ApplyCardEvent(card, e.type, Delta::Enter);
-      top_cards_map_[card.rate].insert(e.cid);
-      if (it->second.empty()) top_cards_map_.erase(it);
-    } else {
-      card_t& card = cards_map_[e.cid];
-      card.cid = static_cast<uint64_t>(e.cid);
-      ApplyCardEvent(card, e.type, Delta::Enter);
-      top_cards_map_[card.rate].insert(e.cid);
+      if (it->second.empty()) {
+        top_cards_map_.erase(it);
+      }
     }
+    ApplyCardEvent(card, e.type, Delta::Enter);
+    top_cards_map_[card.rate].insert(e.cid);
     events_list_.push_front(std::move(e));
   }
 
-  void TimeWindowLeft(const CardEvent& e) {
+  void TimeWindowLeft() {
+    const auto& e = events_list_.back();
     const auto cit = cards_map_.find(e.cid);
     if (cit != cards_map_.end()) {
       auto& card = cit->second;
@@ -160,6 +160,7 @@ struct TopCardsCruncherImpl {
         cards_map_.erase(e.cid);
       }
     }
+    events_list_.pop_back();
   }
 
   enum class Delta : int { Enter = +1, Leave = -1 };
