@@ -33,6 +33,8 @@
 #include "../../Current/Blocks/MMQ/mmq.h"
 #include "../../Current/Bricks/util/singleton.h"
 
+#include "../util.h"
+
 #include "cruncher.h"
 #include "schema.h"
 
@@ -222,19 +224,10 @@ struct TopCardsCruncherImpl {
     try {
       const CTFO_EVENT event = supported_events.at(e.event);
       const std::string cid_str = e.fields.count("cid") ? e.fields.at("cid") : "";
-      TimeWindowEntered(CardEvent{StringToCID(cid_str), event, current_us_});
+      TimeWindowEntered(CardEvent{static_cast<CID>(StringToCID(cid_str)), event, current_us_});
     } catch (const std::out_of_range&) {
       // ignore unsupported events
     }
-  }
-
-  // this code is copied from ../util.h
-  // TODO(grixa): make it possible to use util.h directly
-  static CID StringToCID(const std::string& s) {
-    if (s.length() == 21 && s[0] == 'c') {  // 'c' + 20 digits of `uint64_t` decimal representation.
-      return static_cast<CID>(current::FromString<uint64_t>(s.substr(1)));
-    }
-    return static_cast<CID>(0u);
   }
 
   event_list_t events_list_;
