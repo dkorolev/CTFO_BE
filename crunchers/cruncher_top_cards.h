@@ -52,13 +52,13 @@ CURRENT_STRUCT(CardCounters) {
 
 CURRENT_STRUCT(TopCardResponseItem, CardCounters) {
   CURRENT_FIELD(cid, uint64_t, 0);
-  CURRENT_FIELD(rate, int64_t, 0);
+  CURRENT_FIELD(rate, double, 0.0);
 };
 
 using TopCardsCruncherResponse = std::vector<TopCardResponseItem>;
 
 struct TopCardsCruncherArgs final {
-  using rate_callback_t = std::function<int64_t(const CardCounters&)>;
+  using rate_callback_t = std::function<double(const CardCounters&)>;
 
   std::chrono::microseconds interval;
   uint64_t top_size;
@@ -164,14 +164,12 @@ struct TopCardsCruncherImpl {
 
   enum class Delta : int { Enter = +1, Leave = -1 };
   void ApplyCardEvent(card_t& card, CTFO_EVENT event, Delta delta) {
-    const std::map<CTFO_EVENT, uint64_t*> event_to_member_ptr = {
-      {CTFO_EVENT::SEEN, &card.seen},
-      {CTFO_EVENT::SKIP, &card.skip},
-      {CTFO_EVENT::CTFO, &card.ctfo},
-      {CTFO_EVENT::TFU, &card.tfu},
-      {CTFO_EVENT::FAV_CARD, &card.fav},
-      {CTFO_EVENT::UNFAV_CARD, &card.unfav}
-    };
+    const std::map<CTFO_EVENT, uint64_t*> event_to_member_ptr = {{CTFO_EVENT::SEEN, &card.seen},
+                                                                 {CTFO_EVENT::SKIP, &card.skip},
+                                                                 {CTFO_EVENT::CTFO, &card.ctfo},
+                                                                 {CTFO_EVENT::TFU, &card.tfu},
+                                                                 {CTFO_EVENT::FAV_CARD, &card.fav},
+                                                                 {CTFO_EVENT::UNFAV_CARD, &card.unfav}};
     *event_to_member_ptr.at(event) += static_cast<int>(delta);
     card.rate = args_.rate_calculator(card);
   }

@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
         params.remote_url, "CTFOLogEntry", "CTFO_2016_08_01");
     std::vector<TopCardsCruncherArgs> cruncher_params;
     cruncher_params.reserve(params.args.size());
-    const auto calculator = [](const CardCounters& counters) -> int64_t {
+    const auto calculator = [](const CardCounters& counters) -> double {
       return counters.ctfo + counters.skip + counters.tfu + counters.fav - counters.unfav;
     };
     for (const auto& arg : params.args) {

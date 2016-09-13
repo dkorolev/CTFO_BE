@@ -257,7 +257,7 @@ TEST(CTFOCrunchersTest, TopCardsCruncherLocalTest) {
   using CTFOTopCardsCruncher = CTFO::TopCardsCruncher<CTFO_Local>;
 
   std::vector<CTFO::TopCardsCruncherArgs> args;
-  const auto calculator = [](const CTFO::CardCounters& counters) -> int64_t {
+  const auto calculator = [](const CTFO::CardCounters& counters) -> double {
     return 160000 * counters.ctfo + 8000 * counters.tfu + 400 * (counters.fav - counters.unfav) +
            20 * counters.skip + counters.seen;
   };
@@ -348,7 +348,7 @@ TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTest) {
   using CTFOTopCardsCruncher = CTFO::TopCardsCruncher<CTFO_2016_08_01>;
 
   std::vector<CTFO::TopCardsCruncherArgs> args;
-  const auto calculator = [](const CTFO::CardCounters& counters) -> int64_t {
+  const auto calculator = [](const CTFO::CardCounters& counters) -> double {
     return 160000 * counters.ctfo + 8000 * counters.tfu + 400 * (counters.fav - counters.unfav) +
            20 * counters.skip + counters.seen;
   };
