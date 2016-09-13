@@ -55,8 +55,11 @@ CURRENT_STRUCT(TopCardResponseItem, CardCounters) {
   CURRENT_FIELD(rate, double, 0.0);
 };
 
+// Output of the `TopCardsCruncher` - list of top cards with their ratings.
 using TopCardsCruncherResponse = std::vector<TopCardResponseItem>;
 
+// Input of the `TopCardsCruncher` - time window, default top list size and
+// a function to calculate the card rating from its counters.
 struct TopCardsCruncherArgs final {
   using rate_callback_t = std::function<double(const CardCounters&)>;
 
@@ -82,7 +85,9 @@ struct TopCardsCruncherImpl {
   TopCardsCruncherImpl(const TopCardsCruncherArgs& args) : args_(args) {}
   virtual ~TopCardsCruncherImpl() = default;
 
+  // Handle an incoming event
   void OnEvent(const event_t& e, idxts_t idxts) {
+    // Treat timestamp of the last event as current time.
     current_us_ = idxts.us;
     if (Exists<Transaction_Z>(e)) {
       const auto& transaction = Value<Transaction_Z>(e);
@@ -94,11 +99,13 @@ struct TopCardsCruncherImpl {
     } else if (Exists<EventLogEntry>(e)) {
       OnEventLogEntry(Value<EventLogEntry>(e));
     }
+    // Remove events that go beyoud specified time window
     while (!events_list_.empty() && events_list_.back().us + args_.interval <= current_us_) {
       TimeWindowLeft();
     }
   }
 
+  // Collect and return a list of N cards with top ratings
   value_t GetValue(size_t n = 0) const {
     if (!n) {
       n = args_.top_size;
@@ -130,6 +137,8 @@ struct TopCardsCruncherImpl {
   using top_cards_map_t =
       std::map<int64_t, std::unordered_set<CID, current::CurrentHashFunction<CID>>, std::greater<uint64_t>>;
 
+  // Apply an incoming event by recalculating the corresponding card rating
+  // and push this event to the events list (sliding window).
   void TimeWindowEntered(CardEvent&& e) {
     card_t& card = cards_map_[e.cid];
     if (card.Empty()) {
@@ -146,6 +155,8 @@ struct TopCardsCruncherImpl {
     events_list_.push_front(std::move(e));
   }
 
+  // Remove the oldest event from the events list (sliding window)
+  // and rollback it by recalculate the corresponding card rating.
   void TimeWindowLeft() {
     const auto& e = events_list_.back();
     const auto cit = cards_map_.find(e.cid);
@@ -174,6 +185,7 @@ struct TopCardsCruncherImpl {
     card.rate = args_.rate_calculator(card);
   }
 
+  // Permanently remove card from the top, if it was deleted
   void OnCardDeleted(const CardDeleted& e) {
     const auto cit = cards_map_.find(e.key);
     if (cit != cards_map_.end()) {
