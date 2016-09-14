@@ -101,7 +101,8 @@ struct TopCardsCruncherImpl {
     }
     // Remove events that go beyond specified time window.
     while (!events_list_.empty() && events_list_.back().us + args_.interval <= current_us_) {
-      TimeWindowLeft();
+      ApplyCardEvent(events_list_.back(), Direction::Leave);
+      events_list_.pop_back();
     }
   }
 
@@ -114,10 +115,11 @@ struct TopCardsCruncherImpl {
     result.reserve(n);
     for (const auto& bucket : top_cards_map_) {
       for (const auto cid : bucket.second) {
-        const auto cit = cards_map_.find(cid);
-        result.push_back(cit->second);
-        if (result.size() >= n) {
-          return result;
+        if (!deleted_cards_.count(cid)) {
+          result.push_back(cards_map_.at(cid));
+          if (result.size() >= n) {
+            return result;
+          }
         }
       }
     }
@@ -134,12 +136,13 @@ struct TopCardsCruncherImpl {
   };
   using event_list_t = std::deque<CardEvent>;
   using cards_map_t = std::unordered_map<CID, card_t, current::CurrentHashFunction<CID>>;
-  using top_cards_map_t =
-      std::map<int64_t, std::unordered_set<CID, current::CurrentHashFunction<CID>>, std::greater<uint64_t>>;
+  using cards_set_t = std::unordered_set<CID, current::CurrentHashFunction<CID>>;
+  using top_cards_map_t = std::map<int64_t, cards_set_t, std::greater<uint64_t>>;
 
-  // Apply an incoming event by recalculating the corresponding card rating
-  // and push this event to the events queue (sliding window).
-  void TimeWindowEntered(CardEvent&& e) {
+  // Apply an event by recalculating the corresponding card rating,
+  // when the one moves in or out of the events queue (sliding window).
+  enum class Direction : int { Enter = +1, Leave = -1 };
+  void ApplyCardEvent(const CardEvent& e, Direction direction) {
     card_t& card = cards_map_[e.cid];
     if (card.Empty()) {
       card.cid = static_cast<uint64_t>(e.cid);
@@ -150,31 +153,7 @@ struct TopCardsCruncherImpl {
         top_cards_map_.erase(it);
       }
     }
-    ApplyCardEvent(card, e.type, Delta::Enter);
-    top_cards_map_[card.rate].insert(e.cid);
-    events_list_.push_front(std::move(e));
-  }
 
-  // Remove the oldest event from the events queue (sliding window)
-  // and rollback it by recalculate the corresponding card rating.
-  void TimeWindowLeft() {
-    const auto& e = events_list_.back();
-    const auto cit = cards_map_.find(e.cid);
-    if (cit != cards_map_.end()) {
-      auto& card = cit->second;
-      top_cards_map_[card.rate].erase(e.cid);
-      ApplyCardEvent(card, e.type, Delta::Leave);
-      if (!card.Empty()) {
-        top_cards_map_[card.rate].insert(e.cid);
-      } else {
-        cards_map_.erase(e.cid);
-      }
-    }
-    events_list_.pop_back();
-  }
-
-  enum class Delta : int { Enter = +1, Leave = -1 };
-  void ApplyCardEvent(card_t& card, CTFO_EVENT event, Delta delta) {
     static const std::map<CTFO_EVENT, uint64_t card_t::*> event_to_member_ptr = {
         {CTFO_EVENT::SEEN, &card_t::seen},
         {CTFO_EVENT::SKIP, &card_t::skip},
@@ -182,22 +161,17 @@ struct TopCardsCruncherImpl {
         {CTFO_EVENT::TFU, &card_t::tfu},
         {CTFO_EVENT::FAV_CARD, &card_t::fav},
         {CTFO_EVENT::UNFAV_CARD, &card_t::unfav}};
-    card.*(event_to_member_ptr.at(event)) += static_cast<int>(delta);
+    card.*(event_to_member_ptr.at(e.type)) += static_cast<int>(direction);
     card.rate = args_.rate_calculator(card);
-  }
 
-  // Permanently remove card from the top, if it was deleted.
-  void OnCardDeleted(const CardDeleted& e) {
-    const auto cit = cards_map_.find(e.key);
-    if (cit != cards_map_.end()) {
-      auto& top_bucket = top_cards_map_[cit->second.rate];
-      top_bucket.erase(e.key);
-      cards_map_.erase(cit);
-      if (top_bucket.empty()) {
-        top_cards_map_.erase(cit->second.rate);
-      }
+    if (!card.Empty()) {
+      top_cards_map_[card.rate].insert(e.cid);
+    } else {
+      cards_map_.erase(e.cid);
     }
   }
+
+  void OnCardDeleted(const CardDeleted& e) { deleted_cards_.insert(e.key); }
 
   void OnEventLogEntry(const EventLogEntry& e) {
     current_us_ = e.server_us;
@@ -218,12 +192,14 @@ struct TopCardsCruncherImpl {
     const auto cit = supported_events.find(e.event);
     if (cit != supported_events.end()) {
       const std::string cid_str = e.fields.count("cid") ? e.fields.at("cid") : "";
-      TimeWindowEntered(CardEvent{static_cast<CID>(StringToCID(cid_str)), cit->second, current_us_});
+      events_list_.push_front(CardEvent{static_cast<CID>(StringToCID(cid_str)), cit->second, current_us_});
+      ApplyCardEvent(events_list_.front(), Direction::Enter);
     }
   }
 
   event_list_t events_list_;
   cards_map_t cards_map_;
+  cards_set_t deleted_cards_;
   top_cards_map_t top_cards_map_;
   std::chrono::microseconds current_us_;
   const TopCardsCruncherArgs args_;
