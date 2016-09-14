@@ -175,13 +175,14 @@ struct TopCardsCruncherImpl {
 
   enum class Delta : int { Enter = +1, Leave = -1 };
   void ApplyCardEvent(card_t& card, CTFO_EVENT event, Delta delta) {
-    const std::map<CTFO_EVENT, uint64_t*> event_to_member_ptr = {{CTFO_EVENT::SEEN, &card.seen},
-                                                                 {CTFO_EVENT::SKIP, &card.skip},
-                                                                 {CTFO_EVENT::CTFO, &card.ctfo},
-                                                                 {CTFO_EVENT::TFU, &card.tfu},
-                                                                 {CTFO_EVENT::FAV_CARD, &card.fav},
-                                                                 {CTFO_EVENT::UNFAV_CARD, &card.unfav}};
-    *event_to_member_ptr.at(event) += static_cast<int>(delta);
+    static const std::map<CTFO_EVENT, uint64_t card_t::*> event_to_member_ptr = {
+        {CTFO_EVENT::SEEN, &card_t::seen},
+        {CTFO_EVENT::SKIP, &card_t::skip},
+        {CTFO_EVENT::CTFO, &card_t::ctfo},
+        {CTFO_EVENT::TFU, &card_t::tfu},
+        {CTFO_EVENT::FAV_CARD, &card_t::fav},
+        {CTFO_EVENT::UNFAV_CARD, &card_t::unfav}};
+    card.*(event_to_member_ptr.at(event)) += static_cast<int>(delta);
     card.rate = args_.rate_calculator(card);
   }
 
