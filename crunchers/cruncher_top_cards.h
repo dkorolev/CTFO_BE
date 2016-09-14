@@ -99,13 +99,13 @@ struct TopCardsCruncherImpl {
     } else if (Exists<EventLogEntry>(e)) {
       OnEventLogEntry(Value<EventLogEntry>(e));
     }
-    // Remove events that go beyoud specified time window
+    // Remove events that go beyond specified time window.
     while (!events_list_.empty() && events_list_.back().us + args_.interval <= current_us_) {
       TimeWindowLeft();
     }
   }
 
-  // Collect and return a list of N cards with top ratings
+  // Collect and return a list of N cards with top ratings.
   value_t GetValue(size_t n = 0) const {
     if (!n) {
       n = args_.top_size;
@@ -138,7 +138,7 @@ struct TopCardsCruncherImpl {
       std::map<int64_t, std::unordered_set<CID, current::CurrentHashFunction<CID>>, std::greater<uint64_t>>;
 
   // Apply an incoming event by recalculating the corresponding card rating
-  // and push this event to the events list (sliding window).
+  // and push this event to the events queue (sliding window).
   void TimeWindowEntered(CardEvent&& e) {
     card_t& card = cards_map_[e.cid];
     if (card.Empty()) {
@@ -155,7 +155,7 @@ struct TopCardsCruncherImpl {
     events_list_.push_front(std::move(e));
   }
 
-  // Remove the oldest event from the events list (sliding window)
+  // Remove the oldest event from the events queue (sliding window)
   // and rollback it by recalculate the corresponding card rating.
   void TimeWindowLeft() {
     const auto& e = events_list_.back();
@@ -185,7 +185,7 @@ struct TopCardsCruncherImpl {
     card.rate = args_.rate_calculator(card);
   }
 
-  // Permanently remove card from the top, if it was deleted
+  // Permanently remove card from the top, if it was deleted.
   void OnCardDeleted(const CardDeleted& e) {
     const auto cit = cards_map_.find(e.key);
     if (cit != cards_map_.end()) {
@@ -206,20 +206,18 @@ struct TopCardsCruncherImpl {
   }
 
   void OnIOSGenericEvent(const iOSGenericEvent& e) {
-    static std::map<std::string, CTFO_EVENT> supported_events = {{"SEEN", CTFO_EVENT::SEEN},
-                                                                 {"CTFO", CTFO_EVENT::CTFO},
-                                                                 {"TFU", CTFO_EVENT::TFU},
-                                                                 {"SKIP", CTFO_EVENT::SKIP},
-                                                                 {"FAV", CTFO_EVENT::FAV_CARD},
-                                                                 {"FAV_CARD", CTFO_EVENT::FAV_CARD},
-                                                                 {"UNFAV", CTFO_EVENT::UNFAV_CARD},
-                                                                 {"UNFAV_CARD", CTFO_EVENT::UNFAV_CARD}};
-    try {
-      const CTFO_EVENT event = supported_events.at(e.event);
+    static const std::map<std::string, CTFO_EVENT> supported_events = {{"SEEN", CTFO_EVENT::SEEN},
+                                                                       {"CTFO", CTFO_EVENT::CTFO},
+                                                                       {"TFU", CTFO_EVENT::TFU},
+                                                                       {"SKIP", CTFO_EVENT::SKIP},
+                                                                       {"FAV", CTFO_EVENT::FAV_CARD},
+                                                                       {"FAV_CARD", CTFO_EVENT::FAV_CARD},
+                                                                       {"UNFAV", CTFO_EVENT::UNFAV_CARD},
+                                                                       {"UNFAV_CARD", CTFO_EVENT::UNFAV_CARD}};
+    const auto cit = supported_events.find(e.event);
+    if (cit != supported_events.end()) {
       const std::string cid_str = e.fields.count("cid") ? e.fields.at("cid") : "";
-      TimeWindowEntered(CardEvent{static_cast<CID>(StringToCID(cid_str)), event, current_us_});
-    } catch (const std::out_of_range&) {
-      // ignore unsupported events
+      TimeWindowEntered(CardEvent{static_cast<CID>(StringToCID(cid_str)), cit->second, current_us_});
     }
   }
 

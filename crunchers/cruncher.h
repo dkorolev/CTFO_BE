@@ -143,7 +143,7 @@ CURRENT_STRUCT_T(CruncherResponse) {
 
 // An aggregator for several crunchers of the same type.
 // The CRUNCHER should declare the type of incoming events as `event_t`,
-// the result type of its calculations as `value_t` and impement
+// the result type of its calculations as `value_t` and implement
 // `OnEvent()` and `GetValue()` methods.
 template <typename CRUNCHER>
 class MultiCruncher {
