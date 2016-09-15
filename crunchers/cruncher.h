@@ -61,7 +61,7 @@ using IntermediateSubscriber = current::ss::StreamSubscriber<IntermediateSubscri
 // `OnEvent()` and `OnRequest()` methods.
 // The IMPL class methods are invoked from a single thread, which is achieved
 // by using the MMQ for all incoming events and requests.
-template <typename IMPL>
+template <typename IMPL, size_t BUFFER_SIZE>
 struct GenericCruncherImpl : public IMPL {
   using EntryResponse = current::ss::EntryResponse;
   using TerminationResponse = current::ss::TerminationResponse;
@@ -94,14 +94,14 @@ struct GenericCruncherImpl : public IMPL {
   };
 
   using mmq_message_t = std::unique_ptr<Message>;
-  using mmq_t = current::mmq::MMQ<mmq_message_t, IntermediateSubscriber<mmq_message_t>, 1024 * 1024>;
+  using mmq_t = current::mmq::MMQ<mmq_message_t, IntermediateSubscriber<mmq_message_t>, BUFFER_SIZE>;
 
   template <typename... ARGS>
   GenericCruncherImpl(uint16_t port, const std::string& route, ARGS&&... args)
       : IMPL(std::forward<ARGS>(args)...),
         port_(port),
         mmq_worker_([this](mmq_message_t&& message, idxts_t) { message->Handle(*this); }),
-        mmq_(mmq_worker_, 1024 * 1024) {
+        mmq_(mmq_worker_, BUFFER_SIZE) {
     scoped_http_routes_ += HTTP(port).Register(route + "/healthz", [](Request r) { r("OK\n"); }) +
                            HTTP(port).Register(route + "/data",
                                                [this](Request r) {
@@ -132,8 +132,9 @@ struct GenericCruncherImpl : public IMPL {
   mmq_t mmq_;
 };
 
-template <typename IMPL>
-using StreamCruncher = current::ss::StreamSubscriber<GenericCruncherImpl<IMPL>, typename IMPL::event_t>;
+template <typename IMPL, size_t BUFFER_SIZE = 1024 * 1024>
+using StreamCruncher =
+    current::ss::StreamSubscriber<GenericCruncherImpl<IMPL, BUFFER_SIZE>, typename IMPL::event_t>;
 
 CURRENT_STRUCT_T(CruncherResponse) {
   CURRENT_FIELD(comment, std::string);

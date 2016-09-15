@@ -63,7 +63,8 @@ int main(int argc, char **argv) {
   } else if (FLAGS_defaultconfig) {
     std::cout << JSON(ActiveUsersCruncherParams()) << std::endl;
   } else {
-    const auto params = ParseJSON<ActiveUsersCruncherParams>(current::FileSystem::ReadFileAsString(FLAGS_config_file));
+    const auto params =
+        ParseJSON<ActiveUsersCruncherParams>(current::FileSystem::ReadFileAsString(FLAGS_config_file));
     using CTFOActiveUsersCruncher = CTFO::ActiveUsersCruncher<CTFO_2016_08_01>;
     current::sherlock::SubscribableRemoteStream<CTFO_2016_08_01::CTFOLogEntry> remote_stream(
         params.remote_url, "CTFOLogEntry", "CTFO_2016_08_01");

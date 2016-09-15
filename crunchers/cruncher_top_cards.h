@@ -205,8 +205,8 @@ struct TopCardsCruncherImpl {
   const TopCardsCruncherArgs args_;
 };
 
-template <typename NAMESPACE>
-using TopCardsCruncher = CTFO::StreamCruncher<MultiCruncher<TopCardsCruncherImpl<NAMESPACE>>>;
+template <typename NAMESPACE, size_t BUFFER_SIZE = 1024 * 1024>
+using TopCardsCruncher = CTFO::StreamCruncher<MultiCruncher<TopCardsCruncherImpl<NAMESPACE>>, BUFFER_SIZE>;
 
 }  // namespace CTFO
 
