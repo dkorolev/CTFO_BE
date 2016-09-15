@@ -29,6 +29,7 @@
 
 namespace CTFO {
 
+// A simple wrapper for the StreamSubscriber interface, that reduces it to a single callback
 template <typename ENTRY>
 struct IntermediateSubscriberImpl {
   using EntryResponse = current::ss::EntryResponse;
@@ -54,6 +55,12 @@ struct IntermediateSubscriberImpl {
 template <typename ENTRY>
 using IntermediateSubscriber = current::ss::StreamSubscriber<IntermediateSubscriberImpl<ENTRY>, ENTRY>;
 
+// A wrapper for data crunchers of any kind,
+// which also receives HTTP requests and forward them to the implementation (IMPL).
+// The IMPL should declare the type of incoming events as `event_t` and implement
+// `OnEvent()` and `OnRequest()` methods.
+// The IMPL class methods are invoked from a single thread, which is achieved
+// by using the MMQ for all incoming events and requests.
 template <typename IMPL>
 struct GenericCruncherImpl : public IMPL {
   using EntryResponse = current::ss::EntryResponse;
@@ -134,6 +141,10 @@ CURRENT_STRUCT_T(CruncherResponse) {
   CURRENT_FIELD(value, T);
 };
 
+// An aggregator for several crunchers of the same type.
+// The CRUNCHER should declare the type of incoming events as `event_t`,
+// the result type of its calculations as `value_t` and implement
+// `OnEvent()` and `GetValue()` methods.
 template <typename CRUNCHER>
 class MultiCruncher {
  public:
