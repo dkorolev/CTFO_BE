@@ -201,6 +201,383 @@ TEST(CTFOCrunchersTest, ActiveUsersCruncherRemoteTest) {
   EXPECT_EQ(20u, GetActiveUsers(base_url, 27).value);
 }
 
+using CTFOTopCardsResponseShort = CTFO::CruncherResponse<CTFO::TopCardsCruncherResponse>;
+using CTFOTopCardsResponse = CTFO::CruncherResponse<std::vector<CTFO::TopCardsCruncherResponse>>;
+
+CTFOTopCardsResponseShort GetTopCards(const std::string& url, uint64_t ind) {
+  const auto response = HTTP(GET(url + "/data?i=" + current::ToString(ind)));
+  EXPECT_EQ(HTTPResponseCode.OK, response.code);
+  return ParseJSON<CTFOTopCardsResponseShort>(response.body);
+}
+
+CTFOTopCardsResponse GetTopCards(const std::string& url) {
+  const auto response = HTTP(GET(url + "/data"));
+  EXPECT_EQ(HTTPResponseCode.OK, response.code);
+  return ParseJSON<CTFOTopCardsResponse>(response.body);
+}
+
+TEST(CTFOCrunchersTest, TopCardsCruncherLocalTest) {
+  const std::string tmp_file_name = current::FileSystem::GenTmpFileName();
+  const auto scoped_rm_tmp_file = std::make_unique<current::FileSystem::ScopedRmFile>(tmp_file_name);
+  CTFO_Local::Sherlock local_stream(CTFO::SchemaKey(), tmp_file_name);
+
+  using CTFOTopCardsCruncher = CTFO::TopCardsCruncher<CTFO_Local>;
+
+  std::vector<CTFO::TopCardsCruncherArgs> args = {
+      {std::chrono::milliseconds(1),
+       5,
+       [](const CTFO::CardCounters& counters)
+           -> double { return counters.ctfo + counters.tfu + counters.fav + counters.skip + counters.seen; }},
+      {std::chrono::milliseconds(2),
+       5,
+       [](const CTFO::CardCounters& counters) -> double {
+         return counters.seen
+                    ? (double)(counters.ctfo + counters.tfu + counters.fav + counters.skip) / counters.seen
+                    : 0.0;
+       }}};
+
+  const CTFO::TopCardsCruncherArgs::rate_callback_t calculators[] = {args[0].rate_calculator,
+                                                                     args[1].rate_calculator};
+
+  const std::string base_url = Printf("http://localhost:%u/top_cards", FLAGS_cruncher_http_test_port);
+  auto top_cards_cruncher =
+      std::make_unique<CTFOTopCardsCruncher>(FLAGS_cruncher_http_test_port, "/top_cards", args);
+
+  const auto scope = local_stream.Subscribe(*top_cards_cruncher);
+
+  current::time::ResetToZero();
+  current::time::SetNow(std::chrono::microseconds(1));
+
+  auto top_cards = GetTopCards(base_url);
+  EXPECT_EQ(0u, top_cards.timestamp.count());
+  EXPECT_EQ(2u, top_cards.value.size());
+  EXPECT_EQ(0u, top_cards.value[0].size());
+  EXPECT_EQ(0u, top_cards.value[1].size());
+
+  CTFO_Local::iOSGenericEvent ios_event;
+  ios_event.fields["uid"] = "fake_uid";
+  ios_event.fields["token"] = "fake_token";
+  ios_event.device_id = "fake_device_id";
+
+  ios_event.event = "SEEN";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  ios_event.fields["cid"] = CTFO::CIDToString(static_cast<CTFO::CID>(1));
+  CTFO_Local::EventLogEntry log_entry;
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  current::time::SetNow(std::chrono::microseconds(2));
+  ios_event.event = "SKIP";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  while (GetTopCards(base_url, 0).timestamp < current::time::Now()) {
+    std::this_thread::yield();
+  }
+
+  top_cards = GetTopCards(base_url);
+  EXPECT_EQ(2u, top_cards.timestamp.count());
+  EXPECT_EQ(2u, top_cards.value.size());
+  EXPECT_EQ(1u, top_cards.value[0].size());
+  EXPECT_EQ(1u, top_cards.value[1].size());
+  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_EQ(2.0, top_cards.value[0][0].rate);
+  EXPECT_EQ(1.0, top_cards.value[1][0].rate);
+  EXPECT_EQ(1u, top_cards.value[0][0].cid);
+  EXPECT_EQ(1u, top_cards.value[1][0].cid);
+
+  current::time::SetNow(std::chrono::microseconds(1002));
+  ios_event.event = "CTFO";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  ios_event.fields["cid"] = CTFO::CIDToString(static_cast<CTFO::CID>(2));
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  while (GetTopCards(base_url, 0).timestamp < current::time::Now()) {
+    std::this_thread::yield();
+  }
+
+  top_cards = GetTopCards(base_url);
+  EXPECT_EQ(1002u, top_cards.timestamp.count());
+  EXPECT_EQ(2u, top_cards.value.size());
+  EXPECT_EQ(1u, top_cards.value[0].size());
+  EXPECT_EQ(2u, top_cards.value[1].size());
+  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][1]), top_cards.value[1][1].rate);
+  EXPECT_EQ(1.0, top_cards.value[0][0].rate);
+  EXPECT_EQ(1.0, top_cards.value[1][0].rate);
+  EXPECT_EQ(0.0, top_cards.value[1][1].rate);
+  EXPECT_EQ(2u, top_cards.value[0][0].cid);
+  EXPECT_EQ(1u, top_cards.value[1][0].cid);
+  EXPECT_EQ(2u, top_cards.value[1][1].cid);
+
+  current::time::SetNow(std::chrono::microseconds(1997));
+  ios_event.event = "TFU";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  ios_event.fields["cid"] = CTFO::CIDToString(static_cast<CTFO::CID>(3));
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  current::time::SetNow(std::chrono::microseconds(1998));
+  ios_event.event = "FAV";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  current::time::SetNow(std::chrono::microseconds(1999));
+  ios_event.event = "SEEN";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  while (GetTopCards(base_url, 0).timestamp < current::time::Now()) {
+    std::this_thread::yield();
+  }
+
+  top_cards = GetTopCards(base_url);
+  EXPECT_EQ(1999u, top_cards.timestamp.count());
+  EXPECT_EQ(2u, top_cards.value.size());
+  EXPECT_EQ(2u, top_cards.value[0].size());
+  EXPECT_EQ(3u, top_cards.value[1].size());
+  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_EQ(calculators[0](top_cards.value[0][1]), top_cards.value[0][1].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][1]), top_cards.value[1][1].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][2]), top_cards.value[1][2].rate);
+  EXPECT_EQ(3.0, top_cards.value[0][0].rate);
+  EXPECT_EQ(1.0, top_cards.value[0][1].rate);
+  EXPECT_EQ(2.0, top_cards.value[1][0].rate);
+  EXPECT_EQ(1.0, top_cards.value[1][1].rate);
+  EXPECT_EQ(0.0, top_cards.value[1][2].rate);
+  EXPECT_EQ(3u, top_cards.value[0][0].cid);
+  EXPECT_EQ(2u, top_cards.value[0][1].cid);
+  EXPECT_EQ(3u, top_cards.value[1][0].cid);
+  EXPECT_EQ(1u, top_cards.value[1][1].cid);
+  EXPECT_EQ(2u, top_cards.value[1][2].cid);
+
+  current::time::SetNow(std::chrono::microseconds(3001));
+  ios_event.event = "SEEN";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  current::time::SetNow(std::chrono::microseconds(3002));
+  ios_event.event = "CTFO";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  current::time::SetNow(std::chrono::microseconds(3003));
+  ios_event.event = "UNSUPPORTED";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  while (GetTopCards(base_url, 0).timestamp < current::time::Now()) {
+    std::this_thread::yield();
+  }
+
+  top_cards = GetTopCards(base_url);
+  EXPECT_EQ(3003u, top_cards.timestamp.count());
+  EXPECT_EQ(2u, top_cards.value.size());
+  EXPECT_EQ(1u, top_cards.value[0].size());
+  EXPECT_EQ(1u, top_cards.value[1].size());
+  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_EQ(2.0, top_cards.value[0][0].rate);
+  EXPECT_EQ(1.5, top_cards.value[1][0].rate);
+  EXPECT_EQ(3u, top_cards.value[0][0].cid);
+  EXPECT_EQ(3u, top_cards.value[0][0].cid);
+}
+
+TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTest) {
+  const std::string tmp_file_name = current::FileSystem::GenTmpFileName();
+  const auto scoped_rm_tmp_file = std::make_unique<current::FileSystem::ScopedRmFile>(tmp_file_name);
+  const auto schema_key = CTFO::SchemaKey();
+  CTFO_Local::Sherlock local_stream(schema_key, tmp_file_name);
+  CTFO_Local::Storage storage(local_stream);
+  storage.ExposeRawLogViaHTTP(FLAGS_sherlock_http_test_port, "/raw_log");
+
+  current::sherlock::SubscribableRemoteStream<CTFO_2016_08_01::CTFOLogEntry> remote_stream(
+      Printf("http://localhost:%d/raw_log", FLAGS_sherlock_http_test_port),
+      schema_key.top_level_name,
+      schema_key.namespace_name);
+
+  using CTFOTopCardsCruncher = CTFO::TopCardsCruncher<CTFO_2016_08_01>;
+
+  std::vector<CTFO::TopCardsCruncherArgs> args = {
+      {std::chrono::milliseconds(1),
+       5,
+       [](const CTFO::CardCounters& counters)
+           -> double { return counters.ctfo + counters.tfu + counters.fav + counters.skip + counters.seen; }},
+      {std::chrono::milliseconds(2),
+       5,
+       [](const CTFO::CardCounters& counters) -> double {
+         return counters.seen
+                    ? (double)(counters.ctfo + counters.tfu + counters.fav + counters.skip) / counters.seen
+                    : 0.0;
+       }}};
+
+  const CTFO::TopCardsCruncherArgs::rate_callback_t calculators[] = {args[0].rate_calculator,
+                                                                     args[1].rate_calculator};
+
+  const std::string base_url = Printf("http://localhost:%u/top_cards", FLAGS_cruncher_http_test_port);
+  auto top_cards_cruncher =
+      std::make_unique<CTFOTopCardsCruncher>(FLAGS_cruncher_http_test_port, "/top_cards", args);
+
+  const auto scope = remote_stream.Subscribe(*top_cards_cruncher);
+
+  current::time::ResetToZero();
+  current::time::SetNow(std::chrono::microseconds(1));
+
+  auto top_cards = GetTopCards(base_url);
+  EXPECT_EQ(0u, top_cards.timestamp.count());
+  EXPECT_EQ(2u, top_cards.value.size());
+  EXPECT_EQ(0u, top_cards.value[0].size());
+  EXPECT_EQ(0u, top_cards.value[1].size());
+
+  CTFO_Local::iOSGenericEvent ios_event;
+  ios_event.fields["uid"] = "fake_uid";
+  ios_event.fields["token"] = "fake_token";
+  ios_event.device_id = "fake_device_id";
+
+  ios_event.event = "SEEN";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  ios_event.fields["cid"] = CTFO::CIDToString(static_cast<CTFO::CID>(1));
+  CTFO_Local::EventLogEntry log_entry;
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  current::time::SetNow(std::chrono::microseconds(2));
+  ios_event.event = "SKIP";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  while (GetTopCards(base_url, 0).timestamp < current::time::Now()) {
+    std::this_thread::yield();
+  }
+
+  top_cards = GetTopCards(base_url);
+  EXPECT_EQ(2u, top_cards.timestamp.count());
+  EXPECT_EQ(2u, top_cards.value.size());
+  EXPECT_EQ(1u, top_cards.value[0].size());
+  EXPECT_EQ(1u, top_cards.value[1].size());
+  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_EQ(2.0, top_cards.value[0][0].rate);
+  EXPECT_EQ(1.0, top_cards.value[1][0].rate);
+  EXPECT_EQ(1u, top_cards.value[0][0].cid);
+  EXPECT_EQ(1u, top_cards.value[1][0].cid);
+
+  current::time::SetNow(std::chrono::microseconds(1002));
+  ios_event.event = "CTFO";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  ios_event.fields["cid"] = CTFO::CIDToString(static_cast<CTFO::CID>(2));
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  while (GetTopCards(base_url, 0).timestamp < current::time::Now()) {
+    std::this_thread::yield();
+  }
+
+  top_cards = GetTopCards(base_url);
+  EXPECT_EQ(1002u, top_cards.timestamp.count());
+  EXPECT_EQ(2u, top_cards.value.size());
+  EXPECT_EQ(1u, top_cards.value[0].size());
+  EXPECT_EQ(2u, top_cards.value[1].size());
+  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][1]), top_cards.value[1][1].rate);
+  EXPECT_EQ(1.0, top_cards.value[0][0].rate);
+  EXPECT_EQ(1.0, top_cards.value[1][0].rate);
+  EXPECT_EQ(0.0, top_cards.value[1][1].rate);
+  EXPECT_EQ(2u, top_cards.value[0][0].cid);
+  EXPECT_EQ(1u, top_cards.value[1][0].cid);
+  EXPECT_EQ(2u, top_cards.value[1][1].cid);
+
+  current::time::SetNow(std::chrono::microseconds(1997));
+  ios_event.event = "TFU";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  ios_event.fields["cid"] = CTFO::CIDToString(static_cast<CTFO::CID>(3));
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  current::time::SetNow(std::chrono::microseconds(1998));
+  ios_event.event = "FAV";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  current::time::SetNow(std::chrono::microseconds(1999));
+  ios_event.event = "SEEN";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  while (GetTopCards(base_url, 0).timestamp < current::time::Now()) {
+    std::this_thread::yield();
+  }
+
+  top_cards = GetTopCards(base_url);
+  EXPECT_EQ(1999u, top_cards.timestamp.count());
+  EXPECT_EQ(2u, top_cards.value.size());
+  EXPECT_EQ(2u, top_cards.value[0].size());
+  EXPECT_EQ(3u, top_cards.value[1].size());
+  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_EQ(calculators[0](top_cards.value[0][1]), top_cards.value[0][1].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][1]), top_cards.value[1][1].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][2]), top_cards.value[1][2].rate);
+  EXPECT_EQ(3.0, top_cards.value[0][0].rate);
+  EXPECT_EQ(1.0, top_cards.value[0][1].rate);
+  EXPECT_EQ(2.0, top_cards.value[1][0].rate);
+  EXPECT_EQ(1.0, top_cards.value[1][1].rate);
+  EXPECT_EQ(0.0, top_cards.value[1][2].rate);
+  EXPECT_EQ(3u, top_cards.value[0][0].cid);
+  EXPECT_EQ(2u, top_cards.value[0][1].cid);
+  EXPECT_EQ(3u, top_cards.value[1][0].cid);
+  EXPECT_EQ(1u, top_cards.value[1][1].cid);
+  EXPECT_EQ(2u, top_cards.value[1][2].cid);
+
+  current::time::SetNow(std::chrono::microseconds(3001));
+  ios_event.event = "SEEN";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  current::time::SetNow(std::chrono::microseconds(3002));
+  ios_event.event = "CTFO";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  current::time::SetNow(std::chrono::microseconds(3003));
+  ios_event.event = "UNSUPPORTED";
+  ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
+  log_entry.server_us = current::time::Now();
+  log_entry.event = ios_event;
+  local_stream.Publish(CTFO_Local::CTFOLogEntry(log_entry));
+  while (GetTopCards(base_url, 0).timestamp < current::time::Now()) {
+    std::this_thread::yield();
+  }
+
+  top_cards = GetTopCards(base_url);
+  EXPECT_EQ(3003u, top_cards.timestamp.count());
+  EXPECT_EQ(2u, top_cards.value.size());
+  EXPECT_EQ(1u, top_cards.value[0].size());
+  EXPECT_EQ(1u, top_cards.value[1].size());
+  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_EQ(2.0, top_cards.value[0][0].rate);
+  EXPECT_EQ(1.5, top_cards.value[1][0].rate);
+  EXPECT_EQ(3u, top_cards.value[0][0].cid);
+  EXPECT_EQ(3u, top_cards.value[0][0].cid);
+}
+
 TEST(CTFOCrunchersTest, AutogeneratedTopCardsStorageIsUpToDate) {
   const std::string golden_db_file_name = current::FileSystem::JoinPath("golden", "top_cards_db.json");
   const std::string tmp_db_file_name = current::FileSystem::GenTmpFileName();
@@ -210,7 +587,7 @@ TEST(CTFOCrunchersTest, AutogeneratedTopCardsStorageIsUpToDate) {
   CTFO_Local::iOSGenericEvent ios_event;
   ios_event.fields["uid"] = "fake_uid";
   ios_event.fields["token"] = "fake_token";
-  ios_event.device_id = std::string("fake_device_id");
+  ios_event.device_id = "fake_device_id";
 
   uint64_t now = 0;
   uint64_t interval = 1000llu * 3600 * 3600;
@@ -242,15 +619,7 @@ TEST(CTFOCrunchersTest, AutogeneratedTopCardsStorageIsUpToDate) {
   }
 }
 
-using CTFOTopCardsResponse = CTFO::CruncherResponse<CTFO::TopCardsCruncherResponse>;
-
-CTFOTopCardsResponse GetTopCards(const std::string& url, uint64_t ind) {
-  const auto response = HTTP(GET(url + "/data?i=" + current::ToString(ind)));
-  EXPECT_EQ(HTTPResponseCode.OK, response.code);
-  return ParseJSON<CTFOTopCardsResponse>(response.body);
-}
-
-TEST(CTFOCrunchersTest, TopCardsCruncherLocalTest) {
+TEST(CTFOCrunchersTest, TopCardsCruncherLocalTestComplex) {
   const std::string golden_db_file_name = current::FileSystem::JoinPath("golden", "top_cards_db.json");
   CTFO_Local::Sherlock local_stream(CTFO::SchemaKey(), golden_db_file_name);
 
@@ -333,7 +702,7 @@ TEST(CTFOCrunchersTest, TopCardsCruncherLocalTest) {
   }
 }
 
-TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTest) {
+TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTestComplex) {
   const std::string golden_db_file_name = current::FileSystem::JoinPath("golden", "top_cards_db.json");
   const auto schema_key = CTFO::SchemaKey();
   CTFO_Local::Sherlock local_stream(schema_key, golden_db_file_name);
