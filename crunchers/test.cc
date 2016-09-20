@@ -333,7 +333,7 @@ void TopCardsCruncherTest(CTFO_Local::Sherlock& stream, const std::string& url) 
   EXPECT_DOUBLE_EQ(1.0, top_cards.value[0][0].rate);
   // Cruncher #2 (2ms time window).
   // Card #1: rate = SKIP (1x) / SEEN (1x) = 1.
-  // Card #2: rate = CTFO (1x) / SEEN (0x) = 0.
+  // Card #2: rate = 0, becase there were no SEEN events for this card.
   ASSERT_EQ(2u, top_cards.value[1].size());
   EXPECT_EQ(1u, top_cards.value[1][0].cid);
   EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
@@ -383,7 +383,7 @@ void TopCardsCruncherTest(CTFO_Local::Sherlock& stream, const std::string& url) 
   // Cruncher #2 (2ms time window).
   // Card #3: rate = (TFU (1x) + FAV (1x)) / SEEN (1x) = 2.
   // Card #1: rate = SKIP (1x) / SEEN (1x) = 1.
-  // Card #2: rate = CTFO (1x) / SEEN (0x) = 0.
+  // Card #2: rate = 0, becase there were no SEEN events for this card.
   ASSERT_EQ(3u, top_cards.value[1].size());
   EXPECT_EQ(3u, top_cards.value[1][0].cid);
   EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
