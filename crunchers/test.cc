@@ -281,16 +281,16 @@ TEST(CTFOCrunchersTest, TopCardsCruncherLocalTest) {
   // Card #1: rate = SEEN (1x) + SKIP (1x) = 2.
   ASSERT_EQ(1u, top_cards.value[0].size());
   EXPECT_EQ(1u, top_cards.value[0][0].cid);
-  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
-  EXPECT_EQ(2.0, top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(2.0, top_cards.value[0][0].rate);
   // Cruncher #2 (2ms time window).
   // Card #1: rate = SKIP (1x) / SEEN (1x) = 1.
   ASSERT_EQ(1u, top_cards.value[1].size());
   EXPECT_EQ(1u, top_cards.value[1][0].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
-  EXPECT_EQ(1.0, top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(1.0, top_cards.value[1][0].rate);
 
-  // Add one ctfo event for Card #2.
+  // Add one CTFO event for Card #2.
   current::time::SetNow(std::chrono::microseconds(1002));
   ios_event.event = "CTFO";
   ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
@@ -310,18 +310,18 @@ TEST(CTFOCrunchersTest, TopCardsCruncherLocalTest) {
   // Card #1 is out of the time window.
   ASSERT_EQ(1u, top_cards.value[0].size());
   EXPECT_EQ(2u, top_cards.value[0][0].cid);
-  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
-  EXPECT_EQ(1.0, top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(1.0, top_cards.value[0][0].rate);
   // Cruncher #2 (2ms time window).
   // Card #1: rate = SKIP (1x) / SEEN (1x) = 1.
   // Card #2: rate = CTFO (1x) / SEEN (0x) = 0.
   ASSERT_EQ(2u, top_cards.value[1].size());
   EXPECT_EQ(1u, top_cards.value[1][0].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
-  EXPECT_EQ(1.0, top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(1.0, top_cards.value[1][0].rate);
   EXPECT_EQ(2u, top_cards.value[1][1].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][1]), top_cards.value[1][1].rate);
-  EXPECT_EQ(0.0, top_cards.value[1][1].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][1]), top_cards.value[1][1].rate);
+  EXPECT_DOUBLE_EQ(0.0, top_cards.value[1][1].rate);
 
   // Add three events for Card #3: TFU, FAV and SEEN.
   current::time::SetNow(std::chrono::microseconds(1997));
@@ -356,25 +356,25 @@ TEST(CTFOCrunchersTest, TopCardsCruncherLocalTest) {
   // Card #1 is out of the time window.
   ASSERT_EQ(2u, top_cards.value[0].size());
   EXPECT_EQ(3u, top_cards.value[0][0].cid);
-  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
-  EXPECT_EQ(3.0, top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(3.0, top_cards.value[0][0].rate);
   EXPECT_EQ(2u, top_cards.value[0][1].cid);
-  EXPECT_EQ(calculators[0](top_cards.value[0][1]), top_cards.value[0][1].rate);
-  EXPECT_EQ(1.0, top_cards.value[0][1].rate);
+  EXPECT_DOUBLE_EQ(calculators[0](top_cards.value[0][1]), top_cards.value[0][1].rate);
+  EXPECT_DOUBLE_EQ(1.0, top_cards.value[0][1].rate);
   // Cruncher #2 (2ms time window).
   // Card #3: rate = (TFU (1x) + FAV (1x)) / SEEN (1x) = 2.
   // Card #1: rate = SKIP (1x) / SEEN (1x) = 1.
   // Card #2: rate = CTFO (1x) / SEEN (0x) = 0.
   ASSERT_EQ(3u, top_cards.value[1].size());
   EXPECT_EQ(3u, top_cards.value[1][0].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
-  EXPECT_EQ(2.0, top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(2.0, top_cards.value[1][0].rate);
   EXPECT_EQ(1u, top_cards.value[1][1].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][1]), top_cards.value[1][1].rate);
-  EXPECT_EQ(1.0, top_cards.value[1][1].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][1]), top_cards.value[1][1].rate);
+  EXPECT_DOUBLE_EQ(1.0, top_cards.value[1][1].rate);
   EXPECT_EQ(2u, top_cards.value[1][2].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][2]), top_cards.value[1][2].rate);
-  EXPECT_EQ(0.0, top_cards.value[1][2].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][2]), top_cards.value[1][2].rate);
+  EXPECT_DOUBLE_EQ(0.0, top_cards.value[1][2].rate);
 
   // Add three more events for Card #3: SEEN, CTFO and UNKNOWN (the last one should not affect the ratings).
   current::time::SetNow(std::chrono::microseconds(3001));
@@ -408,15 +408,15 @@ TEST(CTFOCrunchersTest, TopCardsCruncherLocalTest) {
   // Cards #1 and #2 are out of the time window.
   ASSERT_EQ(1u, top_cards.value[0].size());
   EXPECT_EQ(3u, top_cards.value[0][0].cid);
-  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
-  EXPECT_EQ(2.0, top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(2.0, top_cards.value[0][0].rate);
   // Cruncher #2 (2ms time window).
   // Card #3: rate = (TFU (1x) + FAV (1x) + CTFO (1x)) / SEEN (2x) = 1.5.
   // Cards #1 and #2 are out of the time window.
   ASSERT_EQ(1u, top_cards.value[1].size());
   EXPECT_EQ(3u, top_cards.value[0][0].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
-  EXPECT_EQ(1.5, top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(1.5, top_cards.value[1][0].rate);
 }
 
 TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTest) {
@@ -494,16 +494,16 @@ TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTest) {
   // Card #1: rate = SEEN (1x) + SKIP (1x) = 2.
   ASSERT_EQ(1u, top_cards.value[0].size());
   EXPECT_EQ(1u, top_cards.value[0][0].cid);
-  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
-  EXPECT_EQ(2.0, top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(2.0, top_cards.value[0][0].rate);
   // Cruncher #2 (2ms time window).
   // Card #1: rate = SKIP (1x) / SEEN (1x) = 1.
   ASSERT_EQ(1u, top_cards.value[1].size());
   EXPECT_EQ(1u, top_cards.value[1][0].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
-  EXPECT_EQ(1.0, top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(1.0, top_cards.value[1][0].rate);
 
-  // Add one ctfo event for Card #2.
+  // Add one CTFO event for Card #2.
   current::time::SetNow(std::chrono::microseconds(1002));
   ios_event.event = "CTFO";
   ios_event.user_ms = std::chrono::duration_cast<std::chrono::milliseconds>(current::time::Now());
@@ -523,18 +523,18 @@ TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTest) {
   // Card #1 is out of the time window.
   ASSERT_EQ(1u, top_cards.value[0].size());
   EXPECT_EQ(2u, top_cards.value[0][0].cid);
-  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
-  EXPECT_EQ(1.0, top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(1.0, top_cards.value[0][0].rate);
   // Cruncher #2 (2ms time window).
   // Card #1: rate = SKIP (1x) / SEEN (1x) = 1.
   // Card #2: rate = CTFO (1x) / SEEN (0x) = 0.
   ASSERT_EQ(2u, top_cards.value[1].size());
   EXPECT_EQ(1u, top_cards.value[1][0].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
-  EXPECT_EQ(1.0, top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(1.0, top_cards.value[1][0].rate);
   EXPECT_EQ(2u, top_cards.value[1][1].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][1]), top_cards.value[1][1].rate);
-  EXPECT_EQ(0.0, top_cards.value[1][1].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][1]), top_cards.value[1][1].rate);
+  EXPECT_DOUBLE_EQ(0.0, top_cards.value[1][1].rate);
 
   // Add three events for Card #3: TFU, FAV and SEEN.
   current::time::SetNow(std::chrono::microseconds(1997));
@@ -569,25 +569,25 @@ TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTest) {
   // Card #1 is out of the time window.
   ASSERT_EQ(2u, top_cards.value[0].size());
   EXPECT_EQ(3u, top_cards.value[0][0].cid);
-  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
-  EXPECT_EQ(3.0, top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(3.0, top_cards.value[0][0].rate);
   EXPECT_EQ(2u, top_cards.value[0][1].cid);
-  EXPECT_EQ(calculators[0](top_cards.value[0][1]), top_cards.value[0][1].rate);
-  EXPECT_EQ(1.0, top_cards.value[0][1].rate);
+  EXPECT_DOUBLE_EQ(calculators[0](top_cards.value[0][1]), top_cards.value[0][1].rate);
+  EXPECT_DOUBLE_EQ(1.0, top_cards.value[0][1].rate);
   // Cruncher #2 (2ms time window).
   // Card #3: rate = (TFU (1x) + FAV (1x)) / SEEN (1x) = 2.
   // Card #1: rate = SKIP (1x) / SEEN (1x) = 1.
   // Card #2: rate = CTFO (1x) / SEEN (0x) = 0.
   ASSERT_EQ(3u, top_cards.value[1].size());
   EXPECT_EQ(3u, top_cards.value[1][0].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
-  EXPECT_EQ(2.0, top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(2.0, top_cards.value[1][0].rate);
   EXPECT_EQ(1u, top_cards.value[1][1].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][1]), top_cards.value[1][1].rate);
-  EXPECT_EQ(1.0, top_cards.value[1][1].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][1]), top_cards.value[1][1].rate);
+  EXPECT_DOUBLE_EQ(1.0, top_cards.value[1][1].rate);
   EXPECT_EQ(2u, top_cards.value[1][2].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][2]), top_cards.value[1][2].rate);
-  EXPECT_EQ(0.0, top_cards.value[1][2].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][2]), top_cards.value[1][2].rate);
+  EXPECT_DOUBLE_EQ(0.0, top_cards.value[1][2].rate);
 
   // Add three more events for Card #3: SEEN, CTFO and UNKNOWN (the last one should not affect the ratings).
   current::time::SetNow(std::chrono::microseconds(3001));
@@ -621,15 +621,15 @@ TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTest) {
   // Cards #1 and #2 are out of the time window.
   ASSERT_EQ(1u, top_cards.value[0].size());
   EXPECT_EQ(3u, top_cards.value[0][0].cid);
-  EXPECT_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
-  EXPECT_EQ(2.0, top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[0](top_cards.value[0][0]), top_cards.value[0][0].rate);
+  EXPECT_DOUBLE_EQ(2.0, top_cards.value[0][0].rate);
   // Cruncher #2 (2ms time window).
   // Card #3: rate = (TFU (1x) + FAV (1x) + CTFO (1x)) / SEEN (2x) = 1.5.
   // Cards #1 and #2 are out of the time window.
   ASSERT_EQ(1u, top_cards.value[1].size());
   EXPECT_EQ(3u, top_cards.value[0][0].cid);
-  EXPECT_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
-  EXPECT_EQ(1.5, top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(calculators[1](top_cards.value[1][0]), top_cards.value[1][0].rate);
+  EXPECT_DOUBLE_EQ(1.5, top_cards.value[1][0].rate);
 }
 
 TEST(CTFOCrunchersTest, AutogeneratedTopCardsStorageIsUpToDate) {
@@ -707,7 +707,7 @@ TEST(CTFOCrunchersTest, TopCardsCruncherLocalTestComplex) {
     EXPECT_EQ(i + 1, top_cards.size());
     for (uint32_t j = 0; j < top_cards.size(); ++j) {
       EXPECT_EQ(19 - i + j, top_cards[j].cid);
-      EXPECT_EQ(i + 1 - j, top_cards[j].rate);
+      EXPECT_DOUBLE_EQ(i + 1 - j, top_cards[j].rate);
     }
   }
   for (uint32_t i = 0; i < 12; ++i) {
@@ -715,11 +715,11 @@ TEST(CTFOCrunchersTest, TopCardsCruncherLocalTestComplex) {
     EXPECT_EQ(12u, top_cards.size());
     for (uint32_t j = 0; j < i; ++j) {
       EXPECT_EQ(20 - (i - j), top_cards[j].cid);
-      EXPECT_EQ((i - j) * 21, top_cards[j].rate);
+      EXPECT_DOUBLE_EQ((i - j) * 21, top_cards[j].rate);
     }
     for (uint32_t j = i; j < top_cards.size(); ++j) {
       EXPECT_EQ(8 + (j - i), top_cards[j].cid);
-      EXPECT_EQ(12 - (j - i), top_cards[j].rate);
+      EXPECT_DOUBLE_EQ(12 - (j - i), top_cards[j].rate);
     }
   }
   for (uint32_t i = 0; i < 2; ++i) {
@@ -727,11 +727,11 @@ TEST(CTFOCrunchersTest, TopCardsCruncherLocalTestComplex) {
     EXPECT_EQ(i + 13, top_cards.size());
     for (uint32_t j = 0; j < i + 1; ++j) {
       EXPECT_EQ(7 - (i - j), top_cards[j].cid);
-      EXPECT_EQ((i - j + 13) * 20, top_cards[j].rate);
+      EXPECT_DOUBLE_EQ((i - j + 13) * 20, top_cards[j].rate);
     }
     for (uint32_t j = i + 1; j < top_cards.size(); ++j) {
       EXPECT_EQ(7 + (j - i), top_cards[j].cid);
-      EXPECT_EQ((13 - (j - i)) * 21, top_cards[j].rate);
+      EXPECT_DOUBLE_EQ((13 - (j - i)) * 21, top_cards[j].rate);
     }
   }
   {
@@ -741,15 +741,15 @@ TEST(CTFOCrunchersTest, TopCardsCruncherLocalTestComplex) {
       EXPECT_EQ(i, top_cards[i].cid);
       const uint32_t mult = 20 - i;
       if (i < 2) {
-        EXPECT_EQ(mult * 160000, top_cards[i].rate);
+        EXPECT_DOUBLE_EQ(mult * 160000, top_cards[i].rate);
       } else if (i < 4) {
-        EXPECT_EQ(mult * (160000 + 8000), top_cards[i].rate);
+        EXPECT_DOUBLE_EQ(mult * (160000 + 8000), top_cards[i].rate);
       } else if (i < 6) {
-        EXPECT_EQ(mult * (160000 + 8000 + 400), top_cards[i].rate);
+        EXPECT_DOUBLE_EQ(mult * (160000 + 8000 + 400), top_cards[i].rate);
       } else if (i < 8) {
-        EXPECT_EQ(mult * (160000 + 8000 + 400 + 20), top_cards[i].rate);
+        EXPECT_DOUBLE_EQ(mult * (160000 + 8000 + 400 + 20), top_cards[i].rate);
       } else {
-        EXPECT_EQ(mult * (160000 + 8000 + 400 + 20 + 1), top_cards[i].rate);
+        EXPECT_DOUBLE_EQ(mult * (160000 + 8000 + 400 + 20 + 1), top_cards[i].rate);
       }
     }
   }
@@ -797,7 +797,7 @@ TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTestComplex) {
     EXPECT_EQ(i + 1, top_cards.size());
     for (uint32_t j = 0; j < top_cards.size(); ++j) {
       EXPECT_EQ(19 - i + j, top_cards[j].cid);
-      EXPECT_EQ(i + 1 - j, top_cards[j].rate);
+      EXPECT_DOUBLE_EQ(i + 1 - j, top_cards[j].rate);
     }
   }
   for (uint32_t i = 0; i < 12; ++i) {
@@ -805,11 +805,11 @@ TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTestComplex) {
     EXPECT_EQ(12u, top_cards.size());
     for (uint32_t j = 0; j < i; ++j) {
       EXPECT_EQ(20 - (i - j), top_cards[j].cid);
-      EXPECT_EQ((i - j) * 21, top_cards[j].rate);
+      EXPECT_DOUBLE_EQ((i - j) * 21, top_cards[j].rate);
     }
     for (uint32_t j = i; j < top_cards.size(); ++j) {
       EXPECT_EQ(8 + (j - i), top_cards[j].cid);
-      EXPECT_EQ(12 - (j - i), top_cards[j].rate);
+      EXPECT_DOUBLE_EQ(12 - (j - i), top_cards[j].rate);
     }
   }
   for (uint32_t i = 0; i < 2; ++i) {
@@ -817,11 +817,11 @@ TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTestComplex) {
     EXPECT_EQ(i + 13, top_cards.size());
     for (uint32_t j = 0; j < i + 1; ++j) {
       EXPECT_EQ(7 - (i - j), top_cards[j].cid);
-      EXPECT_EQ((i - j + 13) * 20, top_cards[j].rate);
+      EXPECT_DOUBLE_EQ((i - j + 13) * 20, top_cards[j].rate);
     }
     for (uint32_t j = i + 1; j < top_cards.size(); ++j) {
       EXPECT_EQ(7 + (j - i), top_cards[j].cid);
-      EXPECT_EQ((13 - (j - i)) * 21, top_cards[j].rate);
+      EXPECT_DOUBLE_EQ((13 - (j - i)) * 21, top_cards[j].rate);
     }
   }
   {
@@ -831,15 +831,15 @@ TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTestComplex) {
       EXPECT_EQ(i, top_cards[i].cid);
       const uint32_t mult = 20 - i;
       if (i < 2) {
-        EXPECT_EQ(mult * 160000, top_cards[i].rate);
+        EXPECT_DOUBLE_EQ(mult * 160000, top_cards[i].rate);
       } else if (i < 4) {
-        EXPECT_EQ(mult * (160000 + 8000), top_cards[i].rate);
+        EXPECT_DOUBLE_EQ(mult * (160000 + 8000), top_cards[i].rate);
       } else if (i < 6) {
-        EXPECT_EQ(mult * (160000 + 8000 + 400), top_cards[i].rate);
+        EXPECT_DOUBLE_EQ(mult * (160000 + 8000 + 400), top_cards[i].rate);
       } else if (i < 8) {
-        EXPECT_EQ(mult * (160000 + 8000 + 400 + 20), top_cards[i].rate);
+        EXPECT_DOUBLE_EQ(mult * (160000 + 8000 + 400 + 20), top_cards[i].rate);
       } else {
-        EXPECT_EQ(mult * (160000 + 8000 + 400 + 20 + 1), top_cards[i].rate);
+        EXPECT_DOUBLE_EQ(mult * (160000 + 8000 + 400 + 20 + 1), top_cards[i].rate);
       }
     }
   }
