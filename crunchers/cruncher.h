@@ -125,7 +125,7 @@ struct GenericCruncherImpl : public IMPL {
   EntryResponse EntryResponseIfNoMorePassTypeFilter() const { return EntryResponse::More; }
   TerminationResponse Terminate() const { return TerminationResponse::Terminate; }
 
- private:
+ protected:
   const uint16_t port_;
   HTTPRoutesScope scoped_http_routes_;
   IntermediateSubscriber<mmq_message_t> mmq_worker_;
@@ -135,6 +135,61 @@ struct GenericCruncherImpl : public IMPL {
 template <typename IMPL, size_t BUFFER_SIZE = 1024 * 1024>
 using StreamCruncher =
     current::ss::StreamSubscriber<GenericCruncherImpl<IMPL, BUFFER_SIZE>, typename IMPL::event_t>;
+
+template <typename IMPL, size_t BUFFER_SIZE>
+struct GenericTickCruncherImpl : public GenericCruncherImpl<IMPL, BUFFER_SIZE> {
+  using base_t = GenericCruncherImpl<IMPL, BUFFER_SIZE>;
+  using event_t = typename base_t::event_t;
+  using EntryResponse = current::ss::EntryResponse;
+
+  class TickMessage final : public base_t::Message {
+   public:
+    TickMessage(const std::chrono::microseconds& timestamp) : timestamp_(timestamp) {}
+    void Handle(IMPL& cruncher) override { cruncher.OnTick(timestamp_); }
+
+   private:
+    const std::chrono::microseconds timestamp_;
+  };
+
+  template <typename... ARGS>
+  GenericTickCruncherImpl(uint16_t port,
+                          const std::string& route,
+                          const std::chrono::microseconds tick_interval,
+                          ARGS&&... args)
+      : base_t(port, route, std::forward<ARGS>(args)...),
+        tick_interval_(tick_interval),
+        last_event_us_(std::chrono::microseconds(0)) {}
+  virtual ~GenericTickCruncherImpl() = default;
+
+  EntryResponse operator()(const event_t& event, idxts_t current, idxts_t last) {
+    GenerateTickEvents(current.us);
+    return base_t::operator()(event, current, last);
+  }
+
+  EntryResponse operator()(event_t&& event, idxts_t current, idxts_t last) {
+    GenerateTickEvents(current.us);
+    return base_t::operator()(std::move(event), current, last);
+  }
+
+ private:
+  void GenerateTickEvents(std::chrono::microseconds us) {
+    for (uint64_t i = last_event_us_.count() / tick_interval_.count(),
+                  end = us.count() / tick_interval_.count();
+         i < end;
+         ++i) {
+      mmq_.Publish(std::make_unique<TickMessage>(std::chrono::microseconds((i + 1) * tick_interval_.count())));
+    }
+    last_event_us_ = us;
+  }
+
+  using base_t::mmq_;
+  const std::chrono::microseconds tick_interval_;
+  std::chrono::microseconds last_event_us_;
+};
+
+template <typename IMPL, size_t BUFFER_SIZE = 1024 * 1024>
+using StreamTickCruncher =
+    current::ss::StreamSubscriber<GenericTickCruncherImpl<IMPL, BUFFER_SIZE>, typename IMPL::event_t>;
 
 CURRENT_STRUCT_T(CruncherResponse) {
   CURRENT_FIELD(comment, std::string);
@@ -170,6 +225,13 @@ class MultiCruncher {
     last_event_us_ = idxts.us;
     for (auto& cruncher : crunchers_) {
       cruncher->OnEvent(std::move(event), idxts);
+    }
+  }
+
+  void OnTick(std::chrono::microseconds us) {
+    last_event_us_ = us;
+    for (auto& cruncher : crunchers_) {
+      cruncher->OnTick(us);
     }
   }
 

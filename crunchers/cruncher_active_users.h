@@ -52,7 +52,12 @@ struct ActiveUsersCruncherImpl {
     if (Exists<EventLogEntry>(e)) {
       OnEventLogEntry(Value<EventLogEntry>(e));
     }
-    while (!users_list_.empty() && users_list_.back().us + interval_ <= current_us_) {
+    OnTick(idxts.us);
+  }
+
+  void OnTick(const std::chrono::microseconds us) {
+    current_us_ = us;
+    while (!users_list_.empty() && users_list_.back().us + interval_ <= us) {
       users_map_.erase(users_list_.back().device_id);
       users_list_.pop_back();
     }
