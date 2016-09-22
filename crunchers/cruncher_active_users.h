@@ -40,6 +40,7 @@ struct ActiveUsersCruncherImpl {
   using iOSBaseEvent = typename NAMESPACE::iOSBaseEvent;
   using event_t = typename NAMESPACE::CTFOLogEntry;
   using value_t = uint64_t;
+  using active_users_t = std::vector<std::string>;
 
   ActiveUsersCruncherImpl(std::chrono::microseconds interval) : interval_(interval) {}
   virtual ~ActiveUsersCruncherImpl() = default;
@@ -93,12 +94,21 @@ struct ActiveUsersCruncherImpl {
   user_list_t users_list_;
   user_map_t users_map_;
   std::chrono::microseconds current_us_;
-  std::chrono::microseconds interval_;
+  const std::chrono::microseconds interval_;
 };
 
 template <typename NAMESPACE, size_t BUFFER_SIZE = 1024 * 1024>
 using ActiveUsersCruncher =
     CTFO::StreamCruncher<MultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>>, BUFFER_SIZE>;
+
+template <typename NAMESPACE, size_t BUFFER_SIZE = 1024 * 1024>
+using ActiveUsersTickCruncher =
+    CTFO::StreamTickCruncher<MultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>>, BUFFER_SIZE>;
+
+template <typename NAMESPACE, typename OUTPUT_STREAM, size_t BUFFER_SIZE = 1024 * 1024>
+using ActiveUsersStreamedCruncher =
+    CTFO::StreamTickCruncher<StreamedMultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>, OUTPUT_STREAM>,
+                             BUFFER_SIZE>;
 
 }  // namespace CTFO
 
