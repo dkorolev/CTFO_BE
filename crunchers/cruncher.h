@@ -25,6 +25,8 @@
 #ifndef CRUNCHER_H
 #define CRUNCHER_H
 
+#include "../../Current/Blocks/HTTP/api.h"
+#include "../../Current/Blocks/MMQ/mmq.h"
 #include "../../Current/Blocks/SS/ss.h"
 
 namespace CTFO {
@@ -262,9 +264,68 @@ class MultiCruncher {
     }
   }
 
- private:
+ protected:
   std::chrono::microseconds last_event_us_;
   std::vector<std::unique_ptr<cruncher_t>> crunchers_;
+};
+
+CURRENT_STRUCT(CruncherOutputStreamParams) {
+  CURRENT_FIELD(interval, std::chrono::microseconds);
+  CURRENT_FIELD(path, std::string);
+  CURRENT_DEFAULT_CONSTRUCTOR(CruncherOutputStreamParams) {}
+  CURRENT_CONSTRUCTOR(CruncherOutputStreamParams)(std::chrono::microseconds interval, const std::string& path)
+      : interval(interval), path(path) {}
+};
+
+template <typename CRUNCHER, typename OUTPUT_STREAM>
+class StreamedMultiCruncher : public MultiCruncher<CRUNCHER> {
+ public:
+  using base_t = MultiCruncher<CRUNCHER>;
+  using event_t = typename base_t::event_t;
+  using response_t = typename base_t::response_short_t;
+  using params_list_t = std::vector<CruncherOutputStreamParams>;
+  using streams_list_t = std::vector<OUTPUT_STREAM>;
+
+  template <typename ARG>
+  StreamedMultiCruncher(const std::vector<ARG>& args, const params_list_t& params)
+      : base_t(args), params_(params) {
+    assert(args.size() == params.size());
+    streams_.reserve(params.size());
+    for (const auto& param : params) {
+      streams_.emplace_back(param.path);
+    }
+  }
+  virtual ~StreamedMultiCruncher() = default;
+
+  void OnTick(std::chrono::microseconds us) {
+    std::chrono::microseconds last_us = last_event_us_;
+    base_t::OnTick(us);
+    for (size_t i = 0, sz = streams_.size(); i < sz; ++i) {
+      uint64_t publish_interval = params_[i].interval.count();
+      if (us.count() / publish_interval != last_us.count() / publish_interval) {
+        response_t response;
+        response.value = crunchers_[i]->GetValue();
+        for (uint64_t j = last_us.count() / publish_interval, end = us.count() / publish_interval; j < end;
+             ++j) {
+          response.timestamp = std::chrono::microseconds((j + 1) * publish_interval);
+          streams_[i].Publish(response);
+        }
+      }
+    }
+  }
+
+  void OnEvent(event_t&& event, idxts_t idxts) {
+    OnTick(idxts.us);
+    base_t::OnEvent(std::move(event), idxts);
+  }
+
+  void OnRequest(Request&& r) { base_t::OnRequest(std::move(r)); }
+
+ private:
+  using base_t::crunchers_;
+  using base_t::last_event_us_;
+  const params_list_t params_;
+  streams_list_t streams_;
 };
 
 }  // namespace CTFO
