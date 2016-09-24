@@ -34,9 +34,9 @@ CURRENT_STRUCT(ActiveUsersStreamedSubCruncherParams) {
   CURRENT_FIELD(interval, std::chrono::microseconds);
   CURRENT_FIELD_DESCRIPTION(interval, "Size of the cruncher sliding window.");
   CURRENT_FIELD(output_interval, std::chrono::microseconds);
-  CURRENT_FIELD_DESCRIPTION(output_interval, "Time periods to write the cruncher data between.");
+  CURRENT_FIELD_DESCRIPTION(output_interval, "Time intervals to write the cruncher data at.");
   CURRENT_FIELD(output_path, std::string);
-  CURRENT_FIELD_DESCRIPTION(output_path, "A path to file to write the cruncher data to.");
+  CURRENT_FIELD_DESCRIPTION(output_path, "The file to write the cruncher data in.");
   CURRENT_DEFAULT_CONSTRUCTOR(ActiveUsersStreamedSubCruncherParams) {}
   CURRENT_CONSTRUCTOR(ActiveUsersStreamedSubCruncherParams)(std::chrono::microseconds interval,
                                                             std::chrono::microseconds output_interval,
@@ -67,8 +67,8 @@ CURRENT_STRUCT(ActiveUsersStreamedCruncherParams) {
 using namespace CTFO;
 
 DEFINE_string(config_file,
-              "active_users_config.json",
-              "The file to read ActiveUsersCruncherParams in JSON format from.");
+              "active_users_streamed_config.json",
+              "The file to read ActiveUsersStreamedCruncherParams in JSON format from.");
 DEFINE_bool(helpconfig, false, "Display the config format information.");
 DEFINE_bool(defaultconfig, false, "Use default configuration and save it to config_file.");
 

@@ -138,6 +138,9 @@ template <typename IMPL, size_t BUFFER_SIZE = 1024 * 1024>
 using StreamCruncher =
     current::ss::StreamSubscriber<GenericCruncherImpl<IMPL, BUFFER_SIZE>, typename IMPL::event_t>;
 
+// An extension of the `GenerucCruncherImpl` wrapper above,
+// which also generates "ticks" at specified time intervals.
+// The IMPL has the same requirements except it must also implement `OnTick()` method.
 template <typename IMPL, size_t BUFFER_SIZE>
 struct GenericTickCruncherImpl : public GenericCruncherImpl<IMPL, BUFFER_SIZE> {
   using base_t = GenericCruncherImpl<IMPL, BUFFER_SIZE>;
@@ -175,10 +178,9 @@ struct GenericTickCruncherImpl : public GenericCruncherImpl<IMPL, BUFFER_SIZE> {
 
  private:
   void GenerateTickEvents(std::chrono::microseconds us) {
-    for (uint64_t i = last_event_us_.count() / tick_interval_.count(),
-                  end = us.count() / tick_interval_.count();
-         i < end;
-         ++i) {
+    const uint64_t start_marker = last_event_us_.count() / tick_interval_.count();
+    const uint64_t end_marker = us.count() / tick_interval_.count();
+    for (uint64_t i = start_marker; i < end_marker; ++i) {
       mmq_.Publish(std::make_unique<TickMessage>(std::chrono::microseconds((i + 1) * tick_interval_.count())));
     }
     last_event_us_ = us;
@@ -202,7 +204,7 @@ CURRENT_STRUCT_T(CruncherResponse) {
 // An aggregator for several crunchers of the same type.
 // The CRUNCHER should declare the type of incoming events as `event_t`,
 // the result type of its calculations as `value_t` and implement
-// `OnEvent()` and `GetValue()` methods.
+// `OnEvent()`, `GetValue()` and `OnTick()` methods.
 template <typename CRUNCHER>
 class MultiCruncher {
  public:
@@ -277,6 +279,8 @@ CURRENT_STRUCT(CruncherOutputStreamParams) {
       : interval(interval), path(path) {}
 };
 
+// An extension of the `MultiCruncher` aggregator, that writes
+// the results of each cruncher into a separate stream at specified time intervals.
 template <typename CRUNCHER, typename OUTPUT_STREAM>
 class StreamedMultiCruncher : public MultiCruncher<CRUNCHER> {
  public:
@@ -299,19 +303,19 @@ class StreamedMultiCruncher : public MultiCruncher<CRUNCHER> {
 
   void OnTick(std::chrono::microseconds us) {
     std::chrono::microseconds last_us = last_event_us_;
-    base_t::OnTick(us);
     for (size_t i = 0, sz = streams_.size(); i < sz; ++i) {
-      uint64_t publish_interval = params_[i].interval.count();
-      if (us.count() / publish_interval != last_us.count() / publish_interval) {
+      const uint64_t publish_interval = params_[i].interval.count();
+      const uint64_t start_marker = last_us.count() / publish_interval;
+      const uint64_t end_marker = us.count() / publish_interval;
+      for (uint64_t j = start_marker; j < end_marker; ++j) {
         response_t response;
+        response.timestamp = std::chrono::microseconds((j + 1) * publish_interval);
+        crunchers_[i]->OnTick(response.timestamp);
         response.value = crunchers_[i]->GetValue();
-        for (uint64_t j = last_us.count() / publish_interval, end = us.count() / publish_interval; j < end;
-             ++j) {
-          response.timestamp = std::chrono::microseconds((j + 1) * publish_interval);
-          streams_[i].Publish(response);
-        }
+        streams_[i].Publish(response);
       }
     }
+    base_t::OnTick(us);
   }
 
   void OnEvent(event_t&& event, idxts_t idxts) {
