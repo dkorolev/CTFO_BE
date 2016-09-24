@@ -88,7 +88,8 @@ int main(int argc, char** argv) {
     current::sherlock::SubscribableRemoteStream<CTFO_2016_08_01::CTFOLogEntry> remote_stream(
         params.remote_url, "CTFOLogEntry", "CTFO_2016_08_01");
 
-    using stream_t = current::sherlock::Stream<CruncherResponse<uint64_t>, current::persistence::File>;
+    using response_t = CruncherResponse<std::vector<std::string>>;
+    using stream_t = current::sherlock::Stream<response_t, current::persistence::File>;
     using cruncher_t = ActiveUsersStreamedCruncher<CTFO_2016_08_01, stream_t>;
 
     std::chrono::microseconds tick_interval = std::chrono::hours(24 * 365);

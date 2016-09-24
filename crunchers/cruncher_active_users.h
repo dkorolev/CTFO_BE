@@ -39,8 +39,7 @@ struct ActiveUsersCruncherImpl {
   using EventLogEntry = typename NAMESPACE::EventLogEntry;
   using iOSBaseEvent = typename NAMESPACE::iOSBaseEvent;
   using event_t = typename NAMESPACE::CTFOLogEntry;
-  using value_t = uint64_t;
-  using active_users_t = std::vector<std::string>;
+  using value_t = std::vector<std::string>;
 
   ActiveUsersCruncherImpl(std::chrono::microseconds interval) : interval_(interval) {}
   virtual ~ActiveUsersCruncherImpl() = default;
@@ -61,7 +60,14 @@ struct ActiveUsersCruncherImpl {
     }
   }
 
-  value_t GetValue() const { return users_list_.size(); }
+  value_t GetValue() const {
+    value_t result;
+    result.reserve(users_list_.size());
+    for (const auto& user : users_list_) {
+      result.push_back(user.device_id);
+    };
+    return result;
+  }
 
  private:
   struct ActiveUser final {
