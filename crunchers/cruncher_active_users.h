@@ -94,8 +94,9 @@ struct ActiveUsersCruncherImpl {
   std::chrono::microseconds interval_;
 };
 
-template <typename NAMESPACE>
-using ActiveUsersCruncher = CTFO::StreamCruncher<MultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>>>;
+template <typename NAMESPACE, size_t BUFFER_SIZE = 1024 * 1024>
+using ActiveUsersCruncher =
+    CTFO::StreamCruncher<MultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>>, BUFFER_SIZE>;
 
 }  // namespace CTFO
 
