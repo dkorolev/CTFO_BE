@@ -82,7 +82,8 @@ struct TopCardsCruncherImpl {
   using card_t = TopCardResponseItem;
   using value_t = TopCardsCruncherResponse;
 
-  TopCardsCruncherImpl(const TopCardsCruncherArgs& args) : args_(args) {}
+  TopCardsCruncherImpl(const TopCardsCruncherArgs& args)
+      : current_us_(std::chrono::microseconds(0)), args_(args) {}
   virtual ~TopCardsCruncherImpl() = default;
 
   // Handle an incoming event
@@ -205,7 +206,7 @@ struct TopCardsCruncherImpl {
   const TopCardsCruncherArgs args_;
 };
 
-template <typename NAMESPACE, size_t BUFFER_SIZE = 1024 * 1024>
+template <typename NAMESPACE, size_t BUFFER_SIZE = constants::kDefaultMMQBufferSize>
 using TopCardsCruncher = CTFO::StreamCruncher<MultiCruncher<TopCardsCruncherImpl<NAMESPACE>>, BUFFER_SIZE>;
 
 }  // namespace CTFO

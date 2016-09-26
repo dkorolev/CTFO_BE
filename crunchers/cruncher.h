@@ -31,6 +31,12 @@
 
 namespace CTFO {
 
+namespace constants {
+
+const size_t kDefaultMMQBufferSize = 1024 * 1024;
+
+}  // namespace constants
+
 // A simple wrapper for the StreamSubscriber interface, that reduces it to a single callback
 template <typename ENTRY>
 struct IntermediateSubscriberImpl {
@@ -64,7 +70,8 @@ using IntermediateSubscriber = current::ss::StreamSubscriber<IntermediateSubscri
 // The IMPL class methods are invoked from a single thread, which is achieved
 // by using the MMQ for all incoming events and requests.
 template <typename IMPL, size_t BUFFER_SIZE>
-struct GenericCruncherImpl : public IMPL {
+class GenericCruncherImpl : public IMPL {
+ public:
   using EntryResponse = current::ss::EntryResponse;
   using TerminationResponse = current::ss::TerminationResponse;
   using event_t = typename IMPL::event_t;
@@ -134,22 +141,23 @@ struct GenericCruncherImpl : public IMPL {
   mmq_t mmq_;
 };
 
-template <typename IMPL, size_t BUFFER_SIZE = 1024 * 1024>
+template <typename IMPL, size_t BUFFER_SIZE = constants::kDefaultMMQBufferSize>
 using StreamCruncher =
     current::ss::StreamSubscriber<GenericCruncherImpl<IMPL, BUFFER_SIZE>, typename IMPL::event_t>;
 
-// An extension of the `GenerucCruncherImpl` wrapper above,
+// An extension of the `GenericCruncherImpl` wrapper above,
 // which also generates "ticks" at specified time intervals.
 // The IMPL has the same requirements except it must also implement `OnTick()` method.
 template <typename IMPL, size_t BUFFER_SIZE>
-struct GenericTickCruncherImpl : public GenericCruncherImpl<IMPL, BUFFER_SIZE> {
+class GenericCruncherWithTicksImpl : public GenericCruncherImpl<IMPL, BUFFER_SIZE> {
+ public:
   using base_t = GenericCruncherImpl<IMPL, BUFFER_SIZE>;
   using event_t = typename base_t::event_t;
   using EntryResponse = current::ss::EntryResponse;
 
   class TickMessage final : public base_t::Message {
    public:
-    TickMessage(const std::chrono::microseconds& timestamp) : timestamp_(timestamp) {}
+    TickMessage(std::chrono::microseconds timestamp) : timestamp_(timestamp) {}
     void Handle(IMPL& cruncher) override { cruncher.OnTick(timestamp_); }
 
    private:
@@ -157,14 +165,14 @@ struct GenericTickCruncherImpl : public GenericCruncherImpl<IMPL, BUFFER_SIZE> {
   };
 
   template <typename... ARGS>
-  GenericTickCruncherImpl(uint16_t port,
-                          const std::string& route,
-                          const std::chrono::microseconds tick_interval,
-                          ARGS&&... args)
+  GenericCruncherWithTicksImpl(uint16_t port,
+                               const std::string& route,
+                               const std::chrono::microseconds tick_interval,
+                               ARGS&&... args)
       : base_t(port, route, std::forward<ARGS>(args)...),
         tick_interval_(tick_interval),
         last_event_us_(std::chrono::microseconds(0)) {}
-  virtual ~GenericTickCruncherImpl() = default;
+  virtual ~GenericCruncherWithTicksImpl() = default;
 
   EntryResponse operator()(const event_t& event, idxts_t current, idxts_t last) {
     GenerateTickEvents(current.us);
@@ -178,10 +186,11 @@ struct GenericTickCruncherImpl : public GenericCruncherImpl<IMPL, BUFFER_SIZE> {
 
  private:
   void GenerateTickEvents(std::chrono::microseconds us) {
-    const uint64_t start_marker = last_event_us_.count() / tick_interval_.count();
-    const uint64_t end_marker = us.count() / tick_interval_.count();
-    for (uint64_t i = start_marker; i < end_marker; ++i) {
-      mmq_.Publish(std::make_unique<TickMessage>(std::chrono::microseconds((i + 1) * tick_interval_.count())));
+    for (auto t = std::chrono::microseconds(((last_event_us_.count() / tick_interval_.count()) + 1) *
+                                            tick_interval_.count());
+         t < us;
+         t += tick_interval_) {
+      mmq_.Publish(std::make_unique<TickMessage>(t));
     }
     last_event_us_ = us;
   }
@@ -191,9 +200,9 @@ struct GenericTickCruncherImpl : public GenericCruncherImpl<IMPL, BUFFER_SIZE> {
   std::chrono::microseconds last_event_us_;
 };
 
-template <typename IMPL, size_t BUFFER_SIZE = 1024 * 1024>
-using StreamTickCruncher =
-    current::ss::StreamSubscriber<GenericTickCruncherImpl<IMPL, BUFFER_SIZE>, typename IMPL::event_t>;
+template <typename IMPL, size_t BUFFER_SIZE = constants::kDefaultMMQBufferSize>
+using StreamCruncherWithTicks =
+    current::ss::StreamSubscriber<GenericCruncherWithTicksImpl<IMPL, BUFFER_SIZE>, typename IMPL::event_t>;
 
 CURRENT_STRUCT_T(CruncherResponse) {
   CURRENT_FIELD(comment, std::string);
@@ -217,7 +226,7 @@ class MultiCruncher {
 
   template <typename ARG>
   MultiCruncher(const std::vector<ARG>& args)
-      : last_event_us_(std::chrono::microseconds(0)) {
+      : last_event_or_tick_us_(std::chrono::microseconds(0)) {
     crunchers_.reserve(args.size());
     for (const auto& arg : args) {
       crunchers_.push_back(std::make_unique<cruncher_t>(arg));
@@ -226,29 +235,29 @@ class MultiCruncher {
   virtual ~MultiCruncher() = default;
 
   void OnEvent(event_t&& event, idxts_t idxts) {
-    last_event_us_ = idxts.us;
+    last_event_or_tick_us_ = idxts.us;
     for (auto& cruncher : crunchers_) {
       cruncher->OnEvent(std::move(event), idxts);
     }
   }
 
   void OnTick(std::chrono::microseconds us) {
-    last_event_us_ = us;
+    last_event_or_tick_us_ = us;
     for (auto& cruncher : crunchers_) {
       cruncher->OnTick(us);
     }
   }
 
   void OnRequest(Request&& r) {
-    const std::string comment =
-        Printf("Last processed event was %llu minutes ago",
-               std::chrono::duration_cast<std::chrono::minutes>(current::time::Now() - last_event_us_).count());
+    const std::string comment = Printf("Last processed event was %llu minutes ago",
+                                       std::chrono::duration_cast<std::chrono::minutes>(
+                                           current::time::Now() - last_event_or_tick_us_).count());
     if (r.url.query.has("i")) {
       uint64_t ind = current::FromString<uint64_t>(r.url.query.get("i", "0"));
       if (ind < crunchers_.size()) {
         response_short_t response;
         response.comment = comment;
-        response.timestamp = last_event_us_;
+        response.timestamp = last_event_or_tick_us_;
         response.value = crunchers_[ind]->GetValue();
         r(response);
       } else {
@@ -257,7 +266,7 @@ class MultiCruncher {
     } else {
       response_t response;
       response.comment = comment;
-      response.timestamp = last_event_us_;
+      response.timestamp = last_event_or_tick_us_;
       response.value.reserve(crunchers_.size());
       for (const auto& cruncher : crunchers_) {
         response.value.push_back(cruncher->GetValue());
@@ -267,7 +276,7 @@ class MultiCruncher {
   }
 
  protected:
-  std::chrono::microseconds last_event_us_;
+  std::chrono::microseconds last_event_or_tick_us_;
   std::vector<std::unique_ptr<cruncher_t>> crunchers_;
 };
 
@@ -293,7 +302,7 @@ class StreamedMultiCruncher : public MultiCruncher<CRUNCHER> {
   template <typename ARG>
   StreamedMultiCruncher(const std::vector<ARG>& args, const params_list_t& params)
       : base_t(args), params_(params) {
-    assert(args.size() == params.size());
+    CURRENT_ASSERT(args.size() == params.size());
     streams_.reserve(params.size());
     for (const auto& param : params) {
       streams_.emplace_back(param.path);
@@ -302,32 +311,39 @@ class StreamedMultiCruncher : public MultiCruncher<CRUNCHER> {
   virtual ~StreamedMultiCruncher() = default;
 
   void OnTick(std::chrono::microseconds us) {
-    std::chrono::microseconds last_us = last_event_us_;
-    for (size_t i = 0, sz = streams_.size(); i < sz; ++i) {
-      const uint64_t publish_interval = params_[i].interval.count();
-      const uint64_t start_marker = last_us.count() / publish_interval;
-      const uint64_t end_marker = us.count() / publish_interval;
-      for (uint64_t j = start_marker; j < end_marker; ++j) {
-        response_t response;
-        response.timestamp = std::chrono::microseconds((j + 1) * publish_interval);
-        crunchers_[i]->OnTick(response.timestamp);
-        response.value = crunchers_[i]->GetValue();
-        streams_[i].Publish(response);
-      }
-    }
+    OutputCrunchersDataUntil(us);
     base_t::OnTick(us);
   }
 
   void OnEvent(event_t&& event, idxts_t idxts) {
-    OnTick(idxts.us);
+    OutputCrunchersDataUntil(idxts.us);
     base_t::OnEvent(std::move(event), idxts);
   }
 
   void OnRequest(Request&& r) { base_t::OnRequest(std::move(r)); }
 
  private:
+  void OutputCrunchersDataUntil(std::chrono::microseconds us) {
+    const std::chrono::microseconds last_us = last_event_or_tick_us_;
+    for (size_t i = 0, sz = streams_.size(); i < sz; ++i) {
+      const auto publish_interval = params_[i].interval;
+      for (auto t = std::chrono::microseconds((last_us.count() / publish_interval.count() + 1) *
+                                              publish_interval.count());
+           t < us;
+           t += publish_interval) {
+        // The result of GetValue() call could be different if corresponding cruncher
+        // doesn't know that "actual" timestamp is changed.
+        crunchers_[i]->OnTick(t);
+        response_t entry;
+        entry.timestamp = t;
+        entry.value = crunchers_[i]->GetValue();
+        streams_[i].Publish(entry, t);
+      }
+    }
+  }
+
   using base_t::crunchers_;
-  using base_t::last_event_us_;
+  using base_t::last_event_or_tick_us_;
   const params_list_t params_;
   streams_list_t streams_;
 };

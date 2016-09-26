@@ -49,15 +49,12 @@ struct ActiveUsersCruncherImpl {
     if (Exists<EventLogEntry>(e)) {
       OnEventLogEntry(Value<EventLogEntry>(e));
     }
-    OnTick(idxts.us);
+    RemoveUsersOutsideTheTimeWindow();
   }
 
   void OnTick(const std::chrono::microseconds us) {
     current_us_ = us;
-    while (!users_list_.empty() && users_list_.back().us + interval_ <= us) {
-      users_map_.erase(users_list_.back().device_id);
-      users_list_.pop_back();
-    }
+    RemoveUsersOutsideTheTimeWindow();
   }
 
   value_t GetValue() const {
@@ -76,6 +73,13 @@ struct ActiveUsersCruncherImpl {
   };
   using user_list_t = std::list<ActiveUser>;
   using user_map_t = std::unordered_map<std::string, typename user_list_t::iterator>;
+
+  void RemoveUsersOutsideTheTimeWindow() {
+    while (!users_list_.empty() && users_list_.back().us + interval_ <= current_us_) {
+      users_map_.erase(users_list_.back().device_id);
+      users_list_.pop_back();
+    }
+  }
 
   void OnEventLogEntry(const EventLogEntry& e) {
     current_us_ = e.server_us;
@@ -103,18 +107,18 @@ struct ActiveUsersCruncherImpl {
   const std::chrono::microseconds interval_;
 };
 
-template <typename NAMESPACE, size_t BUFFER_SIZE = 1024 * 1024>
+template <typename NAMESPACE, size_t BUFFER_SIZE = constants::kDefaultMMQBufferSize>
 using ActiveUsersCruncher =
     CTFO::StreamCruncher<MultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>>, BUFFER_SIZE>;
 
-template <typename NAMESPACE, size_t BUFFER_SIZE = 1024 * 1024>
-using ActiveUsersTickCruncher =
-    CTFO::StreamTickCruncher<MultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>>, BUFFER_SIZE>;
+template <typename NAMESPACE, size_t BUFFER_SIZE = constants::kDefaultMMQBufferSize>
+using ActiveUsersCruncherWithTicks =
+    CTFO::StreamCruncherWithTicks<MultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>>, BUFFER_SIZE>;
 
-template <typename NAMESPACE, typename OUTPUT_STREAM, size_t BUFFER_SIZE = 1024 * 1024>
+template <typename NAMESPACE, typename OUTPUT_STREAM, size_t BUFFER_SIZE = constants::kDefaultMMQBufferSize>
 using ActiveUsersStreamedCruncher =
-    CTFO::StreamTickCruncher<StreamedMultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>, OUTPUT_STREAM>,
-                             BUFFER_SIZE>;
+    CTFO::StreamCruncherWithTicks<StreamedMultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>, OUTPUT_STREAM>,
+                                  BUFFER_SIZE>;
 
 }  // namespace CTFO
 
