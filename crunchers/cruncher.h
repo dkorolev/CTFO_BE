@@ -249,7 +249,7 @@ class MultiCruncher {
   }
 
   void OnRequest(Request&& r) {
-    const std::string comment = Printf("Last processed event was %llu minutes ago",
+    const std::string comment = Printf("Last processed event was %lld minutes ago",
                                        std::chrono::duration_cast<std::chrono::minutes>(
                                            current::time::Now() - last_event_or_tick_us_).count());
     if (r.url.query.has("i")) {
@@ -331,8 +331,8 @@ class StreamedMultiCruncher : public MultiCruncher<CRUNCHER> {
                                               publish_interval.count());
            t < us;
            t += publish_interval) {
-        // The result of GetValue() call could be different if corresponding cruncher
-        // doesn't know that "actual" timestamp is changed.
+        // The result of the GetValue() could be different if the corresponding cruncher
+        // doesn't know that the "actual" timestamp has changed.
         crunchers_[i]->OnTick(t);
         response_t entry;
         entry.timestamp = t;
