@@ -1,0 +1,10 @@
+{
+  "remote_url":"http://localhost:8383/raw_log",
+  "route":"/active_users",
+  "port":8373,
+  "sub_args":[
+    {"interval":86400000000,"output_interval":86400000000,"output_path":"active_users_1d.log"},
+    {"interval":172800000000,"output_interval":86400000000,"output_path":"active_users_2d.log"},
+    {"interval":259200000000,"output_interval":86400000000,"output_path":"active_users_3d.log"}
+  ]
+}

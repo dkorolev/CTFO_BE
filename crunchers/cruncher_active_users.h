@@ -29,9 +29,6 @@
 #include <vector>
 #include <unordered_map>
 
-#include "../../Current/Blocks/HTTP/api.h"
-#include "../../Current/Blocks/MMQ/mmq.h"
-
 #include "cruncher.h"
 #include "schema.h"
 
@@ -42,7 +39,7 @@ struct ActiveUsersCruncherImpl {
   using EventLogEntry = typename NAMESPACE::EventLogEntry;
   using iOSBaseEvent = typename NAMESPACE::iOSBaseEvent;
   using event_t = typename NAMESPACE::CTFOLogEntry;
-  using value_t = uint64_t;
+  using value_t = std::vector<std::string>;
 
   ActiveUsersCruncherImpl(std::chrono::microseconds interval) : interval_(interval) {}
   virtual ~ActiveUsersCruncherImpl() = default;
@@ -52,13 +49,22 @@ struct ActiveUsersCruncherImpl {
     if (Exists<EventLogEntry>(e)) {
       OnEventLogEntry(Value<EventLogEntry>(e));
     }
-    while (!users_list_.empty() && users_list_.back().us + interval_ <= current_us_) {
-      users_map_.erase(users_list_.back().device_id);
-      users_list_.pop_back();
-    }
+    RemoveUsersOutsideTheTimeWindow();
   }
 
-  value_t GetValue() const { return users_list_.size(); }
+  void OnTick(const std::chrono::microseconds us) {
+    current_us_ = us;
+    RemoveUsersOutsideTheTimeWindow();
+  }
+
+  value_t GetValue() const {
+    value_t result;
+    result.reserve(users_list_.size());
+    for (const auto& user : users_list_) {
+      result.push_back(user.device_id);
+    };
+    return result;
+  }
 
  private:
   struct ActiveUser final {
@@ -67,6 +73,13 @@ struct ActiveUsersCruncherImpl {
   };
   using user_list_t = std::list<ActiveUser>;
   using user_map_t = std::unordered_map<std::string, typename user_list_t::iterator>;
+
+  void RemoveUsersOutsideTheTimeWindow() {
+    while (!users_list_.empty() && users_list_.back().us + interval_ <= current_us_) {
+      users_map_.erase(users_list_.back().device_id);
+      users_list_.pop_back();
+    }
+  }
 
   void OnEventLogEntry(const EventLogEntry& e) {
     current_us_ = e.server_us;
@@ -91,12 +104,21 @@ struct ActiveUsersCruncherImpl {
   user_list_t users_list_;
   user_map_t users_map_;
   std::chrono::microseconds current_us_;
-  std::chrono::microseconds interval_;
+  const std::chrono::microseconds interval_;
 };
 
-template <typename NAMESPACE, size_t BUFFER_SIZE = 1024 * 1024>
+template <typename NAMESPACE, size_t BUFFER_SIZE = constants::kDefaultMMQBufferSize>
 using ActiveUsersCruncher =
     CTFO::StreamCruncher<MultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>>, BUFFER_SIZE>;
+
+template <typename NAMESPACE, size_t BUFFER_SIZE = constants::kDefaultMMQBufferSize>
+using ActiveUsersCruncherWithTicks =
+    CTFO::StreamCruncherWithTicks<MultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>>, BUFFER_SIZE>;
+
+template <typename NAMESPACE, typename OUTPUT_STREAM, size_t BUFFER_SIZE = constants::kDefaultMMQBufferSize>
+using ActiveUsersStreamedCruncher =
+    CTFO::StreamCruncherWithTicks<StreamedMultiCruncher<ActiveUsersCruncherImpl<NAMESPACE>, OUTPUT_STREAM>,
+                                  BUFFER_SIZE>;
 
 }  // namespace CTFO
 
