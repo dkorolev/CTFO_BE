@@ -53,6 +53,11 @@ struct IntermediateSubscriberImpl {
     return EntryResponse::More;
   }
 
+  EntryResponse operator()(std::chrono::microseconds head) const {
+    static_cast<void>(head);
+    return EntryResponse::More;
+  }
+
   EntryResponse EntryResponseIfNoMorePassTypeFilter() const { return EntryResponse::More; }
   TerminationResponse Terminate() const { return TerminationResponse::Terminate; }
 
@@ -131,6 +136,11 @@ class GenericCruncherImpl : public IMPL {
     return EntryResponse::More;
   }
 
+  EntryResponse operator()(std::chrono::microseconds head) const {
+    static_cast<void>(head);
+    return EntryResponse::More;
+  }
+
   EntryResponse EntryResponseIfNoMorePassTypeFilter() const { return EntryResponse::More; }
   TerminationResponse Terminate() const { return TerminationResponse::Terminate; }
 
@@ -182,6 +192,11 @@ class GenericCruncherWithTicksImpl : public GenericCruncherImpl<IMPL, BUFFER_SIZ
   EntryResponse operator()(event_t&& event, idxts_t current, idxts_t last) {
     GenerateTickEvents(current.us);
     return base_t::operator()(std::move(event), current, last);
+  }
+
+  EntryResponse operator()(std::chrono::microseconds head) const {
+    static_cast<void>(head);
+    return EntryResponse::More;
   }
 
  private:

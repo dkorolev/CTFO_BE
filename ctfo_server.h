@@ -1206,6 +1206,11 @@ class CTFOServer final {
       return current::ss::EntryResponse::More;
     }
 
+    current::ss::EntryResponse operator()(std::chrono::microseconds head) const {
+      static_cast<void>(head);
+      return current::ss::EntryResponse::More;
+    }
+
     current::ss::TerminationResponse Terminate() const { return current::ss::TerminationResponse::Terminate; }
 
     current::ss::EntryResponse EntryResponseIfNoMorePassTypeFilter() const {

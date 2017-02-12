@@ -142,7 +142,7 @@ TEST(CTFOCrunchersTest, ActiveUsersCruncherRemoteTest) {
 
   auto remote_stream = current::sherlock::SubscribableRemoteStream<CTFO_2016_08_01::CTFOLogEntry>(
       Printf("http://localhost:%d/raw_log", FLAGS_sherlock_http_test_port),
-      schema_key.top_level_name,
+      schema_key.entry_name,
       schema_key.namespace_name);
 
   CTFO::ActiveUsersCruncher<CTFO_2016_08_01> activeusers_cruncher(
@@ -213,7 +213,7 @@ TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTest) {
   storage.ExposeRawLogViaHTTP(FLAGS_sherlock_http_test_port, "/raw_log");
   auto remote_stream = current::sherlock::SubscribableRemoteStream<CTFO_2016_08_01::CTFOLogEntry>(
       Printf("http://localhost:%d/raw_log", FLAGS_sherlock_http_test_port),
-      schema_key.top_level_name,
+      schema_key.entry_name,
       schema_key.namespace_name);
 
   CTFO::TopCardsCruncher<CTFO_2016_08_01> top_cards_cruncher(
@@ -506,7 +506,7 @@ TEST(CTFOCrunchersTest, TopCardsCruncherRemoteTestComplex) {
 
   auto remote_stream = current::sherlock::SubscribableRemoteStream<CTFO_2016_08_01::CTFOLogEntry>(
       Printf("http://localhost:%d/raw_log", FLAGS_sherlock_http_test_port),
-      schema_key.top_level_name,
+      schema_key.entry_name,
       schema_key.namespace_name);
 
   CTFO::TopCardsCruncher<CTFO_2016_08_01> top_cards_cruncher(
